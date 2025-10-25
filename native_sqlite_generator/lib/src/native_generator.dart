@@ -11,7 +11,27 @@ import 'native_swift_generator.dart';
 
 /// Generates native code files for Android and iOS
 class NativeCodeGenerator {
-  Future<void> generate() async {
+  Future<void> generate({bool runBuildRunner = true}) async {
+    // Check if build_runner needs to run first
+    if (runBuildRunner) {
+      final needsBuildRunner = await _checkBuildRunner();
+      if (needsBuildRunner) {
+        print('📦 Running build_runner first...');
+        print('');
+        final result = await Process.run(
+          'dart',
+          ['run', 'build_runner', 'build', '--delete-conflicting-outputs'],
+        );
+
+        if (result.exitCode != 0) {
+          throw Exception('build_runner failed:\n${result.stderr}');
+        }
+
+        print('✓ build_runner completed');
+        print('');
+      }
+    }
+
     // Load configuration
     print('📋 Loading configuration...');
     final config = await NativeSqliteConfig.load();
@@ -111,9 +131,15 @@ class NativeCodeGenerator {
   Future<List<String>> _findModelFiles(List<String> patterns) async {
     final files = <String>[];
 
+    // Load config to get patterns if not provided
     if (patterns.isEmpty) {
-      // Default: search in lib/models/
-      patterns = ['lib/models/**/*.dart'];
+      final config = await NativeSqliteConfig.load();
+      if (config != null && config.models.isNotEmpty) {
+        patterns = config.models;
+      } else {
+        // Default: search in lib/models/
+        patterns = ['lib/models/**/*.dart'];
+      }
     }
 
     for (final pattern in patterns) {
@@ -357,6 +383,33 @@ class NativeCodeGenerator {
           (match) => '_${match.group(1)!.toLowerCase()}',
         )
         .replaceFirst(RegExp(r'^_'), '');
+  }
+
+  /// Check if build_runner needs to run
+  Future<bool> _checkBuildRunner() async {
+    final modelFiles = await _findModelFiles([]);
+
+    for (final modelFile in modelFiles) {
+      // Check if .table.g.dart exists and is newer than source
+      final generatedFile = modelFile.replaceAll('.dart', '.table.g.dart');
+      final generated = File(generatedFile);
+      final source = File(modelFile);
+
+      if (!await generated.exists()) {
+        print('ℹ️  Generated file missing: ${path.basename(generatedFile)}');
+        return true;
+      }
+
+      final generatedTime = await generated.lastModified();
+      final sourceTime = await source.lastModified();
+
+      if (sourceTime.isAfter(generatedTime)) {
+        print('ℹ️  Source file newer than generated: ${path.basename(modelFile)}');
+        return true;
+      }
+    }
+
+    return false;
   }
 }
 

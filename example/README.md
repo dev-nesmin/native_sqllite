@@ -42,8 +42,23 @@ This example demonstrates how to use the native_sqlite package with code generat
 ## Generated Files
 
 After running `build_runner`, you'll see:
-- `lib/models/user.table.g.dart` - Contains UserSchema and UserRepository
-- `lib/models/post.table.g.dart` - Contains PostSchema and PostRepository
+
+**Dart Files:**
+- `lib/models/user.table.g.dart` - UserSchema and UserRepository
+- `lib/models/post.table.g.dart` - PostSchema and PostRepository
+
+**Native Files (Auto-generated):**
+- `android/app/src/main/kotlin/com/example/native_sqlite_example/generated/UserSchema.kt`
+- `android/app/src/main/kotlin/com/example/native_sqlite_example/generated/UserHelper.kt`
+- `android/app/src/main/kotlin/com/example/native_sqlite_example/generated/PostSchema.kt`
+- `android/app/src/main/kotlin/com/example/native_sqlite_example/generated/PostHelper.kt`
+- `ios/Runner/Generated/UserSchema.swift`
+- `ios/Runner/Generated/UserHelper.swift`
+- `ios/Runner/Generated/PostSchema.swift`
+- `ios/Runner/Generated/PostHelper.swift`
+
+**Automatic Native Generation:**
+Native code (Kotlin for Android, Swift for iOS) is automatically generated when you run `build_runner build`. This is configured in `pubspec.yaml` with `generate_native: true`.
 
 ## Usage Pattern
 
@@ -73,7 +88,18 @@ final allUsers = await userRepo.findAll();
 
 ## Tips
 
+### Code Generation
 - Always run `build_runner` after modifying model classes
 - Use `--delete-conflicting-outputs` flag to avoid conflicts
 - Check the generated `.table.g.dart` files to understand the SQL
+- Native code (Kotlin/Swift) is automatically generated with `build_runner build`
+
+### Native Code
+- For iOS: Add generated files to Xcode project once (Right-click Runner → Add Files)
+- Native files stay in sync with your Dart models automatically
+- Use generated native helpers for platform-specific SQLite operations
+- Check `AUTOMATED_GENERATION.md` for full native code generation docs
+
+### Database
 - Foreign keys require `enableForeignKeys: true` in DatabaseConfig
+- Use watch mode for continuous development: `dart run build_runner watch`

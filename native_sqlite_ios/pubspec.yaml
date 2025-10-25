@@ -1,0 +1,28 @@
+name: native_sqlite_ios
+description: "iOS implementation of native_sqlite"
+version: 0.0.1
+homepage: https://nesmin.dev
+publish_to: none
+
+environment:
+  sdk: '>=3.6.0 <4.0.0'
+  flutter: '>=3.27.0'
+
+flutter:
+  plugin:
+    implements: native_sqlite
+    platforms:
+      ios:
+        pluginClass: NativeSqlitePlugin
+        dartPluginClass: NativeSqliteIOS
+
+dependencies:
+  flutter:
+    sdk: flutter
+  native_sqlite_platform_interface:
+    path: ../native_sqlite_platform_interface
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0

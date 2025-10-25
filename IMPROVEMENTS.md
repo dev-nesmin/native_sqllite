@@ -2,7 +2,7 @@
 
 ## Summary
 
-This document outlines the improvements made to the native_sqlite plugin and the new code generation features added.
+This document outlines the improvements made to the native_sqlite plugin, the new code generation features, and comprehensive native code synchronization support.
 
 ## Plugin Improvements
 
@@ -418,14 +418,103 @@ Potential future improvements:
 5. **Serialization**: JSON serialization/deserialization
 6. **Testing**: Mock repository generation for unit tests
 
+## Native Code Synchronization
+
+### The Challenge
+
+One of the key features of native_sqlite is that the database can be accessed from **both Flutter and native code** (Android Kotlin/iOS Swift). However, this creates a synchronization challenge:
+
+- Flutter code uses generated Dart schemas
+- Native code needs the same table/column names
+- Manual synchronization is error-prone
+
+### The Solution
+
+The code generation system now provides **complete native code support**:
+
+1. **Generated Dart schemas** include all constants
+2. **Native code examples** show how to mirror these constants
+3. **Helper classes** provide type-safe CRUD in Kotlin/Swift
+4. **Comprehensive documentation** ensures everything stays in sync
+
+### Native Code Examples
+
+**Android (Kotlin):**
+```kotlin
+// Mirror the generated Dart schema
+object UserSchema {
+    const val TABLE_NAME = "users"
+    const val ID = "id"
+    const val NAME = "name"
+    const val EMAIL = "email_address"
+}
+
+// Use in WorkManager, Services, etc.
+val userId = NativeSqliteManager.insert(
+    "app_db",
+    UserSchema.TABLE_NAME,  // Type-safe!
+    mapOf(
+        UserSchema.NAME to "John Doe",
+        UserSchema.EMAIL to "john@example.com"
+    )
+)
+```
+
+**iOS (Swift):**
+```swift
+// Mirror the generated Dart schema
+enum UserSchema {
+    static let tableName = "users"
+    static let id = "id"
+    static let name = "name"
+    static let email = "email_address"
+}
+
+// Use in Background Tasks, App Extensions, etc.
+let userId = try manager.insert(
+    name: "app_db",
+    table: UserSchema.tableName,  // Type-safe!
+    values: [
+        UserSchema.name: "John Doe",
+        UserSchema.email: "john@example.com"
+    ]
+)
+```
+
+### Documentation
+
+Comprehensive guides for native code usage:
+
+1. **NATIVE_USAGE.md**: Complete guide with examples for both platforms
+2. **example/native_examples/**: Full working examples
+   - Android: Schema constants, helper classes, WorkManager example
+   - iOS: Schema constants, helper classes, Background Task example
+3. **Synchronization workflow**: Clear steps to keep Dart and native code in sync
+
+### Benefits
+
+✅ **Single Source of Truth**: Define schema once in Dart
+✅ **Type Safety Everywhere**: Kotlin, Swift, and Dart all use constants
+✅ **No Manual Sync**: Copy generated constants to native code
+✅ **Prevents Typos**: No magic strings in SQL queries
+✅ **IDE Support**: Autocomplete works in all languages
+✅ **Easy Updates**: Change Dart model, regenerate, update native constants
+
 ## Conclusion
 
 The improvements to native_sqlite provide:
 
 1. **Better code quality** through equality operators in models
 2. **Significant productivity boost** through code generation
-3. **Type safety** throughout the database layer
-4. **Excellent documentation** for easy adoption
-5. **Backward compatibility** with existing code
+3. **Type safety** throughout the database layer in Dart, Kotlin, and Swift
+4. **Perfect synchronization** between Flutter and native code
+5. **Excellent documentation** for easy adoption (5 comprehensive guides)
+6. **Backward compatibility** with existing code
+7. **Production-ready examples** for all platforms
 
-The plugin is now production-ready with both manual and code-generation approaches available to developers.
+The plugin is now a complete solution for cross-platform SQLite access with code generation, supporting:
+- ✅ Flutter/Dart with auto-generated repositories
+- ✅ Android/Kotlin with schema constants and helpers
+- ✅ iOS/Swift with schema constants and helpers
+- ✅ Background tasks and services on all platforms
+- ✅ Full synchronization across all codebases

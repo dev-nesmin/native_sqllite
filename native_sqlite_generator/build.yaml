@@ -1,0 +1,14 @@
+builders:
+  table:
+    import: "package:native_sqlite_generator/builder.dart"
+    builder_factories: ["tableBuilder"]
+    build_extensions: {".dart": [".table.g.dart"]}
+    auto_apply: dependents
+    build_to: cache
+    applies_builders: ["source_gen|combining_builder"]
+
+post_process_builders:
+  native_code:
+    import: "package:native_sqlite_generator/src/post_build_hook.dart"
+    builder_factory: "nativeCodePostBuilder"
+    input_extensions: [".table.g.dart"]

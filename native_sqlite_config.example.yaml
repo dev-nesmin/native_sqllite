@@ -1,0 +1,39 @@
+# Configuration for Native SQLite code generation
+# Add this to your pubspec.yaml or create a separate native_sqlite_config.yaml
+
+native_sqlite:
+  # Enable/disable native code generation
+  generate_native: true
+
+  # Platform-specific generation
+  android:
+    enabled: true
+    # Output path relative to project root
+    # Default: android/app/src/main/kotlin/generated
+    output_path: "android/app/src/main/kotlin/com/example/generated"
+    # Package name for Kotlin files
+    package: "com.example.generated"
+    # Generate helper classes (true) or just schema constants (false)
+    generate_helpers: true
+
+  ios:
+    enabled: true
+    # Output path relative to project root
+    # Default: ios/Runner/Generated
+    output_path: "ios/Runner/Generated"
+    # Generate helper classes (true) or just schema constants (false)
+    generate_helpers: true
+
+  # Models to generate native code for
+  # If not specified, generates for all @Table annotated classes
+  models:
+    - lib/models/user.dart
+    - lib/models/post.dart
+    # Or use glob patterns:
+    # - lib/models/**/*.dart
+
+  # Database name used in examples
+  database_name: "app_db"
+
+  # Include usage examples in generated files
+  include_examples: true

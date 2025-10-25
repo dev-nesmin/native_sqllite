@@ -61,4 +61,19 @@ class DatabaseConfig {
     return 'DatabaseConfig(name: $name, version: $version, '
         'enableWAL: $enableWAL, enableForeignKeys: $enableForeignKeys)';
   }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    if (other is! DatabaseConfig) return false;
+    return name == other.name &&
+        version == other.version &&
+        enableWAL == other.enableWAL &&
+        enableForeignKeys == other.enableForeignKeys;
+  }
+
+  @override
+  int get hashCode {
+    return Object.hash(name, version, enableWAL, enableForeignKeys);
+  }
 }

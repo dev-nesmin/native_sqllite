@@ -1,0 +1,7 @@
+targets:
+  $default:
+    builders:
+      native_sqlite_generator|table:
+        enabled: true
+        generate_for:
+          - lib/models/*.dart

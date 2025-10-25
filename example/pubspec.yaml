@@ -21,3 +21,24 @@ dev_dependencies:
   native_sqlite_generator:
     path: ../native_sqlite_generator
   flutter_lints: ^5.0.0
+
+# Native SQLite code generation configuration
+native_sqlite:
+  generate_native: true
+
+  android:
+    enabled: true
+    output_path: "android/app/src/main/kotlin/com/example/native_sqlite_example/generated"
+    package: "com.example.native_sqlite_example.generated"
+    generate_helpers: true
+
+  ios:
+    enabled: true
+    output_path: "ios/Runner/Generated"
+    generate_helpers: true
+
+  models:
+    - lib/models/**/*.dart
+
+  database_name: "example_db"
+  include_examples: true

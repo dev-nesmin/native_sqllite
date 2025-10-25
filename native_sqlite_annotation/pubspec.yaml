@@ -1,0 +1,13 @@
+name: native_sqlite_annotation
+description: "Annotations for native_sqlite code generation - Define database tables and columns using annotations"
+version: 0.0.1
+homepage: https://nesmin.dev
+publish_to: none
+
+environment:
+  sdk: '>=3.6.0 <4.0.0'
+
+dependencies:
+
+dev_dependencies:
+  lints: ^5.0.0

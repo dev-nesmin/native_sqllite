@@ -46,4 +46,23 @@ class QueryResult {
   String toString() {
     return 'QueryResult(columns: $columns, rows: ${rows.length} rows)';
   }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    if (other is! QueryResult) return false;
+    if (columns.length != other.columns.length) return false;
+    if (rows.length != other.rows.length) return false;
+
+    for (var i = 0; i < columns.length; i++) {
+      if (columns[i] != other.columns[i]) return false;
+    }
+
+    return true;
+  }
+
+  @override
+  int get hashCode {
+    return Object.hash(columns, rows.length);
+  }
 }

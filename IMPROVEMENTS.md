@@ -2,7 +2,7 @@
 
 ## Summary
 
-This document outlines the improvements made to the native_sqlite plugin, the new code generation features, and comprehensive native code synchronization support.
+This document outlines the improvements made to the native_sqlite plugin, the new code generation features, and **automated native code generation** (like flutter_launcher_icons).
 
 ## Plugin Improvements
 
@@ -481,15 +481,71 @@ let userId = try manager.insert(
 )
 ```
 
+### Automated Native Code Generation
+
+**NEW**: Like `flutter_launcher_icons`, native_sqlite now **automatically generates** native code!
+
+No manual copy-paste needed. Just configure and run:
+
+```yaml
+# native_sqlite_config.yaml
+native_sqlite:
+  generate_native: true
+
+  android:
+    enabled: true
+    output_path: "android/app/src/main/kotlin/generated"
+    package: "com.example.generated"
+
+  ios:
+    enabled: true
+    output_path: "ios/Runner/Generated"
+
+  models:
+    - lib/models/**/*.dart
+```
+
+Run the generator:
+```bash
+# Using the shell script
+./scripts/generate_native.sh
+
+# Or directly
+dart run native_sqlite_generator:generate_native
+```
+
+**Generated files** are written directly to:
+- ✅ `android/app/src/main/kotlin/generated/` - Kotlin schemas and helpers
+- ✅ `ios/Runner/Generated/` - Swift schemas and helpers
+
+**Benefits**:
+- ⚡ **One command** generates everything
+- 🎯 **Zero manual work** - files written automatically
+- 🔒 **Perfect sync** - always matches Dart schema
+- 🚀 **Fast** - runs in seconds
+- 📦 **CI-friendly** - add to your build pipeline
+
+See [AUTOMATED_GENERATION.md](AUTOMATED_GENERATION.md) for complete guide.
+
 ### Documentation
 
 Comprehensive guides for native code usage:
 
-1. **NATIVE_USAGE.md**: Complete guide with examples for both platforms
-2. **example/native_examples/**: Full working examples
+1. **AUTOMATED_GENERATION.md** ⭐ **NEW**: Automatic code generation guide
+   - Configuration reference
+   - Shell script usage
+   - CI/CD integration
+   - Complete workflow
+
+2. **NATIVE_USAGE.md**: Manual approach guide (if you prefer more control)
+   - Shows the pattern behind automation
+   - Useful for understanding generated code
+
+3. **example/native_examples/**: Full working examples
    - Android: Schema constants, helper classes, WorkManager example
    - iOS: Schema constants, helper classes, Background Task example
-3. **Synchronization workflow**: Clear steps to keep Dart and native code in sync
+
+4. **scripts/generate_native.sh**: One-command generation script
 
 ### Benefits
 

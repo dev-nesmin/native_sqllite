@@ -11,6 +11,9 @@ dependencies:
   build: ^2.4.1
   source_gen: ^1.5.0
   analyzer: ^6.9.0
+  yaml: ^3.1.2
+  glob: ^2.1.2
+  path: ^1.9.0
   native_sqlite_annotation:
     path: ../native_sqlite_annotation
 

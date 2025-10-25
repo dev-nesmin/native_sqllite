@@ -10,6 +10,15 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
+# Create logs directory if it doesn't exist
+LOGS_DIR="$(pwd)/logs"
+mkdir -p "$LOGS_DIR"
+
+# Generate timestamp for log files
+get_timestamp() {
+    date "+%Y%m%d_%H%M%S"
+}
+
 # Function to print colored output
 print_info() {
     echo -e "${BLUE}[INFO]${NC} $1"
@@ -43,14 +52,39 @@ has_build_runner() {
 run_pub_get() {
     local project_dir="$1"
     local project_name="$2"
+    local timestamp="$3"
     
     print_info "Running 'flutter pub get' in $project_name..."
     
-    if (cd "$project_dir" && flutter pub get); then
+    local log_file="$LOGS_DIR/${project_name}_pub_get_${timestamp}.log"
+    local temp_log="/tmp/flutter_manager_temp_$$"
+    
+    # Log command start
+    echo "=== Flutter Pub Get Started: $(date) ===" > "$log_file"
+    echo "Project: $project_name" >> "$log_file"
+    echo "Directory: $project_dir" >> "$log_file"
+    echo "Command: flutter pub get" >> "$log_file"
+    echo "============================================" >> "$log_file"
+    
+    if (cd "$project_dir" && flutter pub get > "$temp_log" 2>&1); then
+        # Success - show output and optionally remove log
+        cat "$temp_log"
+        cat "$temp_log" >> "$log_file"
+        echo "=== Completed Successfully: $(date) ===" >> "$log_file"
+        rm -f "$temp_log"
         print_success "Successfully completed 'flutter pub get' in $project_name"
+        # Remove log file on success (optional - you can comment this out to keep all logs)
+        rm -f "$log_file"
         return 0
     else
+        # Failure - show output and keep detailed log
+        cat "$temp_log"
+        cat "$temp_log" >> "$log_file"
+        echo "=== Failed: $(date) ===" >> "$log_file"
+        echo "Exit Code: $?" >> "$log_file"
+        rm -f "$temp_log"
         print_error "Failed to run 'flutter pub get' in $project_name"
+        print_error "Error log saved to: $log_file"
         return 1
     fi
 }
@@ -59,6 +93,7 @@ run_pub_get() {
 run_build_runner() {
     local project_dir="$1"
     local project_name="$2"
+    local timestamp="$3"
     
     if ! has_build_runner "$project_dir"; then
         print_warning "Skipping build_runner for $project_name (no build_runner dependency found)"
@@ -67,11 +102,35 @@ run_build_runner() {
     
     print_info "Running 'dart run build_runner build' in $project_name..."
     
-    if (cd "$project_dir" && dart run build_runner build --delete-conflicting-outputs); then
+    local log_file="$LOGS_DIR/${project_name}_build_runner_${timestamp}.log"
+    local temp_log="/tmp/flutter_manager_temp_$$"
+    
+    # Log command start
+    echo "=== Build Runner Started: $(date) ===" > "$log_file"
+    echo "Project: $project_name" >> "$log_file"
+    echo "Directory: $project_dir" >> "$log_file"
+    echo "Command: dart run build_runner build --delete-conflicting-outputs" >> "$log_file"
+    echo "============================================" >> "$log_file"
+    
+    if (cd "$project_dir" && dart run build_runner build --delete-conflicting-outputs > "$temp_log" 2>&1); then
+        # Success - show output and optionally remove log
+        cat "$temp_log"
+        cat "$temp_log" >> "$log_file"
+        echo "=== Completed Successfully: $(date) ===" >> "$log_file"
+        rm -f "$temp_log"
         print_success "Successfully completed 'dart run build_runner build' in $project_name"
+        # Remove log file on success (optional)
+        rm -f "$log_file"
         return 0
     else
+        # Failure - show output and keep detailed log
+        cat "$temp_log"
+        cat "$temp_log" >> "$log_file"
+        echo "=== Failed: $(date) ===" >> "$log_file"
+        echo "Exit Code: $?" >> "$log_file"
+        rm -f "$temp_log"
         print_error "Failed to run 'dart run build_runner build' in $project_name"
+        print_error "Error log saved to: $log_file"
         return 1
     fi
 }
@@ -80,14 +139,39 @@ run_build_runner() {
 run_flutter_clean() {
     local project_dir="$1"
     local project_name="$2"
+    local timestamp="$3"
     
     print_info "Running 'flutter clean' in $project_name..."
     
-    if (cd "$project_dir" && flutter clean); then
+    local log_file="$LOGS_DIR/${project_name}_flutter_clean_${timestamp}.log"
+    local temp_log="/tmp/flutter_manager_temp_$$"
+    
+    # Log command start
+    echo "=== Flutter Clean Started: $(date) ===" > "$log_file"
+    echo "Project: $project_name" >> "$log_file"
+    echo "Directory: $project_dir" >> "$log_file"
+    echo "Command: flutter clean" >> "$log_file"
+    echo "============================================" >> "$log_file"
+    
+    if (cd "$project_dir" && flutter clean > "$temp_log" 2>&1); then
+        # Success - show output and optionally remove log
+        cat "$temp_log"
+        cat "$temp_log" >> "$log_file"
+        echo "=== Completed Successfully: $(date) ===" >> "$log_file"
+        rm -f "$temp_log"
         print_success "Successfully completed 'flutter clean' in $project_name"
+        # Remove log file on success (optional)
+        rm -f "$log_file"
         return 0
     else
+        # Failure - show output and keep detailed log
+        cat "$temp_log"
+        cat "$temp_log" >> "$log_file"
+        echo "=== Failed: $(date) ===" >> "$log_file"
+        echo "Exit Code: $?" >> "$log_file"
+        rm -f "$temp_log"
         print_error "Failed to run 'flutter clean' in $project_name"
+        print_error "Error log saved to: $log_file"
         return 1
     fi
 }
@@ -96,13 +180,41 @@ run_flutter_clean() {
 clean_pub_get() {
     local project_dir="$1"
     local project_name="$2"
+    local timestamp="$3"
     
     print_info "Cleaning pub dependencies in $project_name..."
     
-    (cd "$project_dir" && rm -f pubspec.lock && rm -rf .dart_tool)
+    local log_file="$LOGS_DIR/${project_name}_clean_pub_${timestamp}.log"
+    local temp_log="/tmp/flutter_manager_temp_$$"
     
-    print_success "Successfully cleaned pub dependencies in $project_name"
-    return 0
+    # Log command start
+    echo "=== Clean Pub Dependencies Started: $(date) ===" > "$log_file"
+    echo "Project: $project_name" >> "$log_file"
+    echo "Directory: $project_dir" >> "$log_file"
+    echo "Commands: rm -f pubspec.lock && rm -rf .dart_tool" >> "$log_file"
+    echo "============================================" >> "$log_file"
+    
+    if (cd "$project_dir" && rm -f pubspec.lock && rm -rf .dart_tool > "$temp_log" 2>&1); then
+        # Success - show output and optionally remove log
+        cat "$temp_log"
+        cat "$temp_log" >> "$log_file"
+        echo "=== Completed Successfully: $(date) ===" >> "$log_file"
+        rm -f "$temp_log"
+        print_success "Successfully cleaned pub dependencies in $project_name"
+        # Remove log file on success (since clean rarely fails)
+        rm -f "$log_file"
+        return 0
+    else
+        # Failure - show output and keep detailed log
+        cat "$temp_log"
+        cat "$temp_log" >> "$log_file"
+        echo "=== Failed: $(date) ===" >> "$log_file"
+        echo "Exit Code: $?" >> "$log_file"
+        rm -f "$temp_log"
+        print_error "Failed to clean pub dependencies in $project_name"
+        print_error "Error log saved to: $log_file"
+        return 1
+    fi
 }
 
 # Main script
@@ -225,6 +337,18 @@ main() {
     echo
     print_info "Starting operations..."
     
+    # Create session timestamp and log
+    local session_timestamp=$(get_timestamp)
+    local session_log="$LOGS_DIR/session_${session_timestamp}.log"
+    
+    # Log session start
+    {
+        echo "Flutter Manager Session Started: $(date)"
+        echo "Operation: $operation"
+        echo "Selected Projects: ${selected_indices[*]}"
+        echo "=========================================="
+    } > "$session_log"
+    
     local failed_projects=()
     local total_projects=${#selected_indices[@]}
     
@@ -236,28 +360,34 @@ main() {
         echo
         print_info "Processing project $((i+1))/$total_projects: $project_name"
         
+        # Log to session file
+        echo "Processing: $project_name ($(date))" >> "$session_log"
+        
         local failed=false
         
         case "$operation" in
             1)
-                run_pub_get "$project_dir" "$project_name" || failed=true
+                run_pub_get "$project_dir" "$project_name" "$session_timestamp" || failed=true
                 ;;
             2)
-                run_build_runner "$project_dir" "$project_name" || failed=true
+                run_build_runner "$project_dir" "$project_name" "$session_timestamp" || failed=true
                 ;;
             3)
-                clean_pub_get "$project_dir" "$project_name" && \
-                run_pub_get "$project_dir" "$project_name" || failed=true
+                clean_pub_get "$project_dir" "$project_name" "$session_timestamp" && \
+                run_pub_get "$project_dir" "$project_name" "$session_timestamp" || failed=true
                 ;;
             4)
-                run_flutter_clean "$project_dir" "$project_name" && \
-                run_pub_get "$project_dir" "$project_name" && \
-                run_build_runner "$project_dir" "$project_name" || failed=true
+                run_flutter_clean "$project_dir" "$project_name" "$session_timestamp" && \
+                run_pub_get "$project_dir" "$project_name" "$session_timestamp" && \
+                run_build_runner "$project_dir" "$project_name" "$session_timestamp" || failed=true
                 ;;
         esac
         
         if [ "$failed" = true ]; then
             failed_projects+=("$project_name")
+            echo "FAILED: $project_name" >> "$session_log"
+        else
+            echo "SUCCESS: $project_name" >> "$session_log"
         fi
     done
     
@@ -270,11 +400,26 @@ main() {
     local successful_count=$((total_projects - ${#failed_projects[@]}))
     print_success "Successfully processed: $successful_count/$total_projects projects"
     
+    # Log session end
+    {
+        echo "=========================================="
+        echo "Session completed: $(date)"
+        echo "Success: $successful_count/$total_projects projects"
+        if [ ${#failed_projects[@]} -gt 0 ]; then
+            echo "Failed projects: ${failed_projects[*]}"
+        fi
+    } >> "$session_log"
+    
     if [ ${#failed_projects[@]} -gt 0 ]; then
         print_error "Failed projects: ${failed_projects[*]}"
+        print_info "Session log saved to: $session_log"
+        print_info "Individual error logs available in: $LOGS_DIR"
         exit 1
     else
         print_success "All operations completed successfully!"
+        print_info "Session log saved to: $session_log"
+        # Remove session log on complete success (optional)
+        # rm -f "$session_log"
     fi
 }
 

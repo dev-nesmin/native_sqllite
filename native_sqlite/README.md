@@ -2,15 +2,23 @@
 
 A simple yet powerful SQLite plugin for Flutter that's accessible from **both native code (Android Kotlin/Swift) and Flutter/Dart**, with **Write-Ahead Logging (WAL)** mode enabled for safe concurrent access.
 
+## Platform Support
+
+- ✅ **Android** - Native SQLite with WAL mode
+- ✅ **iOS** - Native SQLite with WAL mode
+- ✅ **Web** - SQLite WASM with IndexedDB persistence
+
 ## Features
 
-- **Concurrent Access**: WAL mode allows both native and Flutter code to read/write simultaneously
+- **Cross-Platform**: Works on Android, iOS, and Web with the same API
+- **Concurrent Access**: WAL mode allows both native and Flutter code to read/write simultaneously (Android/iOS)
 - **Native Access**: Direct database access from Android (Kotlin) and iOS (Swift) without method channels
+- **Web Support**: Full SQLite compatibility on web using WASM with IndexedDB storage
 - **Simple API**: Easy-to-use API for common database operations
 - **Type-Safe**: Strongly typed with clear error handling
 - **Federated Plugin**: Clean architecture with platform-specific implementations
 - **Thread-Safe**: Built-in synchronization for multi-threaded access
-- **Lightweight**: No heavy dependencies, uses native SQLite
+- **Lightweight**: No heavy dependencies, uses native SQLite (or WASM on web)
 
 ## Why This Plugin?
 
@@ -291,7 +299,46 @@ native_sqlite_ios/                      # iOS implementation
 │   ├── NativeSqlitePlugin.swift       # Method channel handler
 │   └── NativeSqliteManager.swift      # Database manager (accessible from native)
 └── lib/native_sqlite_ios.dart
+
+native_sqlite_web/                      # Web implementation
+├── lib/native_sqlite_web.dart         # SQLite WASM with IndexedDB
+└── README.md                           # Web-specific documentation
 ```
+
+## Web Support
+
+The plugin fully supports web using SQLite WASM (WebAssembly):
+
+- **Full SQLite Compatibility**: Same SQL features as native platforms
+- **IndexedDB Storage**: Data persists in browser storage
+- **Automatic Loading**: WASM module loaded on-demand (~1MB, cached by browser)
+- **Modern Browsers**: Works on all browsers from 2017+ (Chrome 57+, Firefox 52+, Safari 11+, Edge 16+)
+
+### Web Usage
+
+The API is **identical** to Android/iOS:
+
+```dart
+// Same code works on Android, iOS, AND Web!
+await NativeSqlite.open(
+  config: DatabaseConfig(
+    name: 'my_app',
+    version: 1,
+    onCreate: ['CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT)'],
+  ),
+);
+
+await NativeSqlite.insert('my_app', 'users', {'name': 'John'});
+```
+
+### Web-Specific Considerations
+
+- **First Load**: ~200-300ms initialization time (one-time, then cached)
+- **Storage**: Data stored in IndexedDB under your app's origin
+- **WAL Mode**: Uses MEMORY journal mode instead (web limitation, but still performant)
+- **Database Paths**: Returns virtual paths like `indexed_db://mydb.db`
+
+For detailed web documentation, see [native_sqlite_web/README.md](../native_sqlite_web/README.md).
 
 ## Key Features Explained
 

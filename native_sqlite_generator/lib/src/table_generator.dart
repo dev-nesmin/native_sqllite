@@ -1,8 +1,8 @@
 import 'package:analyzer/dart/element/element.dart';
-import 'package:analyzer/dart/element/type.dart';
+import 'package:analyzer/dart/element/nullability_suffix.dart';
 import 'package:build/build.dart';
-import 'package:source_gen/source_gen.dart';
 import 'package:native_sqlite_annotation/native_sqlite_annotation.dart';
+import 'package:source_gen/source_gen.dart';
 
 /// Generator that creates table schemas and repository classes
 /// from classes annotated with @Table.
@@ -20,9 +20,9 @@ class TableGenerator extends GeneratorForAnnotation<Table> {
       );
     }
 
-    final className = element.name;
-    final tableName = annotation.peek('name')?.stringValue ??
-        _toSnakeCase(className);
+    final className = element.name!;
+    final tableName =
+        annotation.peek('name')?.stringValue ?? _toSnakeCase(className);
 
     final buffer = StringBuffer();
 
@@ -58,7 +58,6 @@ class TableGenerator extends GeneratorForAnnotation<Table> {
     final fields = _getAnnotatedFields(element);
     final columnDefs = <String>[];
     final foreignKeys = <String>[];
-    final indexes = <String>[];
 
     for (final field in fields) {
       final columnDef = _generateColumnDefinition(field);
@@ -100,7 +99,7 @@ class TableGenerator extends GeneratorForAnnotation<Table> {
     buffer.writeln('  // Column names');
     for (final field in fields) {
       final columnName = _getColumnName(field);
-      final fieldName = field.name;
+      final fieldName = field.name!;
       final constantName = _toScreamingSnakeCase(fieldName);
       buffer.writeln('  static const String $constantName = \'$columnName\';');
     }
@@ -203,14 +202,15 @@ class TableGenerator extends GeneratorForAnnotation<Table> {
     FieldElement primaryKey,
   ) {
     final pkColumnName = _getColumnName(primaryKey);
-    final pkType = primaryKey.type.getDisplayString(withNullability: false);
+    final pkType = primaryKey.type.getDisplayString();
 
     buffer.writeln('  /// Finds a $className by its ID.');
     buffer.writeln('  /// Returns null if not found.');
     buffer.writeln('  Future<$className?> findById($pkType id) async {');
     buffer.writeln('    final result = await NativeSqlite.query(');
     buffer.writeln('      databaseName,');
-    buffer.writeln('      \'SELECT * FROM $tableName WHERE $pkColumnName = ? LIMIT 1\',');
+    buffer.writeln(
+        '      \'SELECT * FROM $tableName WHERE $pkColumnName = ? LIMIT 1\',');
     buffer.writeln('      [id],');
     buffer.writeln('    );');
     buffer.writeln();
@@ -279,7 +279,7 @@ class TableGenerator extends GeneratorForAnnotation<Table> {
     FieldElement primaryKey,
   ) {
     final pkColumnName = _getColumnName(primaryKey);
-    final pkType = primaryKey.type.getDisplayString(withNullability: false);
+    final pkType = primaryKey.type.getDisplayString();
 
     buffer.writeln('  /// Deletes a $className by its ID.');
     buffer.writeln('  /// Returns the number of rows deleted.');
@@ -297,7 +297,8 @@ class TableGenerator extends GeneratorForAnnotation<Table> {
     buffer.writeln('  /// Deletes all records from the table.');
     buffer.writeln('  /// Returns the number of rows deleted.');
     buffer.writeln('  Future<int> deleteAll() async {');
-    buffer.writeln('    return NativeSqlite.delete(databaseName, \'$tableName\');');
+    buffer.writeln(
+        '    return NativeSqlite.delete(databaseName, \'$tableName\');');
     buffer.writeln('  }');
   }
 
@@ -322,9 +323,12 @@ class TableGenerator extends GeneratorForAnnotation<Table> {
     String tableName,
     List<FieldElement> fields,
   ) {
-    buffer.writeln('  /// Executes a custom query and returns the results as $className objects.');
-    buffer.writeln('  Future<List<$className>> query(String sql, [List<Object?>? arguments]) async {');
-    buffer.writeln('    final result = await NativeSqlite.query(databaseName, sql, arguments);');
+    buffer.writeln(
+        '  /// Executes a custom query and returns the results as $className objects.');
+    buffer.writeln(
+        '  Future<List<$className>> query(String sql, [List<Object?>? arguments]) async {');
+    buffer.writeln(
+        '    final result = await NativeSqlite.query(databaseName, sql, arguments);');
     buffer.writeln('    return result.toMapList().map(_fromMap).toList();');
     buffer.writeln('  }');
     buffer.writeln();
@@ -347,30 +351,32 @@ class TableGenerator extends GeneratorForAnnotation<Table> {
   }
 
   String _deserializeFieldValue(FieldElement field, String accessor) {
-    final dartType = field.type.getDisplayString(withNullability: false);
-    final isNullable = field.type.nullabilitySuffix == NullabilitySuffix.question;
+    final dartType = field.type.getDisplayString();
+    final isNullable =
+        field.type.nullabilitySuffix == NullabilitySuffix.question;
+    final baseType = dartType.replaceAll('?', '');
 
-    if (dartType == 'DateTime') {
+    if (baseType == 'DateTime') {
       if (isNullable) {
         return '$accessor != null ? DateTime.fromMillisecondsSinceEpoch($accessor as int) : null';
       }
       return 'DateTime.fromMillisecondsSinceEpoch($accessor as int)';
-    } else if (dartType == 'bool') {
+    } else if (baseType == 'bool') {
       if (isNullable) {
         return '$accessor != null ? ($accessor as int) == 1 : null';
       }
       return '($accessor as int) == 1';
-    } else if (dartType == 'int') {
+    } else if (baseType == 'int') {
       if (isNullable) {
         return '$accessor as int?';
       }
       return '$accessor as int';
-    } else if (dartType == 'double') {
+    } else if (baseType == 'double') {
       if (isNullable) {
         return '$accessor as double?';
       }
       return '$accessor as double';
-    } else if (dartType == 'String') {
+    } else if (baseType == 'String') {
       if (isNullable) {
         return '$accessor as String?';
       }
@@ -379,9 +385,9 @@ class TableGenerator extends GeneratorForAnnotation<Table> {
 
     // For other types, just cast
     if (isNullable) {
-      return '$accessor as $dartType?';
+      return '$accessor as $baseType?';
     }
-    return '$accessor as $dartType';
+    return '$accessor as $baseType';
   }
 
   String? _generateColumnDefinition(FieldElement field) {
@@ -391,7 +397,8 @@ class TableGenerator extends GeneratorForAnnotation<Table> {
     final sqlType = _getSqlType(field);
     final isPk = _isPrimaryKey(field);
     final isAutoInc = isPk && _isAutoIncrement(field);
-    final isNullable = field.type.nullabilitySuffix == NullabilitySuffix.question;
+    final isNullable =
+        field.type.nullabilitySuffix == NullabilitySuffix.question;
     final isUnique = _isUnique(field);
     final defaultValue = _getDefaultValue(field);
 
@@ -420,7 +427,8 @@ class TableGenerator extends GeneratorForAnnotation<Table> {
   }
 
   String? _getForeignKey(FieldElement field) {
-    final foreignKeyChecker = const TypeChecker.fromRuntime(ForeignKey);
+    final foreignKeyChecker = TypeChecker.fromUrl(
+        'package:native_sqlite_annotation/native_sqlite_annotation.dart#ForeignKey');
     final annotation = foreignKeyChecker.firstAnnotationOf(field);
 
     if (annotation == null) return null;
@@ -432,7 +440,9 @@ class TableGenerator extends GeneratorForAnnotation<Table> {
     final onUpdate = reader.peek('onUpdate')?.stringValue;
 
     final columnName = _getColumnName(field);
-    final parts = <String>['FOREIGN KEY ($columnName) REFERENCES $table($column)'];
+    final parts = <String>[
+      'FOREIGN KEY ($columnName) REFERENCES $table($column)'
+    ];
 
     if (onDelete != null) {
       parts.add('ON DELETE $onDelete');
@@ -446,19 +456,26 @@ class TableGenerator extends GeneratorForAnnotation<Table> {
   }
 
   List<String> _getIndexAnnotations(ClassElement element) {
-    final indexChecker = const TypeChecker.fromRuntime(Index);
+    final indexChecker = TypeChecker.fromUrl(
+        'package:native_sqlite_annotation/native_sqlite_annotation.dart#Index');
     final indexes = <String>[];
 
     for (final annotation in indexChecker.annotationsOf(element)) {
       final reader = ConstantReader(annotation);
       final name = reader.peek('name')?.stringValue;
-      final columns = reader.read('columns').listValue.map((e) => e.toStringValue()!).toList();
+      final columns = reader
+          .read('columns')
+          .listValue
+          .map((e) => e.toStringValue()!)
+          .toList();
       final unique = reader.read('unique').boolValue;
 
-      final tableName = element.name;
-      final indexName = name ?? 'idx_${_toSnakeCase(tableName)}_${columns.join('_')}';
+      final tableName = element.name!;
+      final indexName =
+          name ?? 'idx_${_toSnakeCase(tableName)}_${columns.join('_')}';
       final uniqueStr = unique ? 'UNIQUE ' : '';
-      final indexSql = 'CREATE ${uniqueStr}INDEX $indexName ON ${_toSnakeCase(tableName)} (${columns.join(', ')})';
+      final indexSql =
+          'CREATE ${uniqueStr}INDEX $indexName ON ${_toSnakeCase(tableName)} (${columns.join(', ')})';
       indexes.add(indexSql);
     }
 
@@ -479,12 +496,14 @@ class TableGenerator extends GeneratorForAnnotation<Table> {
   }
 
   bool _isPrimaryKey(FieldElement field) {
-    final checker = const TypeChecker.fromRuntime(PrimaryKey);
+    final checker = TypeChecker.fromUrl(
+        'package:native_sqlite_annotation/native_sqlite_annotation.dart#PrimaryKey');
     return checker.hasAnnotationOf(field);
   }
 
   bool _isAutoIncrement(FieldElement field) {
-    final checker = const TypeChecker.fromRuntime(PrimaryKey);
+    final checker = TypeChecker.fromUrl(
+        'package:native_sqlite_annotation/native_sqlite_annotation.dart#PrimaryKey');
     final annotation = checker.firstAnnotationOf(field);
     if (annotation == null) return false;
 
@@ -493,12 +512,14 @@ class TableGenerator extends GeneratorForAnnotation<Table> {
   }
 
   bool _isIgnored(FieldElement field) {
-    final checker = const TypeChecker.fromRuntime(Ignore);
+    final checker = TypeChecker.fromUrl(
+        'package:native_sqlite_annotation/native_sqlite_annotation.dart#Ignore');
     return checker.hasAnnotationOf(field);
   }
 
   bool _isUnique(FieldElement field) {
-    final checker = const TypeChecker.fromRuntime(Column);
+    final checker = TypeChecker.fromUrl(
+        'package:native_sqlite_annotation/native_sqlite_annotation.dart#Column');
     final annotation = checker.firstAnnotationOf(field);
     if (annotation == null) return false;
 
@@ -507,7 +528,8 @@ class TableGenerator extends GeneratorForAnnotation<Table> {
   }
 
   String? _getDefaultValue(FieldElement field) {
-    final checker = const TypeChecker.fromRuntime(Column);
+    final checker = TypeChecker.fromUrl(
+        'package:native_sqlite_annotation/native_sqlite_annotation.dart#Column');
     final annotation = checker.firstAnnotationOf(field);
     if (annotation == null) return null;
 
@@ -516,7 +538,8 @@ class TableGenerator extends GeneratorForAnnotation<Table> {
   }
 
   String _getColumnName(FieldElement field) {
-    final checker = const TypeChecker.fromRuntime(Column);
+    final checker = TypeChecker.fromUrl(
+        'package:native_sqlite_annotation/native_sqlite_annotation.dart#Column');
     final annotation = checker.firstAnnotationOf(field);
 
     if (annotation != null) {
@@ -525,12 +548,13 @@ class TableGenerator extends GeneratorForAnnotation<Table> {
       if (name != null) return name;
     }
 
-    return field.name;
+    return field.name!;
   }
 
   String _getSqlType(FieldElement field) {
     // Check for explicit type annotation
-    final checker = const TypeChecker.fromRuntime(Column);
+    final checker = TypeChecker.fromUrl(
+        'package:native_sqlite_annotation/native_sqlite_annotation.dart#Column');
     final annotation = checker.firstAnnotationOf(field);
 
     if (annotation != null) {
@@ -540,17 +564,18 @@ class TableGenerator extends GeneratorForAnnotation<Table> {
     }
 
     // Infer from Dart type
-    final dartType = field.type.getDisplayString(withNullability: false);
+    final dartType = field.type.getDisplayString();
+    final baseType = dartType.replaceAll('?', '');
 
-    if (dartType == 'int' || dartType == 'Int' || dartType == 'bool') {
+    if (baseType == 'int' || baseType == 'Int' || baseType == 'bool') {
       return 'INTEGER';
-    } else if (dartType == 'double' || dartType == 'Double') {
+    } else if (baseType == 'double' || baseType == 'Double') {
       return 'REAL';
-    } else if (dartType == 'String') {
+    } else if (baseType == 'String') {
       return 'TEXT';
-    } else if (dartType == 'Uint8List' || dartType == 'List<int>') {
+    } else if (baseType == 'Uint8List' || baseType == 'List<int>') {
       return 'BLOB';
-    } else if (dartType == 'DateTime') {
+    } else if (baseType == 'DateTime') {
       return 'INTEGER'; // Store as milliseconds since epoch
     } else {
       return 'TEXT'; // Default to TEXT for custom types (will need serialization)
@@ -558,15 +583,17 @@ class TableGenerator extends GeneratorForAnnotation<Table> {
   }
 
   String _serializeFieldValue(FieldElement field, String accessor) {
-    final dartType = field.type.getDisplayString(withNullability: false);
-    final isNullable = field.type.nullabilitySuffix == NullabilitySuffix.question;
+    final dartType = field.type.getDisplayString();
+    final isNullable =
+        field.type.nullabilitySuffix == NullabilitySuffix.question;
+    final baseType = dartType.replaceAll('?', '');
 
-    if (dartType == 'DateTime') {
+    if (baseType == 'DateTime') {
       if (isNullable) {
         return '$accessor?.millisecondsSinceEpoch';
       }
       return '$accessor.millisecondsSinceEpoch';
-    } else if (dartType == 'bool') {
+    } else if (baseType == 'bool') {
       if (isNullable) {
         return '$accessor == true ? 1 : ($accessor == false ? 0 : null)';
       }

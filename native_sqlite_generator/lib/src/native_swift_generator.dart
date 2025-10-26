@@ -18,7 +18,8 @@ class NativeSwiftGenerator {
     buffer.writeln('/**');
     buffer.writeln(' * Schema constants for ${model.className} table.');
     buffer.writeln(' * AUTO-GENERATED from Dart - DO NOT EDIT MANUALLY');
-    buffer.writeln(' * Generated from: lib/models/${_toSnakeCase(model.className)}.dart');
+    buffer.writeln(
+        ' * Generated from: lib/models/${_toSnakeCase(model.className)}.dart');
     buffer.writeln(' */');
     buffer.writeln('public enum ${model.className}Schema {');
     buffer.writeln('    public static let tableName = "${model.tableName}"');
@@ -27,7 +28,8 @@ class NativeSwiftGenerator {
 
     for (final field in model.fields) {
       final constantName = _toCamelCase(field.fieldName);
-      buffer.writeln('    public static let $constantName = "${field.columnName}"');
+      buffer.writeln(
+          '    public static let $constantName = "${field.columnName}"');
     }
 
     buffer.writeln();
@@ -91,7 +93,8 @@ class NativeSwiftGenerator {
     final initParams = <String>[];
     for (final field in model.fields) {
       final swiftType = _getSwiftType(field);
-      final defaultValue = field.isPrimaryKey && field.autoIncrement ? ' = nil' : '';
+      final defaultValue =
+          field.isPrimaryKey && field.autoIncrement ? ' = nil' : '';
       initParams.add('        ${field.fieldName}: $swiftType$defaultValue');
     }
     buffer.writeln(initParams.join(',\n'));
@@ -112,7 +115,8 @@ class NativeSwiftGenerator {
       buffer.writeln(' *');
       buffer.writeln(' * Example usage:');
       buffer.writeln(' * ```');
-      buffer.writeln(' * let helper = ${model.className}Helper(databaseName: "$databaseName")');
+      buffer.writeln(
+          ' * let helper = ${model.className}Helper(databaseName: "$databaseName")');
       buffer.writeln(' * let id = try helper.insert(${model.className}(...))');
       buffer.writeln(' * let item = try helper.findById(id)');
       buffer.writeln(' * ```');
@@ -128,27 +132,34 @@ class NativeSwiftGenerator {
     buffer.writeln();
 
     // Insert method
-    buffer.writeln('    public func insert(_ entity: ${model.className}) throws -> Int {');
+    buffer.writeln(
+        '    public func insert(_ entity: ${model.className}) throws -> Int {');
     buffer.writeln('        var values: [String: Any] = [:]');
     for (final field in model.fields) {
       if (field.isPrimaryKey && field.autoIncrement) continue;
 
       final value = _serializeSwift(field, 'entity.${field.fieldName}');
-      buffer.writeln('        values[${model.className}Schema.${_toCamelCase(field.fieldName)}] = $value');
+      buffer.writeln(
+          '        values[${model.className}Schema.${_toCamelCase(field.fieldName)}] = $value');
     }
-    buffer.writeln('        return try manager.insert(name: databaseName, table: ${model.className}Schema.tableName, values: values)');
+    buffer.writeln(
+        '        return try manager.insert(name: databaseName, table: ${model.className}Schema.tableName, values: values)');
     buffer.writeln('    }');
     buffer.writeln();
 
     // FindById method
-    buffer.writeln('    public func findById(_ id: Int) throws -> ${model.className}? {');
+    buffer.writeln(
+        '    public func findById(_ id: Int) throws -> ${model.className}? {');
     buffer.writeln('        let result = try manager.query(');
     buffer.writeln('            name: databaseName,');
-    buffer.writeln('            sql: "SELECT * FROM \\(${model.className}Schema.tableName) WHERE \\(${model.className}Schema.${_toCamelCase(primaryKey.fieldName)}) = ? LIMIT 1",');
+    buffer.writeln(
+        '            sql: "SELECT * FROM \\(${model.className}Schema.tableName) WHERE \\(${model.className}Schema.${_toCamelCase(primaryKey.fieldName)}) = ? LIMIT 1",');
     buffer.writeln('            arguments: [id]');
     buffer.writeln('        )');
-    buffer.writeln('        guard let rows = result["rows"] as? [[Any?]], !rows.isEmpty,');
-    buffer.writeln('              let columns = result["columns"] as? [String] else {');
+    buffer.writeln(
+        '        guard let rows = result["rows"] as? [[Any?]], !rows.isEmpty,');
+    buffer.writeln(
+        '              let columns = result["columns"] as? [String] else {');
     buffer.writeln('            return nil');
     buffer.writeln('        }');
     buffer.writeln('        return fromRow(columns: columns, row: rows[0])');
@@ -156,18 +167,23 @@ class NativeSwiftGenerator {
     buffer.writeln();
 
     // FindAll method
-    buffer.writeln('    public func findAll() throws -> [${model.className}] {');
-    buffer.writeln('        let result = try manager.query(name: databaseName, sql: "SELECT * FROM \\(${model.className}Schema.tableName)")');
+    buffer
+        .writeln('    public func findAll() throws -> [${model.className}] {');
+    buffer.writeln(
+        '        let result = try manager.query(name: databaseName, sql: "SELECT * FROM \\(${model.className}Schema.tableName)")');
     buffer.writeln('        guard let rows = result["rows"] as? [[Any?]],');
-    buffer.writeln('              let columns = result["columns"] as? [String] else {');
+    buffer.writeln(
+        '              let columns = result["columns"] as? [String] else {');
     buffer.writeln('            return []');
     buffer.writeln('        }');
-    buffer.writeln('        return rows.map { fromRow(columns: columns, row: $0) }');
+    buffer.writeln(
+        '        return rows.map { fromRow(columns: columns, row: \$0) }');
     buffer.writeln('    }');
     buffer.writeln();
 
     // FromRow helper
-    buffer.writeln('    private func fromRow(columns: [String], row: [Any?]) -> ${model.className} {');
+    buffer.writeln(
+        '    private func fromRow(columns: [String], row: [Any?]) -> ${model.className} {');
     buffer.writeln('        var columnMap: [String: Int] = [:]');
     buffer.writeln('        for (index, column) in columns.enumerated() {');
     buffer.writeln('            columnMap[column] = index');
@@ -176,7 +192,8 @@ class NativeSwiftGenerator {
 
     final fieldInits = <String>[];
     for (final field in model.fields) {
-      final value = _deserializeSwift(field, 'row[columnMap[${model.className}Schema.${_toCamelCase(field.fieldName)}]!]');
+      final value = _deserializeSwift(field,
+          'row[columnMap[${model.className}Schema.${_toCamelCase(field.fieldName)}]!]');
       fieldInits.add('            ${field.fieldName}: $value');
     }
     buffer.writeln(fieldInits.join(',\n'));
@@ -209,7 +226,7 @@ class NativeSwiftGenerator {
   String _serializeSwift(FieldModel field, String accessor) {
     if (field.dartType.contains('bool')) {
       return field.isNullable
-          ? '$accessor.map { $0 ? 1 : 0 } ?? NSNull()'
+          ? '$accessor.map { \$0 ? 1 : 0 } ?? NSNull()'
           : '$accessor ? 1 : 0';
     }
     return field.isNullable ? '$accessor ?? NSNull()' : accessor;
@@ -226,7 +243,7 @@ class NativeSwiftGenerator {
       return field.isNullable ? '$accessor as? String' : '$accessor as! String';
     } else if (baseType == 'bool') {
       return field.isNullable
-          ? '($accessor as? Int).map { $0 == 1 }'
+          ? '($accessor as? Int).map { \$0 == 1 }'
           : '($accessor as! Int) == 1';
     }
     return accessor;

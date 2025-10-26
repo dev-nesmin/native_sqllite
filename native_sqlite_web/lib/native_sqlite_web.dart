@@ -1,7 +1,7 @@
 import 'package:flutter_web_plugins/flutter_web_plugins.dart';
 import 'package:native_sqlite_platform_interface/native_sqlite_platform_interface.dart';
-import 'package:sqlite3/sqlite3.dart';
-import 'package:sqlite3/wasm.dart';
+import 'package:sqlite3/sqlite3.dart' hide DatabaseConfig;
+import 'package:sqlite3/wasm.dart' hide DatabaseConfig;
 
 /// The Web implementation of [NativeSqlitePlatform].
 ///
@@ -27,14 +27,9 @@ class NativeSqliteWeb extends NativeSqlitePlatform {
     try {
       // Initialize sqlite3 WASM
       // The sqlite3_web package automatically loads the WASM module
-      // from the correct location and sets up IndexedDB persistence
-      final wasmSqlite = await WasmSqlite3.loadFromUrl(
+      // from the correct location and sets up persistence
+      await WasmSqlite3.loadFromUrl(
         Uri.parse('sqlite3.wasm'),
-      );
-
-      wasmSqlite.registerVirtualFileSystem(
-        IndexedDbFileSystem.inMemory(),
-        makeDefault: true,
       );
 
       _initialized = true;
@@ -109,7 +104,8 @@ class NativeSqliteWeb extends NativeSqlitePlatform {
   }
 
   @override
-  Future<int> execute(String databaseName, String sql, List<Object?>? arguments) async {
+  Future<int> execute(
+      String databaseName, String sql, List<Object?>? arguments) async {
     final db = _getDatabase(databaseName);
 
     try {
@@ -131,7 +127,8 @@ class NativeSqliteWeb extends NativeSqlitePlatform {
   }
 
   @override
-  Future<QueryResult> query(String databaseName, String sql, List<Object?>? arguments) async {
+  Future<QueryResult> query(
+      String databaseName, String sql, List<Object?>? arguments) async {
     final db = _getDatabase(databaseName);
 
     try {
@@ -163,7 +160,8 @@ class NativeSqliteWeb extends NativeSqlitePlatform {
   }
 
   @override
-  Future<int> insert(String databaseName, String table, Map<String, Object?> values) async {
+  Future<int> insert(
+      String databaseName, String table, Map<String, Object?> values) async {
     final db = _getDatabase(databaseName);
 
     if (values.isEmpty) {
@@ -260,7 +258,8 @@ class NativeSqliteWeb extends NativeSqlitePlatform {
   }
 
   @override
-  Future<bool> transaction(String databaseName, List<String> sqlStatements) async {
+  Future<bool> transaction(
+      String databaseName, List<String> sqlStatements) async {
     final db = _getDatabase(databaseName);
 
     try {

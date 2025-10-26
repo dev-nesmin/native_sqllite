@@ -1,10 +1,11 @@
 import 'dart:io';
-import 'package:glob/glob.dart';
-import 'package:glob/list_local_fs.dart';
+
 import 'package:analyzer/dart/analysis/utilities.dart';
 import 'package:analyzer/dart/ast/ast.dart';
-import 'package:analyzer/dart/element/element.dart';
+import 'package:glob/glob.dart';
+import 'package:glob/list_local_fs.dart';
 import 'package:path/path.dart' as path;
+
 import 'config.dart';
 import 'native_kotlin_generator.dart';
 import 'native_swift_generator.dart';
@@ -38,7 +39,8 @@ class NativeCodeGenerator {
 
     if (config == null) {
       print('⚠️  No native_sqlite configuration found.');
-      print('   Add configuration to pubspec.yaml or create native_sqlite_config.yaml');
+      print(
+          '   Add configuration to pubspec.yaml or create native_sqlite_config.yaml');
       print('   See native_sqlite_config.example.yaml for reference.');
       return;
     }
@@ -76,7 +78,8 @@ class NativeCodeGenerator {
           continue;
         }
 
-        print('   Found ${models.length} table(s): ${models.map((m) => m.className).join(", ")}');
+        print(
+            '   Found ${models.length} table(s): ${models.map((m) => m.className).join(", ")}');
 
         // Generate Android code
         if (config.android.enabled) {
@@ -109,7 +112,8 @@ class NativeCodeGenerator {
     print('   Files generated: ${generatedFiles.length}');
 
     if (config.android.enabled) {
-      final androidFiles = generatedFiles.where((f) => f.endsWith('.kt')).length;
+      final androidFiles =
+          generatedFiles.where((f) => f.endsWith('.kt')).length;
       print('   - Android (Kotlin): $androidFiles file(s)');
     }
 
@@ -207,7 +211,8 @@ class NativeCodeGenerator {
       for (final arg in arguments) {
         if (arg is NamedExpression && arg.name.label.name == 'name') {
           if (arg.expression is StringLiteral) {
-            tableName = (arg.expression as StringLiteral).stringValue ?? tableName;
+            tableName =
+                (arg.expression as StringLiteral).stringValue ?? tableName;
           }
         }
       }
@@ -233,7 +238,8 @@ class NativeCodeGenerator {
     );
   }
 
-  FieldModel? _parseField(VariableDeclaration variable, FieldDeclaration fieldDecl) {
+  FieldModel? _parseField(
+      VariableDeclaration variable, FieldDeclaration fieldDecl) {
     // Check for @Ignore
     for (final metadata in fieldDecl.metadata) {
       if (metadata.name.name == 'Ignore') {
@@ -258,7 +264,8 @@ class NativeCodeGenerator {
         final arguments = metadata.arguments?.arguments;
         if (arguments != null) {
           for (final arg in arguments) {
-            if (arg is NamedExpression && arg.name.label.name == 'autoIncrement') {
+            if (arg is NamedExpression &&
+                arg.name.label.name == 'autoIncrement') {
               if (arg.expression is BooleanLiteral) {
                 autoIncrement = (arg.expression as BooleanLiteral).value;
               }
@@ -272,8 +279,10 @@ class NativeCodeGenerator {
             if (arg is NamedExpression) {
               final argName = arg.name.label.name;
               if (argName == 'name' && arg.expression is StringLiteral) {
-                columnName = (arg.expression as StringLiteral).stringValue ?? columnName;
-              } else if (argName == 'unique' && arg.expression is BooleanLiteral) {
+                columnName =
+                    (arg.expression as StringLiteral).stringValue ?? columnName;
+              } else if (argName == 'unique' &&
+                  arg.expression is BooleanLiteral) {
                 isUnique = (arg.expression as BooleanLiteral).value;
               }
             }
@@ -285,7 +294,7 @@ class NativeCodeGenerator {
     return FieldModel(
       fieldName: fieldName,
       columnName: columnName,
-      dartType: dartType ?? 'String',
+      dartType: dartType,
       isNullable: isNullable,
       isPrimaryKey: isPrimaryKey,
       autoIncrement: autoIncrement,
@@ -317,7 +326,8 @@ class NativeCodeGenerator {
     for (final model in models) {
       // Generate schema file
       final schemaCode = generator.generateSchema(model);
-      final schemaFile = File(path.join(config.outputPath, '${model.className}Schema.kt'));
+      final schemaFile =
+          File(path.join(config.outputPath, '${model.className}Schema.kt'));
       await schemaFile.writeAsString(schemaCode);
       generatedFiles.add(schemaFile.path);
       print('   ✓ Generated ${path.basename(schemaFile.path)}');
@@ -325,7 +335,8 @@ class NativeCodeGenerator {
       // Generate helper file if enabled
       if (config.generateHelpers) {
         final helperCode = generator.generateHelper(model);
-        final helperFile = File(path.join(config.outputPath, '${model.className}Helper.kt'));
+        final helperFile =
+            File(path.join(config.outputPath, '${model.className}Helper.kt'));
         await helperFile.writeAsString(helperCode);
         generatedFiles.add(helperFile.path);
         print('   ✓ Generated ${path.basename(helperFile.path)}');
@@ -358,7 +369,8 @@ class NativeCodeGenerator {
     for (final model in models) {
       // Generate schema file
       final schemaCode = generator.generateSchema(model);
-      final schemaFile = File(path.join(config.outputPath, '${model.className}Schema.swift'));
+      final schemaFile =
+          File(path.join(config.outputPath, '${model.className}Schema.swift'));
       await schemaFile.writeAsString(schemaCode);
       generatedFiles.add(schemaFile.path);
       print('   ✓ Generated ${path.basename(schemaFile.path)}');
@@ -366,7 +378,8 @@ class NativeCodeGenerator {
       // Generate helper file if enabled
       if (config.generateHelpers) {
         final helperCode = generator.generateHelper(model);
-        final helperFile = File(path.join(config.outputPath, '${model.className}Helper.swift'));
+        final helperFile = File(
+            path.join(config.outputPath, '${model.className}Helper.swift'));
         await helperFile.writeAsString(helperCode);
         generatedFiles.add(helperFile.path);
         print('   ✓ Generated ${path.basename(helperFile.path)}');
@@ -404,7 +417,8 @@ class NativeCodeGenerator {
       final sourceTime = await source.lastModified();
 
       if (sourceTime.isAfter(generatedTime)) {
-        print('ℹ️  Source file newer than generated: ${path.basename(modelFile)}');
+        print(
+            'ℹ️  Source file newer than generated: ${path.basename(modelFile)}');
         return true;
       }
     }
@@ -448,7 +462,10 @@ class FieldModel {
 
   String get sqlType {
     final baseType = dartType.replaceAll('?', '');
-    if (baseType == 'int' || baseType == 'Int' || baseType == 'bool' || baseType == 'DateTime') {
+    if (baseType == 'int' ||
+        baseType == 'Int' ||
+        baseType == 'bool' ||
+        baseType == 'DateTime') {
       return 'INTEGER';
     } else if (baseType == 'double' || baseType == 'Double') {
       return 'REAL';

@@ -25,14 +25,20 @@ A powerful SQLite plugin for Flutter that provides **true cross-platform databas
 # pubspec.yaml
 dependencies:
   native_sqlite:
-    path: ../native_sqlite
+    git:
+      url: https://github.com/dev-nesmin/native_sqllite.git
+      path: native_sqlite
   native_sqlite_annotation:
-    path: ../native_sqlite_annotation
+    git:
+      url: https://github.com/dev-nesmin/native_sqllite.git
+      path: native_sqlite_annotation
 
 dev_dependencies:
   build_runner: ^2.4.13
   native_sqlite_generator:
-    path: ../native_sqlite_generator
+    git:
+      url: https://github.com/dev-nesmin/native_sqllite.git
+      path: native_sqlite_generator
 ```
 
 ### 2. Define Your Model

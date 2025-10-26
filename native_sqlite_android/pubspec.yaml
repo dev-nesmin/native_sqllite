@@ -21,7 +21,9 @@ dependencies:
   flutter:
     sdk: flutter
   native_sqlite_platform_interface:
-    path: ../native_sqlite_platform_interface
+    git:
+      url: https://github.com/dev-nesmin/native_sqllite.git
+      path: native_sqlite_platform_interface
 
 dev_dependencies:
   flutter_test:

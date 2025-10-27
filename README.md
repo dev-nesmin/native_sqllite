@@ -34,7 +34,7 @@ dependencies:
       path: native_sqlite_annotation
 
 dev_dependencies:
-  build_runner: ^2.4.13
+  build_runner: ^2.10.1
   native_sqlite_generator:
     git:
       url: https://github.com/dev-nesmin/native_sqllite.git
@@ -47,7 +47,7 @@ dev_dependencies:
 // lib/models/user.dart
 import 'package:native_sqlite_annotation/native_sqlite_annotation.dart';
 
-part 'user.table.g.dart';
+part 'user.g.dart';
 
 @Table(name: 'users')
 class User {
@@ -162,7 +162,7 @@ dart run native_sqlite_generator
 
 **What gets generated:**
 
-✅ **Dart** (`lib/models/user.table.g.dart`):
+✅ **Dart** (`lib/models/user.g.dart`):
 ```dart
 abstract class UserSchema {
   static const String tableName = 'users';

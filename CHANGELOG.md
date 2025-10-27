@@ -9,12 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Fixed generator file extension mismatch: Changed from `.table.g.dart` to `.g.dart` to match part statements in model files
-- Updated all package dependencies to use path references for local development (was using git references)
 - Updated example project SDK constraint to match other packages (3.6.0)
 - Updated build_runner to ^2.10.1 and flutter_lints to ^5.0.0 in example project
 
 ### Changed
-- All internal package dependencies now use path references instead of git URLs for easier local development
 - Updated documentation to reflect correct file extensions for generated files
 
 ## [0.0.1] - 2024-10-27

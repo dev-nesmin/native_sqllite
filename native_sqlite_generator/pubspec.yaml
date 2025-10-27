@@ -15,7 +15,9 @@ dependencies:
   glob: ^2.1.2
   path: ^1.9.0
   native_sqlite_annotation:
-    path: ../native_sqlite_annotation
+    git:
+      url: https://github.com/dev-nesmin/native_sqllite.git
+      path: native_sqlite_annotation
 
 dev_dependencies:
   lints: ^5.0.0

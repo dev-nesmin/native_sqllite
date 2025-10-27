@@ -41,19 +41,7 @@ Also updated the post_process_builders:
 input_extensions: [".g.dart"]  # Was [".table.g.dart"]
 ```
 
-### 2. Updated Dependencies
-
-**Updated all packages to use path dependencies for local development:**
-
-- `native_sqlite/pubspec.yaml` - Converted git dependencies to path dependencies
-- `native_sqlite_android/pubspec.yaml` - Converted git dependencies to path dependencies
-- `native_sqlite_ios/pubspec.yaml` - Converted git dependencies to path dependencies
-- `native_sqlite_web/pubspec.yaml` - Converted git dependencies to path dependencies
-- `native_sqlite_generator/pubspec.yaml` - Converted git dependencies to path dependencies
-
-This change makes local development and testing much easier, as you don't need to commit and push changes to test them.
-
-### 3. Updated Example Project
+### 2. Updated Example Project
 
 **File:** `example/pubspec.yaml`
 
@@ -61,7 +49,7 @@ This change makes local development and testing much easier, as you don't need t
 - Updated `build_runner` from `^2.4.0` to `^2.10.1` (latest compatible version)
 - Updated `flutter_lints` from `^3.0.0` to `^5.0.0` (latest version)
 
-### 4. Updated Documentation
+### 3. Updated Documentation
 
 **File:** `README.md`
 

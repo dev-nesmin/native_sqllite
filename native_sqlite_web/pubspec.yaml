@@ -22,9 +22,7 @@ dependencies:
   flutter_web_plugins:
     sdk: flutter
   native_sqlite_platform_interface:
-    git:
-      url: https://github.com/dev-nesmin/native_sqllite.git
-      path: native_sqlite_platform_interface
+    path: ../native_sqlite_platform_interface
   sqlite3: ^2.4.6
   sqlite3_web: ^0.1.0
 

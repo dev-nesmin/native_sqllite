@@ -22,21 +22,13 @@ dependencies:
   flutter:
     sdk: flutter
   native_sqlite_platform_interface:
-    git:
-      url: https://github.com/dev-nesmin/native_sqllite.git
-      path: native_sqlite_platform_interface
+    path: ../native_sqlite_platform_interface
   native_sqlite_android:
-    git:
-      url: https://github.com/dev-nesmin/native_sqllite.git
-      path: native_sqlite_android
+    path: ../native_sqlite_android
   native_sqlite_ios:
-    git:
-      url: https://github.com/dev-nesmin/native_sqllite.git
-      path: native_sqlite_ios
+    path: ../native_sqlite_ios
   native_sqlite_web:
-    git:
-      url: https://github.com/dev-nesmin/native_sqllite.git
-      path: native_sqlite_web
+    path: ../native_sqlite_web
 
 dev_dependencies:
   flutter_test:

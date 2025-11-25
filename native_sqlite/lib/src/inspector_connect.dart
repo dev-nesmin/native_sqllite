@@ -143,7 +143,7 @@ class InspectorConnect {
               tables.add({
                 'name': tableName,
                 'columns': columns,
-                'indexes': [], // TODO: Fetch indexes
+                'indexes': await _getIndexes(name, tableName),
                 'primaryKey': columns.firstWhere(
                   (c) => c['primaryKey'] == true,
                   orElse: () => {},
@@ -155,7 +155,7 @@ class InspectorConnect {
               'name': name,
               'path': path,
               'tables': tables,
-              'size': 0, // TODO: Get file size
+              'size': await _getDatabaseSize(name),
             });
           }
         }
@@ -385,5 +385,68 @@ class InspectorConnect {
 
   static void _notifyDataChanged() {
     developer.postEvent('ext.native_sqlite.data_changed', {});
+  }
+
+  static Future<List<String>> _getIndexes(
+    String database,
+    String tableName,
+  ) async {
+    try {
+      final indexesResult = await NativeSqlite.query(
+        database,
+        "PRAGMA index_list($tableName)",
+      );
+
+      final indexes = <String>[];
+      for (final row in indexesResult.toMapList()) {
+        final indexName = row['name'] as String;
+        // Skip auto-generated indexes (like for primary keys) if desired,
+        // but usually we want to see them or at least explicit ones.
+        // sqlite_autoindex_...
+
+        final infoResult = await NativeSqlite.query(
+          database,
+          "PRAGMA index_info($indexName)",
+        );
+
+        final columns = infoResult
+            .toMapList()
+            .map((c) => c['name'] as String)
+            .join(', ');
+        indexes.add('$indexName ($columns)');
+      }
+      return indexes;
+    } catch (e) {
+      print('Error fetching indexes: $e');
+      return [];
+    }
+  }
+
+  static Future<int> _getDatabaseSize(String database) async {
+    try {
+      final pageCountResult = await NativeSqlite.query(
+        database,
+        'PRAGMA page_count',
+      );
+      final pageSizeResult = await NativeSqlite.query(
+        database,
+        'PRAGMA page_size',
+      );
+
+      final pageCountRows = pageCountResult.toMapList();
+      final pageSizeRows = pageSizeResult.toMapList();
+
+      if (pageCountRows.isNotEmpty && pageSizeRows.isNotEmpty) {
+        // PRAGMA results usually have the pragma name as key, or sometimes just 'page_count'
+        // Let's inspect the values safely
+        final pageCount = pageCountRows.first.values.first as int;
+        final pageSize = pageSizeRows.first.values.first as int;
+        return pageCount * pageSize;
+      }
+      return 0;
+    } catch (e) {
+      print('Error fetching database size: $e');
+      return 0;
+    }
   }
 }

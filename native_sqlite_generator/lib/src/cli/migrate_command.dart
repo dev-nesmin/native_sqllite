@@ -4,6 +4,8 @@ import 'dart:io';
 import 'package:native_sqlite_generator/src/migration/schema_comparator.dart';
 import 'package:native_sqlite_generator/src/models/schema_snapshot.dart';
 
+import '../utils/logger.dart';
+
 /// Column mapping for data migration
 class _ColumnMapping {
   final List<String> oldColumns;
@@ -45,7 +47,7 @@ class MigrateCommand {
   MigrateCommand(this.verbose);
 
   Future<void> execute(List<String> args) async {
-    print('🔄 Generating migration...\n');
+    logger.info('🔄 Generating migration...\n');
 
     // Parse arguments
     String? fromPath;
@@ -63,17 +65,17 @@ class MigrateCommand {
     }
 
     if (fromPath == null || toPath == null) {
-      print('❌ Error: Missing required arguments\n');
-      print('Usage: dart run native_sqlite_generator migrate \\');
-      print('  --from <old-schema.json> \\');
-      print('  --to <new-schema.json> \\');
-      print('  --output <migration.sql> (optional)');
-      print('');
-      print('Example:');
-      print('  dart run native_sqlite_generator migrate \\');
-      print('    --from test_schemas/schema_v1.json \\');
-      print('    --to test_schemas/schema_v2.json \\');
-      print('    --output migrations/001_v1_to_v2.sql');
+      logger.severe('❌ Error: Missing required arguments\n');
+      logger.info('Usage: dart run native_sqlite_generator migrate \\');
+      logger.info('  --from <old-schema.json> \\');
+      logger.info('  --to <new-schema.json> \\');
+      logger.info('  --output <migration.sql> (optional)');
+      logger.info('');
+      logger.info('Example:');
+      logger.info('  dart run native_sqlite_generator migrate \\');
+      logger.info('    --from test_schemas/schema_v1.json \\');
+      logger.info('    --to test_schemas/schema_v2.json \\');
+      logger.info('    --output migrations/001_v1_to_v2.sql');
       exit(1);
     }
 
@@ -83,29 +85,32 @@ class MigrateCommand {
       final toSchema = await _loadDatabaseSchema(toPath);
 
       if (fromSchema == null) {
-        print('❌ Error: Could not load schema from: $fromPath\n');
+        logger.severe('❌ Error: Could not load schema from: $fromPath\n');
         exit(1);
       }
 
       if (toSchema == null) {
-        print('❌ Error: Could not load schema from: $toPath\n');
+        logger.severe('❌ Error: Could not load schema from: $toPath\n');
         exit(1);
       }
 
       if (verbose) {
-        print(
-            'From: ${fromSchema.version} (${fromSchema.tables.length} tables)');
-        print('To:   ${toSchema.version} (${toSchema.tables.length} tables)');
-        print('');
+        logger.info(
+          'From: ${fromSchema.version} (${fromSchema.tables.length} tables)',
+        );
+        logger.info(
+          'To:   ${toSchema.version} (${toSchema.tables.length} tables)',
+        );
+        logger.info('');
       }
 
       // Generate migration SQL
       final migrationSql = _generateDatabaseMigrationSql(fromSchema, toSchema);
 
       if (migrationSql.isEmpty) {
-        print('✅ No changes detected!');
-        print('');
-        print('The schemas are identical.');
+        logger.info('✅ No changes detected!');
+        logger.info('');
+        logger.info('The schemas are identical.');
         return;
       }
 
@@ -115,25 +120,25 @@ class MigrateCommand {
         await outputFile.create(recursive: true);
         await outputFile.writeAsString(migrationSql);
 
-        print('✅ Migration generated successfully!');
-        print('');
-        print('Output: $outputPath');
-        print('From version: ${fromSchema.version}');
-        print('To version:   ${toSchema.version}');
+        logger.info('✅ Migration generated successfully!');
+        logger.info('');
+        logger.info('Output: $outputPath');
+        logger.info('From version: ${fromSchema.version}');
+        logger.info('To version:   ${toSchema.version}');
       } else {
-        print('Generated Migration SQL:');
-        print('═' * 60);
-        print(migrationSql);
-        print('═' * 60);
-        print('');
-        print('💡 Use --output to save to a file');
+        logger.info('Generated Migration SQL:');
+        logger.info('═' * 60);
+        logger.info(migrationSql);
+        logger.info('═' * 60);
+        logger.info('');
+        logger.info('💡 Use --output to save to a file');
       }
     } catch (e, stackTrace) {
-      print('❌ Error generating migration: $e');
+      logger.severe('❌ Error generating migration: $e');
       if (verbose) {
-        print('');
-        print('Stack trace:');
-        print(stackTrace);
+        logger.severe('');
+        logger.severe('Stack trace:');
+        logger.severe(stackTrace);
       }
       exit(1);
     }
@@ -152,14 +157,16 @@ class MigrateCommand {
       return DatabaseSchema.fromJson(json);
     } catch (e) {
       if (verbose) {
-        print('⚠️  Error loading schema from $filePath: $e');
+        logger.warning('⚠️  Error loading schema from $filePath: $e');
       }
       return null;
     }
   }
 
   String _generateDatabaseMigrationSql(
-      DatabaseSchema fromSchema, DatabaseSchema toSchema) {
+    DatabaseSchema fromSchema,
+    DatabaseSchema toSchema,
+  ) {
     final buffer = StringBuffer();
     final now = DateTime.now();
 
@@ -169,7 +176,8 @@ class MigrateCommand {
     buffer.writeln('-- To version:   ${toSchema.version}');
     buffer.writeln('');
     buffer.writeln(
-        '-- =============================================================================');
+      '-- =============================================================================',
+    );
     buffer.writeln('');
 
     // Begin transaction
@@ -198,7 +206,8 @@ class MigrateCommand {
 
         if (changes.isNotEmpty) {
           buffer.writeln(
-              '-- Update table: $tableName (${changes.length} changes)');
+            '-- Update table: $tableName (${changes.length} changes)',
+          );
           buffer.writeln(_generateMigrationSql(changes, fromTable, toTable));
           buffer.writeln('');
         }
@@ -235,18 +244,22 @@ class MigrateCommand {
     buffer.writeln('-- Changes: ${changes.length}');
     buffer.writeln('');
     buffer.writeln(
-        '-- =============================================================================');
+      '-- =============================================================================',
+    );
     buffer.writeln('');
 
     // Check if table recreation is required
-    final requiresRecreation =
-        SchemaComparator.requiresTableRecreation(changes);
+    final requiresRecreation = SchemaComparator.requiresTableRecreation(
+      changes,
+    );
 
     if (requiresRecreation) {
-      buffer
-          .writeln('-- ⚠️  WARNING: This migration requires table recreation');
       buffer.writeln(
-          '-- Data will be preserved but this operation cannot be easily rolled back');
+        '-- ⚠️  WARNING: This migration requires table recreation',
+      );
+      buffer.writeln(
+        '-- Data will be preserved but this operation cannot be easily rolled back',
+      );
       buffer.writeln('');
     }
 
@@ -256,8 +269,9 @@ class MigrateCommand {
 
     // If recreation is needed, do it all at once
     if (requiresRecreation) {
-      buffer
-          .writeln(_generateTableRecreationSQL(fromSchema, toSchema, changes));
+      buffer.writeln(
+        _generateTableRecreationSQL(fromSchema, toSchema, changes),
+      );
     } else {
       // Generate SQL for each change
       for (final change in changes) {
@@ -296,7 +310,8 @@ class MigrateCommand {
     buffer.writeln('-- Step 2: Copy data');
     final columnMapping = _buildColumnMapping(fromSchema, toSchema, changes);
     buffer.writeln(
-        'INSERT INTO $tempTableName (${columnMapping.newColumns.join(', ')})');
+      'INSERT INTO $tempTableName (${columnMapping.newColumns.join(', ')})',
+    );
     buffer.writeln('  SELECT ${columnMapping.oldColumns.join(', ')}');
     buffer.writeln('  FROM ${fromSchema.tableName};');
     buffer.writeln('');
@@ -308,19 +323,24 @@ class MigrateCommand {
 
     // 4. Rename new table
     buffer.writeln('-- Step 4: Rename new table');
-    buffer
-        .writeln('ALTER TABLE $tempTableName RENAME TO ${toSchema.tableName};');
+    buffer.writeln(
+      'ALTER TABLE $tempTableName RENAME TO ${toSchema.tableName};',
+    );
     buffer.writeln('');
 
     // 5. Recreate indexes
     if (toSchema.indexes.isNotEmpty) {
       buffer.writeln('-- Step 5: Recreate indexes');
       for (final index in toSchema.indexes) {
-        buffer.writeln(_generateAddIndexSQL(SchemaChange(
-          type: SchemaChangeType.addIndex,
-          tableName: toSchema.tableName,
-          index: index,
-        )));
+        buffer.writeln(
+          _generateAddIndexSQL(
+            SchemaChange(
+              type: SchemaChangeType.addIndex,
+              tableName: toSchema.tableName,
+              index: index,
+            ),
+          ),
+        );
       }
       buffer.writeln('');
     }
@@ -422,7 +442,7 @@ class MigrateCommand {
         return _generateRenameColumnSQL(change, fromSchema);
 
       case SchemaChangeType.modifyColumn:
-        return _generateModifyColumnSQL(change, fromSchema);
+        return '-- Error: Modify column should be handled by table recreation';
 
       case SchemaChangeType.addIndex:
         return _generateAddIndexSQL(change);
@@ -432,18 +452,17 @@ class MigrateCommand {
     }
   }
 
-  String _generateCreateTableSQL(TableSchemaSnapshot schema,
-      [String? tableName]) {
+  String _generateCreateTableSQL(
+    TableSchemaSnapshot schema, [
+    String? tableName,
+  ]) {
     final buffer = StringBuffer();
     final name = tableName ?? schema.tableName;
     buffer.writeln('CREATE TABLE IF NOT EXISTS $name (');
 
     final columnDefs = <String>[];
     for (final column in schema.columns) {
-      final parts = <String>[
-        column.name,
-        column.type,
-      ];
+      final parts = <String>[column.name, column.type];
 
       if (column.primaryKey) {
         parts.add('PRIMARY KEY');
@@ -479,10 +498,7 @@ class MigrateCommand {
     }
 
     final column = change.column!;
-    final parts = <String>[
-      column.name,
-      column.type,
-    ];
+    final parts = <String>[column.name, column.type];
 
     if (!column.nullable) {
       // If NOT NULL, need a default value for existing rows
@@ -498,7 +514,9 @@ class MigrateCommand {
   }
 
   String _generateDropColumnSQL(
-      SchemaChange change, TableSchemaSnapshot schema) {
+    SchemaChange change,
+    TableSchemaSnapshot schema,
+  ) {
     // SQLite doesn't support DROP COLUMN before version 3.35.0
     // Need to recreate the table without the column
     final buffer = StringBuffer();
@@ -506,33 +524,22 @@ class MigrateCommand {
     buffer.writeln('-- SQLite: Drop column by recreating table');
     buffer.writeln('CREATE TABLE ${change.tableName}_new AS');
     buffer.writeln(
-        '  SELECT ${_getColumnsExcept(schema, change.column?.name ?? '')}');
+      '  SELECT ${_getColumnsExcept(schema, change.column?.name ?? '')}',
+    );
     buffer.writeln('  FROM ${change.tableName};');
     buffer.writeln('DROP TABLE ${change.tableName};');
     buffer.write(
-        'ALTER TABLE ${change.tableName}_new RENAME TO ${change.tableName};');
+      'ALTER TABLE ${change.tableName}_new RENAME TO ${change.tableName};',
+    );
 
     return buffer.toString();
   }
 
   String _generateRenameColumnSQL(
-      SchemaChange change, TableSchemaSnapshot schema) {
+    SchemaChange change,
+    TableSchemaSnapshot schema,
+  ) {
     return 'ALTER TABLE ${change.tableName} RENAME COLUMN ${change.oldColumn?.name} TO ${change.newColumn?.name};';
-  }
-
-  String _generateModifyColumnSQL(
-      SchemaChange change, TableSchemaSnapshot schema) {
-    // SQLite doesn't support MODIFY COLUMN
-    // Need to recreate the table
-    final buffer = StringBuffer();
-
-    buffer.writeln('-- SQLite: Modify column by recreating table');
-    buffer
-        .writeln('-- TODO: Implement table recreation for column type change');
-    buffer.write(
-        '-- Changing ${change.column?.name} type in ${change.tableName}');
-
-    return buffer.toString();
   }
 
   String _generateAddIndexSQL(SchemaChange change) {

@@ -9,6 +9,7 @@ import 'package:native_sqlite_generator/src/cli/export_command.dart';
 import 'package:native_sqlite_generator/src/cli/migrate_command.dart';
 import 'package:native_sqlite_generator/src/cli/stats_command.dart';
 import 'package:native_sqlite_generator/src/native_generator.dart';
+import 'package:native_sqlite_generator/src/utils/logger.dart';
 
 /// Main entry point for native code generation and utilities
 ///
@@ -32,20 +33,31 @@ Future<void> main(List<String> arguments) async {
 
   final migrateParser = parser.addCommand('migrate');
   migrateParser
-    ..addOption('from',
-        help: 'Path to the old schema JSON file', mandatory: true)
+    ..addOption(
+      'from',
+      help: 'Path to the old schema JSON file',
+      mandatory: true,
+    )
     ..addOption('to', help: 'Path to the new schema JSON file', mandatory: true)
-    ..addOption('output',
-        abbr: 'o', help: 'Output path for migration SQL file');
+    ..addOption(
+      'output',
+      abbr: 'o',
+      help: 'Output path for migration SQL file',
+    );
 
   final exportParser = parser.addCommand('export');
   exportParser
-    ..addOption('output',
-        abbr: 'o',
-        help: 'Output path for schema JSON/YAML file',
-        mandatory: true)
-    ..addOption('format',
-        help: 'Output format: json or yaml', defaultsTo: 'json');
+    ..addOption(
+      'output',
+      abbr: 'o',
+      help: 'Output path for schema JSON/YAML file',
+      mandatory: true,
+    )
+    ..addOption(
+      'format',
+      help: 'Output format: json or yaml',
+      defaultsTo: 'json',
+    );
 
   try {
     final results = parser.parse(arguments);
@@ -56,6 +68,7 @@ Future<void> main(List<String> arguments) async {
     }
 
     final verbose = results['verbose'] as bool;
+    setupLogger(verbose: verbose);
 
     // Handle commands
     switch (results.command?.name) {
@@ -82,18 +95,18 @@ Future<void> main(List<String> arguments) async {
         await _generateNativeCode(arguments);
         break;
       default:
-        print('Unknown command: ${results.command?.name}');
+        logger.severe('Unknown command: ${results.command?.name}');
         _printUsage(parser);
         exit(1);
     }
   } catch (e, stackTrace) {
-    print('');
-    print('✗ Error: $e');
-    print('');
+    logger.severe('');
+    logger.severe('✗ Error: $e');
+    logger.severe('');
     if (arguments.contains('--verbose') || arguments.contains('-v')) {
-      print('Stack trace:');
-      print(stackTrace);
-      print('');
+      logger.severe('Stack trace:');
+      logger.severe(stackTrace);
+      logger.severe('');
     }
     exit(1);
   }
@@ -176,72 +189,69 @@ Future<void> _export(bool verbose, ArgResults commandResults) async {
   final format = commandResults['format'] as String? ?? 'json';
 
   final command = ExportCommand(verbose);
-  final args = [
-    '--output',
-    outputPath,
-    '--format',
-    format,
-  ];
+  final args = ['--output', outputPath, '--format', format];
   await command.execute(args);
 }
 
 Future<void> _generateNativeCode(List<String> arguments) async {
-  print('');
-  print('════════════════════════════════════════════');
-  print('  Native SQLite Code Generator');
-  print('════════════════════════════════════════════');
-  print('');
+  logger.info('');
+  logger.info('════════════════════════════════════════════');
+  logger.info('  Native SQLite Code Generator');
+  logger.info('════════════════════════════════════════════');
+  logger.info('');
 
   final generator = NativeCodeGenerator();
   await generator.generate();
 
-  print('');
-  print('✓ Native code generation completed successfully!');
-  print('');
+  logger.info('');
+  logger.info('✓ Native code generation completed successfully!');
+  logger.info('');
 }
 
 Future<void> _cleanCache(bool verbose) async {
-  print('🧹 Cleaning build cache...\n');
+  logger.info('🧹 Cleaning build cache...\n');
 
   final cache = BuildCache('.dart_tool/native_sqlite_generator');
   final stats = cache.getStats();
 
   if (verbose) {
-    print('Cache location: ${stats.cacheFile}');
-    print('Entries before: ${stats.totalEntries}');
-    print('Size before: ${stats.size} bytes');
-    print('');
+    logger.info('Cache location: ${stats.cacheFile}');
+    logger.info('Entries before: ${stats.totalEntries}');
+    logger.info('Size before: ${stats.size} bytes');
+    logger.info('');
   }
 
   cache.clear();
   cache.save();
 
-  print('✅ Cache cleared successfully!');
+  logger.info('✅ Cache cleared successfully!');
 
   if (verbose) {
-    print('');
-    print('Next build will regenerate all files.');
+    logger.info('');
+    logger.info('Next build will regenerate all files.');
   }
 }
 
 Future<void> _cacheStats(bool verbose) async {
-  print('📊 Build Cache Statistics\n');
+  logger.info('📊 Build Cache Statistics\n');
 
   final cache = BuildCache('.dart_tool/native_sqlite_generator');
   final stats = cache.getStats();
 
-  print(stats);
+  logger.info(stats);
 
   if (verbose && stats.totalEntries > 0) {
-    print('Cached files:');
+    logger.info('Cached files:');
     final files = cache.getCachedFiles();
     for (int i = 0; i < files.length; i++) {
-      print('  ${i + 1}. ${files[i]}');
+      logger.info('  ${i + 1}. ${files[i]}');
     }
-    print('');
+    logger.info('');
   }
 
   if (stats.totalEntries == 0) {
-    print('💡 Tip: Run "dart run build_runner build" to populate the cache.');
+    logger.info(
+      '💡 Tip: Run "dart run build_runner build" to populate the cache.',
+    );
   }
 }

@@ -9,6 +9,7 @@ import 'package:path/path.dart' as path;
 import 'config.dart';
 import 'native_kotlin_generator.dart';
 import 'native_swift_generator.dart';
+import 'utils/logger.dart';
 
 /// Generates native code files for Android and iOS
 class NativeCodeGenerator {
@@ -17,8 +18,7 @@ class NativeCodeGenerator {
     if (runBuildRunner) {
       final needsBuildRunner = await _checkBuildRunner();
       if (needsBuildRunner) {
-        print('📦 Running build_runner first...');
-        print('');
+        logger.info('📦 Running build_runner first...\n');
         final result = await Process.run('dart', [
           'run',
           'build_runner',
@@ -30,58 +30,61 @@ class NativeCodeGenerator {
           throw Exception('build_runner failed:\n${result.stderr}');
         }
 
-        print('✓ build_runner completed');
-        print('');
+        logger.info('✓ build_runner completed\n');
       }
     }
 
     // Load configuration
-    print('📋 Loading configuration...');
+    logger.info('📋 Loading configuration...');
     final config = await NativeSqliteConfig.load();
 
     if (config == null) {
-      print('⚠️  No native_sqlite configuration found.');
-      print(
+      logger.warning('⚠️  No native_sqlite configuration found.');
+      logger.warning(
         '   Add configuration to pubspec.yaml or create native_sqlite_config.yaml',
       );
-      print('   See native_sqlite_config.example.yaml for reference.');
+      logger.warning('   See native_sqlite_config.example.yaml for reference.');
       return;
     }
 
     if (!config.generateNative) {
-      print('ℹ️  Native code generation is disabled (generate_native: false)');
+      logger.info(
+        'ℹ️  Native code generation is disabled (generate_native: false)',
+      );
       return;
     }
 
-    print('✓ Configuration loaded\n');
+    logger.info('✓ Configuration loaded\n');
 
     // Find Dart model files
-    print('🔍 Finding model files...');
+    logger.info('🔍 Finding model files...');
     final modelFiles = await _findModelFiles(config.models);
 
     if (modelFiles.isEmpty) {
-      print('⚠️  No model files found.');
-      print('   Check the "models" configuration in your config file.');
+      logger.warning('⚠️  No model files found.');
+      logger.warning(
+        '   Check the "models" configuration in your config file.',
+      );
       return;
     }
 
-    print('✓ Found ${modelFiles.length} model file(s)\n');
+    logger.info('✓ Found ${modelFiles.length} model file(s)\n');
 
     // Parse each file and generate native code
     final generatedFiles = <String>[];
 
     for (final file in modelFiles) {
-      print('📄 Processing ${path.basename(file)}...');
+      logger.info('📄 Processing ${path.basename(file)}...');
 
       try {
         final models = await _parseModels(file);
 
         if (models.isEmpty) {
-          print('   ⊘ No @Table annotated classes found');
+          logger.info('   ⊘ No @Table annotated classes found');
           continue;
         }
 
-        print(
+        logger.info(
           '   Found ${models.length} table(s): ${models.map((m) => m.className).join(", ")}',
         );
 
@@ -107,33 +110,35 @@ class NativeCodeGenerator {
           generatedFiles.addAll(iosFiles);
         }
       } catch (e) {
-        print('   ❌ Error: $e');
+        logger.severe('   ❌ Error: $e');
       }
     }
 
     // Summary
-    print('\n📊 Generation Summary');
-    print('   Files generated: ${generatedFiles.length}');
+    logger.info('\n📊 Generation Summary');
+    logger.info('   Files generated: ${generatedFiles.length}');
 
     if (config.android.enabled) {
       final androidFiles = generatedFiles
           .where((f) => f.endsWith('.kt'))
           .length;
-      print('   - Android (Kotlin): $androidFiles file(s)');
+      logger.info('   - Android (Kotlin): $androidFiles file(s)');
     }
 
     if (config.ios.enabled) {
       final iosFiles = generatedFiles.where((f) => f.endsWith('.swift')).length;
-      print('   - iOS (Swift): $iosFiles file(s)');
+      logger.info('   - iOS (Swift): $iosFiles file(s)');
     }
 
-    print('\n💡 Next steps:');
+    logger.info('\n💡 Next steps:');
     if (config.android.enabled) {
-      print('   • Rebuild your Android app to include the generated files');
+      logger.info(
+        '   • Rebuild your Android app to include the generated files',
+      );
     }
     if (config.ios.enabled) {
-      print('   • Add generated Swift files to your Xcode project');
-      print('   • Right-click on Runner folder → Add Files to "Runner"');
+      logger.info('   • Add generated Swift files to your Xcode project');
+      logger.info('   • Right-click on Runner folder → Add Files to "Runner"');
     }
   }
 
@@ -327,7 +332,7 @@ class NativeCodeGenerator {
     // Create output directory
     if (!await outputDir.exists()) {
       await outputDir.create(recursive: true);
-      print('   📁 Created directory: ${config.outputPath}');
+      logger.info('   📁 Created directory: ${config.outputPath}');
     }
 
     for (final model in models) {
@@ -338,7 +343,7 @@ class NativeCodeGenerator {
       );
       await schemaFile.writeAsString(schemaCode);
       generatedFiles.add(schemaFile.path);
-      print('   ✓ Generated ${path.basename(schemaFile.path)}');
+      logger.info('   ✓ Generated ${path.basename(schemaFile.path)}');
 
       // Generate helper file if enabled
       if (config.generateHelpers) {
@@ -348,7 +353,7 @@ class NativeCodeGenerator {
         );
         await helperFile.writeAsString(helperCode);
         generatedFiles.add(helperFile.path);
-        print('   ✓ Generated ${path.basename(helperFile.path)}');
+        logger.info('   ✓ Generated ${path.basename(helperFile.path)}');
       }
     }
 
@@ -372,7 +377,7 @@ class NativeCodeGenerator {
     // Create output directory
     if (!await outputDir.exists()) {
       await outputDir.create(recursive: true);
-      print('   📁 Created directory: ${config.outputPath}');
+      logger.info('   📁 Created directory: ${config.outputPath}');
     }
 
     for (final model in models) {
@@ -383,7 +388,7 @@ class NativeCodeGenerator {
       );
       await schemaFile.writeAsString(schemaCode);
       generatedFiles.add(schemaFile.path);
-      print('   ✓ Generated ${path.basename(schemaFile.path)}');
+      logger.info('   ✓ Generated ${path.basename(schemaFile.path)}');
 
       // Generate helper file if enabled
       if (config.generateHelpers) {
@@ -393,7 +398,7 @@ class NativeCodeGenerator {
         );
         await helperFile.writeAsString(helperCode);
         generatedFiles.add(helperFile.path);
-        print('   ✓ Generated ${path.basename(helperFile.path)}');
+        logger.info('   ✓ Generated ${path.basename(helperFile.path)}');
       }
     }
 
@@ -420,7 +425,9 @@ class NativeCodeGenerator {
       final source = File(modelFile);
 
       if (!await generated.exists()) {
-        print('ℹ️  Generated file missing: ${path.basename(generatedFile)}');
+        logger.info(
+          'ℹ️  Generated file missing: ${path.basename(generatedFile)}',
+        );
         return true;
       }
 
@@ -428,7 +435,7 @@ class NativeCodeGenerator {
       final sourceTime = await source.lastModified();
 
       if (sourceTime.isAfter(generatedTime)) {
-        print(
+        logger.info(
           'ℹ️  Source file newer than generated: ${path.basename(modelFile)}',
         );
         return true;

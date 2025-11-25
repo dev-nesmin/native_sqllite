@@ -1,0 +1,146 @@
+{
+  "className": "Product",
+  "tableName": "products",
+  "columns": [
+    {
+      "dartName": "id",
+      "name": "id",
+      "type": "INTEGER",
+      "nullable": true,
+      "primaryKey": true,
+      "autoIncrement": true,
+      "unique": false,
+      "isJsonField": false,
+      "hasConverter": false,
+      "dartType": "int?"
+    },
+    {
+      "dartName": "name",
+      "name": "name",
+      "type": "TEXT",
+      "nullable": false,
+      "primaryKey": false,
+      "autoIncrement": false,
+      "unique": false,
+      "isJsonField": false,
+      "hasConverter": false,
+      "dartType": "String"
+    },
+    {
+      "dartName": "description",
+      "name": "description",
+      "type": "TEXT",
+      "nullable": true,
+      "primaryKey": false,
+      "autoIncrement": false,
+      "unique": false,
+      "isJsonField": false,
+      "hasConverter": false,
+      "dartType": "String?"
+    },
+    {
+      "dartName": "price",
+      "name": "price",
+      "type": "REAL",
+      "nullable": false,
+      "primaryKey": false,
+      "autoIncrement": false,
+      "unique": false,
+      "isJsonField": false,
+      "hasConverter": false,
+      "dartType": "double"
+    },
+    {
+      "dartName": "stock",
+      "name": "stock",
+      "type": "INTEGER",
+      "nullable": false,
+      "primaryKey": false,
+      "autoIncrement": false,
+      "unique": false,
+      "defaultValue": "0",
+      "isJsonField": false,
+      "hasConverter": false,
+      "dartType": "int"
+    },
+    {
+      "dartName": "isAvailable",
+      "name": "isAvailable",
+      "type": "INTEGER",
+      "nullable": false,
+      "primaryKey": false,
+      "autoIncrement": false,
+      "unique": false,
+      "defaultValue": "1",
+      "isJsonField": false,
+      "hasConverter": false,
+      "dartType": "bool"
+    },
+    {
+      "dartName": "categoryId",
+      "name": "categoryId",
+      "type": "INTEGER",
+      "nullable": false,
+      "primaryKey": false,
+      "autoIncrement": false,
+      "unique": false,
+      "foreignKey": "categories.id",
+      "isJsonField": false,
+      "hasConverter": false,
+      "dartType": "int"
+    },
+    {
+      "dartName": "imageUrl",
+      "name": "imageUrl",
+      "type": "TEXT",
+      "nullable": true,
+      "primaryKey": false,
+      "autoIncrement": false,
+      "unique": false,
+      "isJsonField": false,
+      "hasConverter": false,
+      "dartType": "String?"
+    },
+    {
+      "dartName": "createdAt",
+      "name": "createdAt",
+      "type": "INTEGER",
+      "nullable": false,
+      "primaryKey": false,
+      "autoIncrement": false,
+      "unique": false,
+      "isJsonField": false,
+      "hasConverter": false,
+      "dartType": "DateTime"
+    },
+    {
+      "dartName": "updatedAt",
+      "name": "updatedAt",
+      "type": "INTEGER",
+      "nullable": true,
+      "primaryKey": false,
+      "autoIncrement": false,
+      "unique": false,
+      "isJsonField": false,
+      "hasConverter": false,
+      "dartType": "DateTime?"
+    }
+  ],
+  "indexes": [
+    {
+      "columns": [
+        "categoryId",
+        "price"
+      ],
+      "unique": false
+    },
+    {
+      "columns": [
+        "name"
+      ],
+      "unique": false
+    }
+  ],
+  "version": 1,
+  "hash": "eda74ed"
+}

@@ -1,0 +1,16 @@
+targets:
+  $default:
+    builders:
+      native_sqlite_generator:table:
+        options:
+          # Global default database name for all tables
+          # This can be overridden per-table using @Table(database: 'other_db')
+          default_database: 'example_app'
+          
+          # Other available options:
+          # format: true
+          # generate_helpers: true
+          # enable_cached_builds: true
+          # table_name_case: 'snake'  # 'snake', 'camel', 'pascal', or 'none'
+          # column_name_case: 'snake'
+          # verbose: false

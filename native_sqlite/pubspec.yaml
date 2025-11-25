@@ -1,0 +1,36 @@
+name: native_sqlite
+description: "A simple yet powerful SQLite plugin accessible from both native (Android/iOS/Web) and Flutter code with WAL mode support for concurrent access."
+version: 0.0.1
+homepage: https://nesmin.dev
+publish_to: none
+
+environment:
+  sdk: '>=3.9.0 <4.0.0'
+  flutter: '>=3.35.0'
+
+flutter:
+  plugin:
+    platforms:
+      android:
+        default_package: native_sqlite_android
+      ios:
+        default_package: native_sqlite_ios
+      web:
+        default_package: native_sqlite_web
+
+dependencies:
+  flutter:
+    sdk: flutter
+  native_sqlite_platform_interface:
+    path: ../native_sqlite_platform_interface
+  native_sqlite_android:
+    path: ../native_sqlite_android
+  native_sqlite_ios:
+    path: ../native_sqlite_ios
+  native_sqlite_web:
+    path: ../native_sqlite_web
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0

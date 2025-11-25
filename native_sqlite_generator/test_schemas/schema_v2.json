@@ -1,0 +1,48 @@
+{
+  "version": "2.0.0",
+  "generatedAt": "2024-01-15T00:00:00.000Z",
+  "tables": [
+    {
+      "className": "User",
+      "tableName": "users",
+      "version": 2,
+      "hash": "abc456",
+      "columns": [
+        {"dartName": "id", "name": "id", "type": "INTEGER", "dartType": "int", "primaryKey": true, "autoIncrement": true, "nullable": false, "unique": false, "isJsonField": false, "hasConverter": false},
+        {"dartName": "name", "name": "name", "type": "TEXT", "dartType": "String", "primaryKey": false, "autoIncrement": false, "nullable": false, "unique": false, "isJsonField": false, "hasConverter": false},
+        {"dartName": "email", "name": "email", "type": "TEXT", "dartType": "String", "primaryKey": false, "autoIncrement": false, "nullable": false, "unique": true, "isJsonField": false, "hasConverter": false},
+        {"dartName": "createdAt", "name": "created_at", "type": "INTEGER", "dartType": "int", "primaryKey": false, "autoIncrement": false, "nullable": false, "unique": false, "isJsonField": false, "hasConverter": false},
+        {"dartName": "bio", "name": "bio", "type": "TEXT", "dartType": "String?", "primaryKey": false, "autoIncrement": false, "nullable": true, "unique": false, "isJsonField": false, "hasConverter": false}
+      ],
+      "indexes": [{"columns": ["email"], "unique": true}, {"columns": ["created_at"], "unique": false}]
+    },
+    {
+      "className": "Post",
+      "tableName": "posts",
+      "version": 2,
+      "hash": "def789",
+      "columns": [
+        {"dartName": "id", "name": "id", "type": "INTEGER", "dartType": "int", "primaryKey": true, "autoIncrement": true, "nullable": false, "unique": false, "isJsonField": false, "hasConverter": false},
+        {"dartName": "title", "name": "title", "type": "TEXT", "dartType": "String", "primaryKey": false, "autoIncrement": false, "nullable": false, "unique": false, "isJsonField": false, "hasConverter": false},
+        {"dartName": "content", "name": "content", "type": "TEXT", "dartType": "String?", "primaryKey": false, "autoIncrement": false, "nullable": true, "unique": false, "isJsonField": false, "hasConverter": false},
+        {"dartName": "userId", "name": "userId", "type": "INTEGER", "dartType": "int", "primaryKey": false, "autoIncrement": false, "nullable": false, "unique": false, "foreignKey": "users.id", "isJsonField": false, "hasConverter": false},
+        {"dartName": "publishedAt", "name": "published_at", "type": "INTEGER", "dartType": "int?", "primaryKey": false, "autoIncrement": false, "nullable": true, "unique": false, "isJsonField": false, "hasConverter": false}
+      ],
+      "indexes": [{"columns": ["userId"], "unique": false}, {"columns": ["published_at"], "unique": false}]
+    },
+    {
+      "className": "Comment",
+      "tableName": "comments",
+      "version": 1,
+      "hash": "ghi123",
+      "columns": [
+        {"dartName": "id", "name": "id", "type": "INTEGER", "dartType": "int", "primaryKey": true, "autoIncrement": true, "nullable": false, "unique": false, "isJsonField": false, "hasConverter": false},
+        {"dartName": "postId", "name": "postId", "type": "INTEGER", "dartType": "int", "primaryKey": false, "autoIncrement": false, "nullable": false, "unique": false, "foreignKey": "posts.id", "isJsonField": false, "hasConverter": false},
+        {"dartName": "userId", "name": "userId", "type": "INTEGER", "dartType": "int", "primaryKey": false, "autoIncrement": false, "nullable": false, "unique": false, "foreignKey": "users.id", "isJsonField": false, "hasConverter": false},
+        {"dartName": "content", "name": "content", "type": "TEXT", "dartType": "String", "primaryKey": false, "autoIncrement": false, "nullable": false, "unique": false, "isJsonField": false, "hasConverter": false},
+        {"dartName": "createdAt", "name": "created_at", "type": "INTEGER", "dartType": "int", "primaryKey": false, "autoIncrement": false, "nullable": false, "unique": false, "isJsonField": false, "hasConverter": false}
+      ],
+      "indexes": [{"columns": ["postId"], "unique": false}, {"columns": ["userId"], "unique": false}]
+    }
+  ]
+}

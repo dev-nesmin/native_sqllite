@@ -1,0 +1,26 @@
+name: native_sqlite_generator
+description: "Code generator for native_sqlite - Generates table schemas and repositories from annotated classes"
+version: 0.0.1
+homepage: https://nesmin.dev
+publish_to: none
+
+environment:
+  sdk: '>=3.9.0 <4.0.0'
+
+dependencies:
+  build: ^4.0.2
+  source_gen: ^4.0.2
+  analyzer: ^8.4.0
+  yaml: ^3.1.2
+  glob: ^2.1.2
+  path: ^1.9.0
+  args: ^2.5.0
+  dart_style: ^3.1.2
+  crypto: ^3.0.5
+  native_sqlite:
+    path: ../native_sqlite
+
+dev_dependencies:
+  lints: ^6.0.0
+  build_runner: ^2.10.1
+  build_test: ^3.5.1

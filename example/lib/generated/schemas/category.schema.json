@@ -1,0 +1,57 @@
+{
+  "className": "Category",
+  "tableName": "categories",
+  "columns": [
+    {
+      "dartName": "id",
+      "name": "id",
+      "type": "INTEGER",
+      "nullable": true,
+      "primaryKey": true,
+      "autoIncrement": true,
+      "unique": false,
+      "isJsonField": false,
+      "hasConverter": false,
+      "dartType": "int?"
+    },
+    {
+      "dartName": "name",
+      "name": "name",
+      "type": "TEXT",
+      "nullable": false,
+      "primaryKey": false,
+      "autoIncrement": false,
+      "unique": true,
+      "isJsonField": false,
+      "hasConverter": false,
+      "dartType": "String"
+    },
+    {
+      "dartName": "description",
+      "name": "description",
+      "type": "TEXT",
+      "nullable": true,
+      "primaryKey": false,
+      "autoIncrement": false,
+      "unique": false,
+      "isJsonField": false,
+      "hasConverter": false,
+      "dartType": "String?"
+    },
+    {
+      "dartName": "createdAt",
+      "name": "createdAt",
+      "type": "INTEGER",
+      "nullable": false,
+      "primaryKey": false,
+      "autoIncrement": false,
+      "unique": false,
+      "isJsonField": false,
+      "hasConverter": false,
+      "dartType": "DateTime"
+    }
+  ],
+  "indexes": [],
+  "version": 1,
+  "hash": "22163039"
+}

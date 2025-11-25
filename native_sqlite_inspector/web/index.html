@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <base href="$FLUTTER_BASE_HREF">
+
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="description" content="SQLite Inspector - Inspect SQLite databases in real-time">
+
+  <!-- iOS meta tags & icons -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="SQLite Inspector">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>SQLite Inspector</title>
+  <link rel="manifest" href="manifest.json">
+
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background: #1a1c1e;
+      color: #ffffff;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    }
+
+    #loader {
+      position: absolute;
+      display: grid;
+      grid-auto-flow: row;
+      row-gap: 20px;
+      justify-items: center;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 5000;
+    }
+
+    #loader .spinner {
+      width: 60px;
+      height: 60px;
+      border: 4px solid rgba(255, 255, 255, 0.1);
+      border-top-color: #0277BD;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    #loader-info-text {
+      font-size: 14pt;
+      color: #fff;
+      text-align: center;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    #loader.hide {
+      opacity: 0;
+      transition: opacity 0.5s;
+    }
+  </style>
+</head>
+
+<body>
+  <section id="loader">
+    <div class="spinner"></div>
+    <span id="loader-info-text">Loading SQLite Inspector...</span>
+  </section>
+
+  <script>
+    window.addEventListener('flutter-first-frame', function () {
+      const loader = document.getElementById('loader');
+      if (loader) {
+        loader.classList.add('hide');
+        setTimeout(() => loader.remove(), 500);
+      }
+    });
+  </script>
+
+  <script src="flutter_bootstrap.js" async></script>
+</body>
+
+</html>

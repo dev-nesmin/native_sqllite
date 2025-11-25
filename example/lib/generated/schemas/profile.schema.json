@@ -1,0 +1,117 @@
+{
+  "className": "Profile",
+  "tableName": "profiles",
+  "columns": [
+    {
+      "dartName": "id",
+      "name": "id",
+      "type": "INTEGER",
+      "nullable": true,
+      "primaryKey": true,
+      "autoIncrement": true,
+      "unique": false,
+      "isJsonField": false,
+      "hasConverter": false,
+      "dartType": "int?"
+    },
+    {
+      "dartName": "name",
+      "name": "name",
+      "type": "TEXT",
+      "nullable": false,
+      "primaryKey": false,
+      "autoIncrement": false,
+      "unique": false,
+      "isJsonField": false,
+      "hasConverter": false,
+      "dartType": "String"
+    },
+    {
+      "dartName": "email",
+      "name": "email",
+      "type": "TEXT",
+      "nullable": false,
+      "primaryKey": false,
+      "autoIncrement": false,
+      "unique": false,
+      "isJsonField": false,
+      "hasConverter": false,
+      "dartType": "String"
+    },
+    {
+      "dartName": "phoneNumber",
+      "name": "phone_number",
+      "type": "TEXT",
+      "nullable": true,
+      "primaryKey": false,
+      "autoIncrement": false,
+      "unique": false,
+      "isJsonField": false,
+      "hasConverter": false,
+      "dartType": "String?"
+    },
+    {
+      "dartName": "settings",
+      "name": "settings",
+      "type": "TEXT",
+      "nullable": true,
+      "primaryKey": false,
+      "autoIncrement": false,
+      "unique": false,
+      "isJsonField": true,
+      "hasConverter": false,
+      "dartType": "Map<String, dynamic>?"
+    },
+    {
+      "dartName": "tags",
+      "name": "tags",
+      "type": "TEXT",
+      "nullable": true,
+      "primaryKey": false,
+      "autoIncrement": false,
+      "unique": false,
+      "isJsonField": true,
+      "hasConverter": false,
+      "dartType": "List<String>?"
+    },
+    {
+      "dartName": "address",
+      "name": "address",
+      "type": "TEXT",
+      "nullable": true,
+      "primaryKey": false,
+      "autoIncrement": false,
+      "unique": false,
+      "isJsonField": true,
+      "hasConverter": false,
+      "dartType": "Address?"
+    },
+    {
+      "dartName": "addresses",
+      "name": "addresses",
+      "type": "TEXT",
+      "nullable": true,
+      "primaryKey": false,
+      "autoIncrement": false,
+      "unique": false,
+      "isJsonField": true,
+      "hasConverter": false,
+      "dartType": "List<Address>?"
+    },
+    {
+      "dartName": "metadata",
+      "name": "metadata",
+      "type": "TEXT",
+      "nullable": false,
+      "primaryKey": false,
+      "autoIncrement": false,
+      "unique": false,
+      "isJsonField": true,
+      "hasConverter": false,
+      "dartType": "dynamic"
+    }
+  ],
+  "indexes": [],
+  "version": 1,
+  "hash": "31174409"
+}

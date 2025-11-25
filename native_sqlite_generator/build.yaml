@@ -1,0 +1,23 @@
+builders:
+  table:
+    import: "package:native_sqlite_generator/builder.dart"
+    builder_factories: ["tableBuilder"]
+    build_extensions: {".dart": [".table.dart"]}
+    auto_apply: dependents
+    build_to: source  # Changed from cache to source - generates in lib/
+    applies_builders: ["source_gen|combining_builder"]
+  
+  migration:
+    import: "package:native_sqlite_generator/builder.dart"
+    builder_factories: ["migrationBuilder"]
+    build_extensions: {".dart": [".schema.json"]}
+    auto_apply: dependents
+    build_to: cache  # Use cache to allow flexible output paths
+    runs_before: ["native_sqlite_generator:table"]
+    # Schema files are generated in lib/generated/schemas/ by default
+
+post_process_builders:
+  native_code:
+    import: "package:native_sqlite_generator/src/post_build_hook.dart"
+    builder_factory: "nativeCodePostBuilder"
+    input_extensions: [".table.dart"]

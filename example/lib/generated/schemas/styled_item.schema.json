@@ -1,0 +1,81 @@
+{
+  "className": "StyledItem",
+  "tableName": "styled_items",
+  "columns": [
+    {
+      "dartName": "id",
+      "name": "id",
+      "type": "INTEGER",
+      "nullable": true,
+      "primaryKey": true,
+      "autoIncrement": true,
+      "unique": false,
+      "isJsonField": false,
+      "hasConverter": false,
+      "dartType": "int?"
+    },
+    {
+      "dartName": "name",
+      "name": "name",
+      "type": "TEXT",
+      "nullable": false,
+      "primaryKey": false,
+      "autoIncrement": false,
+      "unique": false,
+      "isJsonField": false,
+      "hasConverter": false,
+      "dartType": "String"
+    },
+    {
+      "dartName": "backgroundColor",
+      "name": "backgroundColor",
+      "type": "INTEGER",
+      "nullable": false,
+      "primaryKey": false,
+      "autoIncrement": false,
+      "unique": false,
+      "isJsonField": false,
+      "hasConverter": true,
+      "dartType": "Color"
+    },
+    {
+      "dartName": "textColor",
+      "name": "textColor",
+      "type": "INTEGER",
+      "nullable": true,
+      "primaryKey": false,
+      "autoIncrement": false,
+      "unique": false,
+      "isJsonField": false,
+      "hasConverter": true,
+      "dartType": "Color?"
+    },
+    {
+      "dartName": "tags",
+      "name": "tags",
+      "type": "TEXT",
+      "nullable": false,
+      "primaryKey": false,
+      "autoIncrement": false,
+      "unique": false,
+      "isJsonField": false,
+      "hasConverter": true,
+      "dartType": "List<String>"
+    },
+    {
+      "dartName": "createdAt",
+      "name": "createdAt",
+      "type": "INTEGER",
+      "nullable": false,
+      "primaryKey": false,
+      "autoIncrement": false,
+      "unique": false,
+      "isJsonField": false,
+      "hasConverter": false,
+      "dartType": "DateTime"
+    }
+  ],
+  "indexes": [],
+  "version": 1,
+  "hash": "23cf2790"
+}

@@ -1,0 +1,117 @@
+{
+  "className": "AdvancedUser",
+  "tableName": "advanced_users",
+  "columns": [
+    {
+      "dartName": "id",
+      "name": "id",
+      "type": "INTEGER",
+      "nullable": true,
+      "primaryKey": true,
+      "autoIncrement": true,
+      "unique": false,
+      "isJsonField": false,
+      "hasConverter": false,
+      "dartType": "int?"
+    },
+    {
+      "dartName": "name",
+      "name": "name",
+      "type": "TEXT",
+      "nullable": false,
+      "primaryKey": false,
+      "autoIncrement": false,
+      "unique": false,
+      "isJsonField": false,
+      "hasConverter": false,
+      "dartType": "String"
+    },
+    {
+      "dartName": "loginDuration",
+      "name": "loginDuration",
+      "type": "INTEGER",
+      "nullable": true,
+      "primaryKey": false,
+      "autoIncrement": false,
+      "unique": false,
+      "isJsonField": false,
+      "hasConverter": false,
+      "dartType": "Duration?"
+    },
+    {
+      "dartName": "profileUrl",
+      "name": "profileUrl",
+      "type": "TEXT",
+      "nullable": true,
+      "primaryKey": false,
+      "autoIncrement": false,
+      "unique": false,
+      "isJsonField": false,
+      "hasConverter": false,
+      "dartType": "Uri?"
+    },
+    {
+      "dartName": "score",
+      "name": "score",
+      "type": "REAL",
+      "nullable": true,
+      "primaryKey": false,
+      "autoIncrement": false,
+      "unique": false,
+      "isJsonField": false,
+      "hasConverter": false,
+      "dartType": "num?"
+    },
+    {
+      "dartName": "status",
+      "name": "status",
+      "type": "INTEGER",
+      "nullable": false,
+      "primaryKey": false,
+      "autoIncrement": false,
+      "unique": false,
+      "isJsonField": false,
+      "hasConverter": false,
+      "dartType": "UserStatus"
+    },
+    {
+      "dartName": "priority",
+      "name": "priority",
+      "type": "TEXT",
+      "nullable": true,
+      "primaryKey": false,
+      "autoIncrement": false,
+      "unique": false,
+      "isJsonField": false,
+      "hasConverter": false,
+      "dartType": "Priority?"
+    },
+    {
+      "dartName": "createdAt",
+      "name": "createdAt",
+      "type": "INTEGER",
+      "nullable": false,
+      "primaryKey": false,
+      "autoIncrement": false,
+      "unique": false,
+      "isJsonField": false,
+      "hasConverter": false,
+      "dartType": "DateTime"
+    },
+    {
+      "dartName": "isVerified",
+      "name": "isVerified",
+      "type": "INTEGER",
+      "nullable": false,
+      "primaryKey": false,
+      "autoIncrement": false,
+      "unique": false,
+      "isJsonField": false,
+      "hasConverter": false,
+      "dartType": "bool"
+    }
+  ],
+  "indexes": [],
+  "version": 1,
+  "hash": "2d9533e7"
+}

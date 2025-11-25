@@ -1,0 +1,132 @@
+{
+  "className": "User",
+  "tableName": "users",
+  "columns": [
+    {
+      "dartName": "id",
+      "name": "id",
+      "type": "INTEGER",
+      "nullable": true,
+      "primaryKey": true,
+      "autoIncrement": true,
+      "unique": false,
+      "isJsonField": false,
+      "hasConverter": false,
+      "dartType": "int?"
+    },
+    {
+      "dartName": "name",
+      "name": "name",
+      "type": "TEXT",
+      "nullable": false,
+      "primaryKey": false,
+      "autoIncrement": false,
+      "unique": false,
+      "isJsonField": false,
+      "hasConverter": false,
+      "dartType": "String"
+    },
+    {
+      "dartName": "email",
+      "name": "email",
+      "type": "TEXT",
+      "nullable": false,
+      "primaryKey": false,
+      "autoIncrement": false,
+      "unique": true,
+      "isJsonField": false,
+      "hasConverter": false,
+      "dartType": "String"
+    },
+    {
+      "dartName": "phoneNumber",
+      "name": "phoneNumber",
+      "type": "TEXT",
+      "nullable": true,
+      "primaryKey": false,
+      "autoIncrement": false,
+      "unique": false,
+      "isJsonField": false,
+      "hasConverter": false,
+      "dartType": "String?"
+    },
+    {
+      "dartName": "address",
+      "name": "address",
+      "type": "TEXT",
+      "nullable": true,
+      "primaryKey": false,
+      "autoIncrement": false,
+      "unique": false,
+      "isJsonField": false,
+      "hasConverter": false,
+      "dartType": "String?"
+    },
+    {
+      "dartName": "age",
+      "name": "age",
+      "type": "INTEGER",
+      "nullable": false,
+      "primaryKey": false,
+      "autoIncrement": false,
+      "unique": false,
+      "defaultValue": "1",
+      "isJsonField": false,
+      "hasConverter": false,
+      "dartType": "int"
+    },
+    {
+      "dartName": "isActive",
+      "name": "isActive",
+      "type": "INTEGER",
+      "nullable": false,
+      "primaryKey": false,
+      "autoIncrement": false,
+      "unique": false,
+      "defaultValue": "1",
+      "isJsonField": false,
+      "hasConverter": false,
+      "dartType": "bool"
+    },
+    {
+      "dartName": "createdAt",
+      "name": "createdAt",
+      "type": "INTEGER",
+      "nullable": false,
+      "primaryKey": false,
+      "autoIncrement": false,
+      "unique": false,
+      "isJsonField": false,
+      "hasConverter": false,
+      "dartType": "DateTime"
+    },
+    {
+      "dartName": "updatedAt",
+      "name": "updatedAt",
+      "type": "INTEGER",
+      "nullable": true,
+      "primaryKey": false,
+      "autoIncrement": false,
+      "unique": false,
+      "isJsonField": false,
+      "hasConverter": false,
+      "dartType": "DateTime?"
+    }
+  ],
+  "indexes": [
+    {
+      "columns": [
+        "email"
+      ],
+      "unique": false
+    },
+    {
+      "columns": [
+        "createdAt"
+      ],
+      "unique": false
+    }
+  ],
+  "version": 1,
+  "hash": "38685d16"
+}

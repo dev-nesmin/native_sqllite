@@ -1,0 +1,146 @@
+{
+  "className": "Order",
+  "tableName": "orders",
+  "columns": [
+    {
+      "dartName": "id",
+      "name": "id",
+      "type": "INTEGER",
+      "nullable": true,
+      "primaryKey": true,
+      "autoIncrement": true,
+      "unique": false,
+      "isJsonField": false,
+      "hasConverter": false,
+      "dartType": "int?"
+    },
+    {
+      "dartName": "userId",
+      "name": "userId",
+      "type": "INTEGER",
+      "nullable": false,
+      "primaryKey": false,
+      "autoIncrement": false,
+      "unique": false,
+      "foreignKey": "users.id",
+      "isJsonField": false,
+      "hasConverter": false,
+      "dartType": "int"
+    },
+    {
+      "dartName": "productId",
+      "name": "productId",
+      "type": "INTEGER",
+      "nullable": false,
+      "primaryKey": false,
+      "autoIncrement": false,
+      "unique": false,
+      "foreignKey": "products.id",
+      "isJsonField": false,
+      "hasConverter": false,
+      "dartType": "int"
+    },
+    {
+      "dartName": "quantity",
+      "name": "quantity",
+      "type": "INTEGER",
+      "nullable": false,
+      "primaryKey": false,
+      "autoIncrement": false,
+      "unique": false,
+      "isJsonField": false,
+      "hasConverter": false,
+      "dartType": "int"
+    },
+    {
+      "dartName": "totalPrice",
+      "name": "totalPrice",
+      "type": "REAL",
+      "nullable": false,
+      "primaryKey": false,
+      "autoIncrement": false,
+      "unique": false,
+      "isJsonField": false,
+      "hasConverter": false,
+      "dartType": "double"
+    },
+    {
+      "dartName": "status",
+      "name": "status",
+      "type": "TEXT",
+      "nullable": false,
+      "primaryKey": false,
+      "autoIncrement": false,
+      "unique": false,
+      "defaultValue": "'pending'",
+      "isJsonField": false,
+      "hasConverter": false,
+      "dartType": "String"
+    },
+    {
+      "dartName": "notes",
+      "name": "notes",
+      "type": "TEXT",
+      "nullable": true,
+      "primaryKey": false,
+      "autoIncrement": false,
+      "unique": false,
+      "isJsonField": false,
+      "hasConverter": false,
+      "dartType": "String?"
+    },
+    {
+      "dartName": "createdAt",
+      "name": "createdAt",
+      "type": "INTEGER",
+      "nullable": false,
+      "primaryKey": false,
+      "autoIncrement": false,
+      "unique": false,
+      "isJsonField": false,
+      "hasConverter": false,
+      "dartType": "DateTime"
+    },
+    {
+      "dartName": "updatedAt",
+      "name": "updatedAt",
+      "type": "INTEGER",
+      "nullable": true,
+      "primaryKey": false,
+      "autoIncrement": false,
+      "unique": false,
+      "isJsonField": false,
+      "hasConverter": false,
+      "dartType": "DateTime?"
+    },
+    {
+      "dartName": "deliveredAt",
+      "name": "deliveredAt",
+      "type": "INTEGER",
+      "nullable": true,
+      "primaryKey": false,
+      "autoIncrement": false,
+      "unique": false,
+      "isJsonField": false,
+      "hasConverter": false,
+      "dartType": "DateTime?"
+    }
+  ],
+  "indexes": [
+    {
+      "columns": [
+        "userId",
+        "createdAt"
+      ],
+      "unique": false
+    },
+    {
+      "columns": [
+        "status"
+      ],
+      "unique": false
+    }
+  ],
+  "version": 1,
+  "hash": "321d46fe"
+}

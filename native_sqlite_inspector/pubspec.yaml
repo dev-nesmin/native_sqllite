@@ -1,0 +1,35 @@
+name: native_sqlite_inspector
+description: DevTools Inspector for Native SQLite - Inspect SQLite databases in real-time during development
+version: 1.0.0
+publish_to: none
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  
+  # For connecting to VM Service
+  vm_service: ^14.0.0
+  web_socket_channel: ^2.4.0
+  
+  # UI
+  google_fonts: ^6.1.0
+  
+  # Routing
+  go_router: ^13.0.0
+  
+  # State management
+  provider: ^6.1.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
+  
+  assets:
+    - assets/

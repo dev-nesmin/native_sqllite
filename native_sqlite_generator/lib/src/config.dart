@@ -1,4 +1,5 @@
 import 'dart:io';
+
 import 'package:yaml/yaml.dart';
 
 /// Configuration for native code generation
@@ -8,6 +9,7 @@ class NativeSqliteConfig {
   final IosConfig ios;
   final List<String> models;
   final String databaseName;
+  final int schemaVersion;
   final bool includeExamples;
 
   const NativeSqliteConfig({
@@ -16,6 +18,7 @@ class NativeSqliteConfig {
     required this.ios,
     required this.models,
     required this.databaseName,
+    required this.schemaVersion,
     required this.includeExamples,
   });
 
@@ -44,11 +47,13 @@ class NativeSqliteConfig {
       generateNative: nativeConfig['generate_native'] ?? false,
       android: AndroidConfig.fromYaml(nativeConfig['android']),
       ios: IosConfig.fromYaml(nativeConfig['ios']),
-      models: (nativeConfig['models'] as List?)
+      models:
+          (nativeConfig['models'] as List?)
               ?.map((e) => e.toString())
               .toList() ??
           [],
       databaseName: nativeConfig['database_name'] ?? 'app_db',
+      schemaVersion: nativeConfig['schema_version'] ?? 1,
       includeExamples: nativeConfig['include_examples'] ?? true,
     );
   }
@@ -80,7 +85,8 @@ class AndroidConfig {
 
     return AndroidConfig(
       enabled: yaml['enabled'] ?? true,
-      outputPath: yaml['output_path'] ?? 'android/app/src/main/kotlin/generated',
+      outputPath:
+          yaml['output_path'] ?? 'android/app/src/main/kotlin/generated',
       package: yaml['package'] ?? 'generated',
       generateHelpers: yaml['generate_helpers'] ?? true,
     );

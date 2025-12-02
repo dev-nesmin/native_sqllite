@@ -1,0 +1,18 @@
+native_sqlite:
+  generate_native: true
+  database_name: 'example_app'
+  include_examples: true
+  
+  models:
+    - 'lib/models/*.dart'
+  
+  android:
+    enabled: true
+    output_path: '../native_sqlite_android/android/src/main/kotlin/generated'
+    package: 'dev.nesmin.native_sqlite.generated'
+    generate_helpers: true
+  
+  ios:
+    enabled: true
+    output_path: '../native_sqlite_ios/ios/Classes/Generated'
+    generate_helpers: true

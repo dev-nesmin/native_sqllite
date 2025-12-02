@@ -7,6 +7,7 @@ import 'package:glob/list_local_fs.dart';
 import 'package:path/path.dart' as path;
 
 import 'config.dart';
+import 'migration_generator.dart';
 import 'native_kotlin_generator.dart';
 import 'native_swift_generator.dart';
 import 'utils/logger.dart';
@@ -94,6 +95,7 @@ class NativeCodeGenerator {
             models,
             config.android,
             config.databaseName,
+            config.schemaVersion,
             config.includeExamples,
           );
           generatedFiles.addAll(androidFiles);
@@ -105,6 +107,7 @@ class NativeCodeGenerator {
             models,
             config.ios,
             config.databaseName,
+            config.schemaVersion,
             config.includeExamples,
           );
           generatedFiles.addAll(iosFiles);
@@ -318,6 +321,7 @@ class NativeCodeGenerator {
     List<TableModel> models,
     AndroidConfig config,
     String databaseName,
+    int schemaVersion,
     bool includeExamples,
   ) async {
     final generator = NativeKotlinGenerator(
@@ -357,6 +361,55 @@ class NativeCodeGenerator {
       }
     }
 
+    // Generate Migration Support
+    final migrationGen = MigrationGenerator();
+    final migrationsDir = Directory(path.join(config.outputPath, 'migrations'));
+
+    if (!await migrationsDir.exists()) {
+      await migrationsDir.create(recursive: true);
+    }
+
+    // Generate SchemaVersionManager
+    final versionManagerCode = migrationGen.generateKotlinVersionManager(
+      packageName: config.package,
+      databaseName: databaseName,
+      currentVersion: schemaVersion,
+    );
+
+    final versionManagerFile = File(
+      path.join(migrationsDir.path, 'SchemaVersionManager.kt'),
+    );
+    await versionManagerFile.writeAsString(versionManagerCode);
+    generatedFiles.add(versionManagerFile.path);
+    logger.info('   ✓ Generated ${path.basename(versionManagerFile.path)}');
+
+    // Generate missing migration files
+    if (schemaVersion > 1) {
+      for (var i = 1; i < schemaVersion; i++) {
+        final fromVersion = i;
+        final toVersion = i + 1;
+        final migrationFileName = 'Migration_${fromVersion}_$toVersion.kt';
+        final migrationFile = File(
+          path.join(migrationsDir.path, migrationFileName),
+        );
+
+        if (!await migrationFile.exists()) {
+          final migrationCode = migrationGen.generateKotlinMigration(
+            packageName: config.package,
+            databaseName: databaseName,
+            tables: models,
+            fromVersion: fromVersion,
+            toVersion: toVersion,
+          );
+          await migrationFile.writeAsString(migrationCode);
+          generatedFiles.add(migrationFile.path);
+          logger.info(
+            '   ✓ Generated stub ${path.basename(migrationFile.path)}',
+          );
+        }
+      }
+    }
+
     return generatedFiles;
   }
 
@@ -364,6 +417,7 @@ class NativeCodeGenerator {
     List<TableModel> models,
     IosConfig config,
     String databaseName,
+    int schemaVersion,
     bool includeExamples,
   ) async {
     final generator = NativeSwiftGenerator(
@@ -399,6 +453,48 @@ class NativeCodeGenerator {
         await helperFile.writeAsString(helperCode);
         generatedFiles.add(helperFile.path);
         logger.info('   ✓ Generated ${path.basename(helperFile.path)}');
+      }
+    }
+
+    // Generate Migration Support
+    final migrationGen = MigrationGenerator();
+
+    // Generate SchemaVersionManager
+    final versionManagerCode = migrationGen.generateSwiftVersionManager(
+      databaseName: databaseName,
+      currentVersion: schemaVersion,
+    );
+
+    final versionManagerFile = File(
+      path.join(config.outputPath, 'SchemaVersionManager.swift'),
+    );
+    await versionManagerFile.writeAsString(versionManagerCode);
+    generatedFiles.add(versionManagerFile.path);
+    logger.info('   ✓ Generated ${path.basename(versionManagerFile.path)}');
+
+    // Generate missing migration files
+    if (schemaVersion > 1) {
+      for (var i = 1; i < schemaVersion; i++) {
+        final fromVersion = i;
+        final toVersion = i + 1;
+        final migrationFileName = 'Migration_${fromVersion}_$toVersion.swift';
+        final migrationFile = File(
+          path.join(config.outputPath, migrationFileName),
+        );
+
+        if (!await migrationFile.exists()) {
+          final migrationCode = migrationGen.generateSwiftMigration(
+            databaseName: databaseName,
+            tables: models,
+            fromVersion: fromVersion,
+            toVersion: toVersion,
+          );
+          await migrationFile.writeAsString(migrationCode);
+          generatedFiles.add(migrationFile.path);
+          logger.info(
+            '   ✓ Generated stub ${path.basename(migrationFile.path)}',
+          );
+        }
       }
     }
 

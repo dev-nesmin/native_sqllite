@@ -25,7 +25,11 @@ import java.util.concurrent.ConcurrentHashMap
  * })
  * ```
  */
-object NativeSqliteManager {
+open class NativeSqliteManager {
+    companion object {
+        val Instance = NativeSqliteManager()
+    }
+
     private lateinit var appContext: Context
     private val databases = ConcurrentHashMap<String, SQLiteDatabase>()
     private val helpers = ConcurrentHashMap<String, DatabaseHelper>()
@@ -43,7 +47,7 @@ object NativeSqliteManager {
      *
      * @return The absolute path to the database file
      */
-    fun openDatabase(config: DatabaseConfig): String {
+    open fun openDatabase(config: DatabaseConfig): String {
         synchronized(this) {
             // Close existing database if open
             if (databases.containsKey(config.name)) {
@@ -75,21 +79,21 @@ object NativeSqliteManager {
      *
      * This is useful for native code that needs direct database access.
      */
-    fun getDatabase(name: String): SQLiteDatabase {
+    open fun getDatabase(name: String): SQLiteDatabase {
         return databases[name] ?: throw IllegalStateException("Database '$name' is not open")
     }
 
     /**
      * Checks if a database is currently open.
      */
-    fun isDatabaseOpen(name: String): Boolean {
+    open fun isDatabaseOpen(name: String): Boolean {
         return databases.containsKey(name)
     }
 
     /**
      * Closes a database.
      */
-    fun closeDatabase(name: String) {
+    open fun closeDatabase(name: String) {
         synchronized(this) {
             databases.remove(name)?.close()
             helpers.remove(name)?.close()
@@ -99,7 +103,7 @@ object NativeSqliteManager {
     /**
      * Closes all open databases.
      */
-    fun closeAll() {
+    open fun closeAll() {
         synchronized(this) {
             databases.values.forEach { it.close() }
             helpers.values.forEach { it.close() }
@@ -113,7 +117,7 @@ object NativeSqliteManager {
      *
      * @return Number of rows affected
      */
-    fun execute(name: String, sql: String, arguments: List<Any?>? = null): Int {
+    open fun execute(name: String, sql: String, arguments: List<Any?>? = null): Int {
         val db = getDatabase(name)
         val args = arguments?.toTypedArray()
         if (args != null) {
@@ -138,7 +142,7 @@ object NativeSqliteManager {
      *
      * @return A map with "columns" and "rows" keys
      */
-    fun query(name: String, sql: String, arguments: List<Any?>? = null): Map<String, Any> {
+    open fun query(name: String, sql: String, arguments: List<Any?>? = null): Map<String, Any> {
         val db = getDatabase(name)
         val cursor = db.rawQuery(sql, arguments?.map { it?.toString() }?.toTypedArray())
 
@@ -166,7 +170,7 @@ object NativeSqliteManager {
      *
      * @return The row ID of the newly inserted row, or -1 if an error occurred
      */
-    fun insert(name: String, table: String, values: Map<String, Any?>): Long {
+    open fun insert(name: String, table: String, values: Map<String, Any?>): Long {
         val db = getDatabase(name)
         val contentValues = ContentValues().apply {
             values.forEach { (key, value) ->
@@ -181,7 +185,7 @@ object NativeSqliteManager {
      *
      * @return The number of rows affected
      */
-    fun update(
+    open fun update(
         name: String,
         table: String,
         values: Map<String, Any?>,
@@ -207,7 +211,7 @@ object NativeSqliteManager {
      *
      * @return The number of rows deleted
      */
-    fun delete(
+    open fun delete(
         name: String,
         table: String,
         where: String? = null,
@@ -222,7 +226,7 @@ object NativeSqliteManager {
      *
      * @return true if the transaction was successful, false otherwise
      */
-    fun transaction(name: String, statements: List<String>): Boolean {
+    open fun transaction(name: String, statements: List<String>): Boolean {
         val db = getDatabase(name)
         db.beginTransaction()
         return try {
@@ -241,14 +245,14 @@ object NativeSqliteManager {
     /**
      * Gets the absolute path to a database file.
      */
-    fun getDatabasePath(name: String): String {
+    open fun getDatabasePath(name: String): String {
         return appContext.getDatabasePath("$name.db").absolutePath
     }
 
     /**
      * Deletes a database file.
      */
-    fun deleteDatabase(name: String) {
+    open fun deleteDatabase(name: String) {
         synchronized(this) {
             closeDatabase(name)
             appContext.deleteDatabase("$name.db")

@@ -13,10 +13,11 @@ import io.flutter.plugin.common.MethodChannel.Result
  * This plugin provides SQLite database access from both Flutter and native Android code.
  * It uses WAL (Write-Ahead Logging) mode for concurrent access support.
  */
-class NativeSqlitePlugin : FlutterPlugin, MethodCallHandler {
+class NativeSqlitePlugin(
+    private var databaseManager: NativeSqliteManager = NativeSqliteManager.Instance
+) : FlutterPlugin, MethodCallHandler {
     private lateinit var channel: MethodChannel
     private lateinit var context: Context
-    private val databaseManager = NativeSqliteManager
 
     override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
         context = flutterPluginBinding.applicationContext

@@ -29,6 +29,9 @@ dev_dependencies:
   native_sqlite_generator:
     path: ../native_sqlite_generator
   flutter_launcher_icons: ^0.14.4
+  plugin_platform_interface: ^2.1.8
+  native_sqlite_platform_interface:
+    path: ../native_sqlite_platform_interface
 
 
 

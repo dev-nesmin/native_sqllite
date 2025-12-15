@@ -1,7 +1,7 @@
 // dart format width=80
 // coverage:ignore-file
 // GENERATED CODE - DO NOT MODIFY BY HAND
-// Generated on: 2025-10-30T19:25:30.955106
+// Generated on: 2025-12-15T12:42:36.050650
 
 // ignore_for_file: type=lint, prefer_single_quotes, lines_longer_than_80_chars, depend_on_referenced_packages, unused_element, unused_import
 

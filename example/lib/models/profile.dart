@@ -49,7 +49,7 @@ class Profile {
   @DbColumn(name: 'phone_number')
   final String? phoneNumber;
 
-  /// Store settings as a Map<String, dynamic>
+  /// Store settings as a `Map<String, dynamic>`
   @JsonField()
   @DbColumn(name: 'settings')
   final Map<String, dynamic>? settings;

@@ -8,13 +8,17 @@ class ColorConverter extends TypeConverter<Color, int> {
   const ColorConverter();
 
   @override
-  int toSql(Color value) => value.value;
+  int toSql(Color value) =>
+      (value.a * 255).toInt() << 24 |
+      (value.r * 255).toInt() << 16 |
+      (value.g * 255).toInt() << 8 |
+      (value.b * 255).toInt();
 
   @override
   Color fromSql(int sqlValue) => Color(sqlValue);
 }
 
-/// Custom type converter for List<String> (storing as comma-separated TEXT)
+/// Custom type converter for `List<String>` (storing as comma-separated TEXT)
 class StringListConverter extends TypeConverter<List<String>, String> {
   const StringListConverter();
 

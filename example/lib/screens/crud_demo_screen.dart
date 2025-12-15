@@ -349,8 +349,9 @@ class _UserFormDialogState extends State<UserFormDialog> {
                 keyboardType: TextInputType.emailAddress,
                 validator: (value) {
                   if (value?.isEmpty ?? true) return 'Please enter an email';
-                  if (!value!.contains('@'))
+                  if (!value!.contains('@')) {
                     return 'Please enter a valid email';
+                  }
                   return null;
                 },
               ),
@@ -858,8 +859,9 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
                 validator: (value) {
                   if (value?.isEmpty ?? true) return 'Please enter price';
                   final price = double.tryParse(value!);
-                  if (price == null || price < 0)
+                  if (price == null || price < 0) {
                     return 'Please enter valid price';
+                  }
                   return null;
                 },
               ),
@@ -870,8 +872,9 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
                 validator: (value) {
                   if (value?.isEmpty ?? true) return 'Please enter stock';
                   final stock = int.tryParse(value!);
-                  if (stock == null || stock < 0)
+                  if (stock == null || stock < 0) {
                     return 'Please enter valid stock';
+                  }
                   return null;
                 },
               ),

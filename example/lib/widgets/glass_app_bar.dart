@@ -30,16 +30,16 @@ class GlassAppBar extends StatelessWidget implements PreferredSizeWidget {
     final baseColor =
         backgroundColor ??
         (isDark
-            ? Colors.black.withOpacity(0.6)
-            : Colors.white.withOpacity(0.7));
+            ? Colors.black.withValues(alpha: 0.6)
+            : Colors.white.withValues(alpha: 0.7));
 
     return Container(
       decoration: BoxDecoration(
         border: Border(
           bottom: BorderSide(
             color: isDark
-                ? Colors.white.withOpacity(0.1)
-                : Colors.black.withOpacity(0.1),
+                ? Colors.white.withValues(alpha: 0.1)
+                : Colors.black.withValues(alpha: 0.1),
             width: 0.5,
           ),
         ),
@@ -58,7 +58,7 @@ class GlassAppBar extends StatelessWidget implements PreferredSizeWidget {
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                colors: [baseColor, baseColor.withOpacity(0.95)],
+                colors: [baseColor, baseColor.withValues(alpha: 0.95)],
               ),
             ),
             child: AppBar(

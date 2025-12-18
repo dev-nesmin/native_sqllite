@@ -1,7 +1,7 @@
 // dart format width=80
 // coverage:ignore-file
 // GENERATED CODE - DO NOT MODIFY BY HAND
-// Generated on: 2025-12-15T12:42:36.050650
+// Generated on: 2025-12-18T15:22:05.820278
 
 // ignore_for_file: type=lint, prefer_single_quotes, lines_longer_than_80_chars, depend_on_referenced_packages, unused_element, unused_import
 
@@ -564,8 +564,8 @@ class OrderRepository {
 
   /// Inserts a new Order into the database.
   /// Returns the ID of the inserted row.
-  Future<int> insert(Order entity) async {
-    return NativeSqlite.insert(databaseName, 'orders', {
+  Future<int?> insert(Order entity) async {
+    final id = await NativeSqlite.insert(databaseName, 'orders', {
       'user_id': entity.userId,
       'product_id': entity.productId,
       'quantity': entity.quantity,
@@ -576,6 +576,7 @@ class OrderRepository {
       'updated_at': entity.updatedAt?.millisecondsSinceEpoch,
       'delivered_at': entity.deliveredAt?.millisecondsSinceEpoch,
     });
+    return id;
   }
 
   /// Finds a Order by its ID.

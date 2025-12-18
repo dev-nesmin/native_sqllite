@@ -1,7 +1,7 @@
 // dart format width=80
 // coverage:ignore-file
 // GENERATED CODE - DO NOT MODIFY BY HAND
-// Generated on: 2025-12-15T12:42:36.050650
+// Generated on: 2025-12-18T15:22:05.820278
 
 // ignore_for_file: type=lint, prefer_single_quotes, lines_longer_than_80_chars, depend_on_referenced_packages, unused_element, unused_import
 
@@ -545,8 +545,8 @@ class ProductRepository {
 
   /// Inserts a new Product into the database.
   /// Returns the ID of the inserted row.
-  Future<int> insert(Product entity) async {
-    return NativeSqlite.insert(databaseName, 'products', {
+  Future<int?> insert(Product entity) async {
+    final id = await NativeSqlite.insert(databaseName, 'products', {
       'name': entity.name,
       'description': entity.description,
       'price': entity.price,
@@ -557,6 +557,7 @@ class ProductRepository {
       'created_at': entity.createdAt.millisecondsSinceEpoch,
       'updated_at': entity.updatedAt?.millisecondsSinceEpoch,
     });
+    return id;
   }
 
   /// Finds a Product by its ID.

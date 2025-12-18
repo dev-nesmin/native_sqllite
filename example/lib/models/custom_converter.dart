@@ -84,5 +84,3 @@ class StyledItem {
     );
   }
 }
-
-// Force rebuild 2

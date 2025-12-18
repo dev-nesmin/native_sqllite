@@ -1,7 +1,7 @@
 // dart format width=80
 // coverage:ignore-file
 // GENERATED CODE - DO NOT MODIFY BY HAND
-// Generated on: 2025-12-15T12:42:36.050650
+// Generated on: 2025-12-18T15:22:05.820278
 
 // ignore_for_file: type=lint, prefer_single_quotes, lines_longer_than_80_chars, depend_on_referenced_packages, unused_element, unused_import
 
@@ -402,8 +402,8 @@ class ProfileRepository {
 
   /// Inserts a new Profile into the database.
   /// Returns the ID of the inserted row.
-  Future<int> insert(Profile entity) async {
-    return NativeSqlite.insert(databaseName, 'profiles', {
+  Future<int?> insert(Profile entity) async {
+    final id = await NativeSqlite.insert(databaseName, 'profiles', {
       'name': entity.name,
       'email': entity.email,
       'phone_number': entity.phoneNumber,
@@ -417,6 +417,7 @@ class ProfileRepository {
           : null,
       'metadata': jsonEncode(entity.metadata),
     });
+    return id;
   }
 
   /// Finds a Profile by its ID.

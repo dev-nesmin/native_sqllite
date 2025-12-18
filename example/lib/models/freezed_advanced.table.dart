@@ -9,10 +9,10 @@
 // TableGenerator
 // **************************************************************************
 
-part of 'advanced.dart';
+part of 'freezed_advanced.dart';
 
-// Table schema for AdvancedUser
-abstract class AdvancedUserSchema {
+// Table schema for FreezedAdvancedUser
+abstract class FreezedAdvancedUserSchema {
   static const String tableName = 'advanced_users';
 
   static const String createTableSql = '''
@@ -21,9 +21,8 @@ abstract class AdvancedUserSchema {
       name TEXT NOT NULL,
       login_duration INTEGER,
       profile_url TEXT,
-      score REAL,
       status INTEGER NOT NULL,
-      priority TEXT,
+      priority INTEGER,
       created_at INTEGER NOT NULL,
       is_verified INTEGER NOT NULL
     )
@@ -34,15 +33,14 @@ abstract class AdvancedUserSchema {
   static const String NAME = 'name';
   static const String LOGIN_DURATION = 'login_duration';
   static const String PROFILE_URL = 'profile_url';
-  static const String SCORE = 'score';
   static const String STATUS = 'status';
   static const String PRIORITY = 'priority';
   static const String CREATED_AT = 'created_at';
   static const String IS_VERIFIED = 'is_verified';
 }
 
-// Query builder for AdvancedUser
-class AdvancedUserQueryBuilder {
+// Query builder for FreezedAdvancedUser
+class FreezedAdvancedUserQueryBuilder {
   final String _databaseName;
   final List<String> _whereConditions = [];
   final List<Object?> _whereArgs = [];
@@ -50,171 +48,133 @@ class AdvancedUserQueryBuilder {
   int? _limit;
   int? _offset;
 
-  AdvancedUserQueryBuilder(this._databaseName);
+  FreezedAdvancedUserQueryBuilder(this._databaseName);
 
   /// Filter where name equals [value].
-  AdvancedUserQueryBuilder nameEqualTo(String value) {
+  FreezedAdvancedUserQueryBuilder nameEqualTo(String value) {
     _whereConditions.add('name = ?');
     _whereArgs.add(value);
     return this;
   }
 
   /// Filter where name contains [value].
-  AdvancedUserQueryBuilder nameContains(String value) {
+  FreezedAdvancedUserQueryBuilder nameContains(String value) {
     _whereConditions.add('name LIKE ?');
     _whereArgs.add('%$value%');
     return this;
   }
 
   /// Filter where name starts with [value].
-  AdvancedUserQueryBuilder nameStartsWith(String value) {
+  FreezedAdvancedUserQueryBuilder nameStartsWith(String value) {
     _whereConditions.add('name LIKE ?');
     _whereArgs.add('$value%');
     return this;
   }
 
   /// Filter where name ends with [value].
-  AdvancedUserQueryBuilder nameEndsWith(String value) {
+  FreezedAdvancedUserQueryBuilder nameEndsWith(String value) {
     _whereConditions.add('name LIKE ?');
     _whereArgs.add('%$value');
     return this;
   }
 
   /// Filter where loginDuration equals [value].
-  AdvancedUserQueryBuilder loginDurationEqualTo(Duration? value) {
+  FreezedAdvancedUserQueryBuilder loginDurationEqualTo(Duration? value) {
     _whereConditions.add('login_duration = ?');
     _whereArgs.add(value?.inMilliseconds);
     return this;
   }
 
   /// Filter where loginDuration is greater than [value].
-  AdvancedUserQueryBuilder loginDurationGreaterThan(Duration value) {
+  FreezedAdvancedUserQueryBuilder loginDurationGreaterThan(Duration value) {
     _whereConditions.add('login_duration > ?');
     _whereArgs.add(value.inMilliseconds);
     return this;
   }
 
   /// Filter where loginDuration is less than [value].
-  AdvancedUserQueryBuilder loginDurationLessThan(Duration value) {
+  FreezedAdvancedUserQueryBuilder loginDurationLessThan(Duration value) {
     _whereConditions.add('login_duration < ?');
     _whereArgs.add(value.inMilliseconds);
     return this;
   }
 
   /// Filter where loginDuration is null.
-  AdvancedUserQueryBuilder loginDurationIsNull() {
+  FreezedAdvancedUserQueryBuilder loginDurationIsNull() {
     _whereConditions.add('login_duration IS NULL');
     return this;
   }
 
   /// Filter where loginDuration is not null.
-  AdvancedUserQueryBuilder loginDurationIsNotNull() {
+  FreezedAdvancedUserQueryBuilder loginDurationIsNotNull() {
     _whereConditions.add('login_duration IS NOT NULL');
     return this;
   }
 
   /// Filter where profileUrl is null.
-  AdvancedUserQueryBuilder profileUrlIsNull() {
+  FreezedAdvancedUserQueryBuilder profileUrlIsNull() {
     _whereConditions.add('profile_url IS NULL');
     return this;
   }
 
   /// Filter where profileUrl is not null.
-  AdvancedUserQueryBuilder profileUrlIsNotNull() {
+  FreezedAdvancedUserQueryBuilder profileUrlIsNotNull() {
     _whereConditions.add('profile_url IS NOT NULL');
     return this;
   }
 
-  /// Filter where score equals [value].
-  AdvancedUserQueryBuilder scoreEqualTo(num? value) {
-    _whereConditions.add('score = ?');
-    _whereArgs.add(value);
-    return this;
-  }
-
-  /// Filter where score is greater than [value].
-  AdvancedUserQueryBuilder scoreGreaterThan(num value) {
-    _whereConditions.add('score > ?');
-    _whereArgs.add(value);
-    return this;
-  }
-
-  /// Filter where score is less than [value].
-  AdvancedUserQueryBuilder scoreLessThan(num value) {
-    _whereConditions.add('score < ?');
-    _whereArgs.add(value);
-    return this;
-  }
-
-  /// Filter where score is between [min] and [max].
-  AdvancedUserQueryBuilder scoreBetween(num min, num max) {
-    _whereConditions.add('score BETWEEN ? AND ?');
-    _whereArgs.add(min);
-    _whereArgs.add(max);
-    return this;
-  }
-
-  /// Filter where score is null.
-  AdvancedUserQueryBuilder scoreIsNull() {
-    _whereConditions.add('score IS NULL');
-    return this;
-  }
-
-  /// Filter where score is not null.
-  AdvancedUserQueryBuilder scoreIsNotNull() {
-    _whereConditions.add('score IS NOT NULL');
-    return this;
-  }
-
   /// Filter where status equals [value].
-  AdvancedUserQueryBuilder statusEqualTo(UserStatus value) {
+  FreezedAdvancedUserQueryBuilder statusEqualTo(UserStatus value) {
     _whereConditions.add('status = ?');
     _whereArgs.add(value.index);
     return this;
   }
 
   /// Filter where priority equals [value].
-  AdvancedUserQueryBuilder priorityEqualTo(Priority? value) {
+  FreezedAdvancedUserQueryBuilder priorityEqualTo(Priority? value) {
     _whereConditions.add('priority = ?');
-    _whereArgs.add(value?.name);
+    _whereArgs.add(value?.index);
     return this;
   }
 
   /// Filter where priority is null.
-  AdvancedUserQueryBuilder priorityIsNull() {
+  FreezedAdvancedUserQueryBuilder priorityIsNull() {
     _whereConditions.add('priority IS NULL');
     return this;
   }
 
   /// Filter where priority is not null.
-  AdvancedUserQueryBuilder priorityIsNotNull() {
+  FreezedAdvancedUserQueryBuilder priorityIsNotNull() {
     _whereConditions.add('priority IS NOT NULL');
     return this;
   }
 
   /// Filter where createdAt equals [value].
-  AdvancedUserQueryBuilder createdAtEqualTo(DateTime value) {
+  FreezedAdvancedUserQueryBuilder createdAtEqualTo(DateTime value) {
     _whereConditions.add('created_at = ?');
     _whereArgs.add(value.millisecondsSinceEpoch);
     return this;
   }
 
   /// Filter where createdAt is after [value].
-  AdvancedUserQueryBuilder createdAtAfter(DateTime value) {
+  FreezedAdvancedUserQueryBuilder createdAtAfter(DateTime value) {
     _whereConditions.add('created_at > ?');
     _whereArgs.add(value.millisecondsSinceEpoch);
     return this;
   }
 
   /// Filter where createdAt is before [value].
-  AdvancedUserQueryBuilder createdAtBefore(DateTime value) {
+  FreezedAdvancedUserQueryBuilder createdAtBefore(DateTime value) {
     _whereConditions.add('created_at < ?');
     _whereArgs.add(value.millisecondsSinceEpoch);
     return this;
   }
 
   /// Filter where createdAt is between [start] and [end].
-  AdvancedUserQueryBuilder createdAtBetween(DateTime start, DateTime end) {
+  FreezedAdvancedUserQueryBuilder createdAtBetween(
+    DateTime start,
+    DateTime end,
+  ) {
     _whereConditions.add('created_at BETWEEN ? AND ?');
     _whereArgs.add(start.millisecondsSinceEpoch);
     _whereArgs.add(end.millisecondsSinceEpoch);
@@ -222,148 +182,136 @@ class AdvancedUserQueryBuilder {
   }
 
   /// Filter where isVerified is true.
-  AdvancedUserQueryBuilder isVerifiedIsTrue() {
+  FreezedAdvancedUserQueryBuilder isVerifiedIsTrue() {
     _whereConditions.add('is_verified = ?');
     _whereArgs.add(1);
     return this;
   }
 
   /// Filter where isVerified is false.
-  AdvancedUserQueryBuilder isVerifiedIsFalse() {
+  FreezedAdvancedUserQueryBuilder isVerifiedIsFalse() {
     _whereConditions.add('is_verified = ?');
     _whereArgs.add(0);
     return this;
   }
 
   /// Sort by id in ascending order.
-  AdvancedUserQueryBuilder sortByIdAsc() {
+  FreezedAdvancedUserQueryBuilder sortByIdAsc() {
     _orderBy = 'id ASC';
     return this;
   }
 
   /// Sort by id in descending order.
-  AdvancedUserQueryBuilder sortByIdDesc() {
+  FreezedAdvancedUserQueryBuilder sortByIdDesc() {
     _orderBy = 'id DESC';
     return this;
   }
 
   /// Sort by name in ascending order.
-  AdvancedUserQueryBuilder sortByNameAsc() {
+  FreezedAdvancedUserQueryBuilder sortByNameAsc() {
     _orderBy = 'name ASC';
     return this;
   }
 
   /// Sort by name in descending order.
-  AdvancedUserQueryBuilder sortByNameDesc() {
+  FreezedAdvancedUserQueryBuilder sortByNameDesc() {
     _orderBy = 'name DESC';
     return this;
   }
 
   /// Sort by loginDuration in ascending order.
-  AdvancedUserQueryBuilder sortByLoginDurationAsc() {
+  FreezedAdvancedUserQueryBuilder sortByLoginDurationAsc() {
     _orderBy = 'login_duration ASC';
     return this;
   }
 
   /// Sort by loginDuration in descending order.
-  AdvancedUserQueryBuilder sortByLoginDurationDesc() {
+  FreezedAdvancedUserQueryBuilder sortByLoginDurationDesc() {
     _orderBy = 'login_duration DESC';
     return this;
   }
 
   /// Sort by profileUrl in ascending order.
-  AdvancedUserQueryBuilder sortByProfileUrlAsc() {
+  FreezedAdvancedUserQueryBuilder sortByProfileUrlAsc() {
     _orderBy = 'profile_url ASC';
     return this;
   }
 
   /// Sort by profileUrl in descending order.
-  AdvancedUserQueryBuilder sortByProfileUrlDesc() {
+  FreezedAdvancedUserQueryBuilder sortByProfileUrlDesc() {
     _orderBy = 'profile_url DESC';
     return this;
   }
 
-  /// Sort by score in ascending order.
-  AdvancedUserQueryBuilder sortByScoreAsc() {
-    _orderBy = 'score ASC';
-    return this;
-  }
-
-  /// Sort by score in descending order.
-  AdvancedUserQueryBuilder sortByScoreDesc() {
-    _orderBy = 'score DESC';
-    return this;
-  }
-
   /// Sort by status in ascending order.
-  AdvancedUserQueryBuilder sortByStatusAsc() {
+  FreezedAdvancedUserQueryBuilder sortByStatusAsc() {
     _orderBy = 'status ASC';
     return this;
   }
 
   /// Sort by status in descending order.
-  AdvancedUserQueryBuilder sortByStatusDesc() {
+  FreezedAdvancedUserQueryBuilder sortByStatusDesc() {
     _orderBy = 'status DESC';
     return this;
   }
 
   /// Sort by priority in ascending order.
-  AdvancedUserQueryBuilder sortByPriorityAsc() {
+  FreezedAdvancedUserQueryBuilder sortByPriorityAsc() {
     _orderBy = 'priority ASC';
     return this;
   }
 
   /// Sort by priority in descending order.
-  AdvancedUserQueryBuilder sortByPriorityDesc() {
+  FreezedAdvancedUserQueryBuilder sortByPriorityDesc() {
     _orderBy = 'priority DESC';
     return this;
   }
 
   /// Sort by createdAt in ascending order.
-  AdvancedUserQueryBuilder sortByCreatedAtAsc() {
+  FreezedAdvancedUserQueryBuilder sortByCreatedAtAsc() {
     _orderBy = 'created_at ASC';
     return this;
   }
 
   /// Sort by createdAt in descending order.
-  AdvancedUserQueryBuilder sortByCreatedAtDesc() {
+  FreezedAdvancedUserQueryBuilder sortByCreatedAtDesc() {
     _orderBy = 'created_at DESC';
     return this;
   }
 
   /// Sort by isVerified in ascending order.
-  AdvancedUserQueryBuilder sortByIsVerifiedAsc() {
+  FreezedAdvancedUserQueryBuilder sortByIsVerifiedAsc() {
     _orderBy = 'is_verified ASC';
     return this;
   }
 
   /// Sort by isVerified in descending order.
-  AdvancedUserQueryBuilder sortByIsVerifiedDesc() {
+  FreezedAdvancedUserQueryBuilder sortByIsVerifiedDesc() {
     _orderBy = 'is_verified DESC';
     return this;
   }
 
   /// Limit the number of results.
-  AdvancedUserQueryBuilder limit(int value) {
+  FreezedAdvancedUserQueryBuilder limit(int value) {
     _limit = value;
     return this;
   }
 
   /// Skip [value] results.
-  AdvancedUserQueryBuilder offset(int value) {
+  FreezedAdvancedUserQueryBuilder offset(int value) {
     _offset = value;
     return this;
   }
 
   /// Execute the query and return all matching records.
-  Future<List<AdvancedUser>> findAll() async {
+  Future<List<FreezedAdvancedUser>> findAll() async {
     final sql = _buildQuery();
     final result = await NativeSqlite.query(_databaseName, sql, _whereArgs);
     return result.toMapList().map(_fromMap).toList();
   }
 
   /// Execute the query and return the first matching record.
-  Future<AdvancedUser?> findFirst() async {
+  Future<FreezedAdvancedUser?> findFirst() async {
     _limit = 1;
     final results = await findAll();
     return results.isEmpty ? null : results.first;
@@ -403,8 +351,8 @@ class AdvancedUserQueryBuilder {
     return 'SELECT * FROM advanced_users$whereClause$orderClause$limitClause$offsetClause';
   }
 
-  AdvancedUser _fromMap(Map<String, Object?> map) {
-    return AdvancedUser(
+  FreezedAdvancedUser _fromMap(Map<String, Object?> map) {
+    return FreezedAdvancedUser(
       id: map['id'] as int?,
       name: map['name'] as String,
       loginDuration: map['login_duration'] != null
@@ -413,10 +361,9 @@ class AdvancedUserQueryBuilder {
       profileUrl: map['profile_url'] != null
           ? Uri.parse(map['profile_url'] as String)
           : null,
-      score: map['score'] as num?,
       status: UserStatus.values[map['status'] as int],
       priority: map['priority'] != null
-          ? Priority.values.firstWhere((e) => e.name == map['priority'])
+          ? Priority.values[map['priority'] as int]
           : null,
       createdAt: DateTime.fromMillisecondsSinceEpoch(map['created_at'] as int),
       isVerified: (map['is_verified'] as int) == 1,
@@ -424,31 +371,30 @@ class AdvancedUserQueryBuilder {
   }
 }
 
-// Repository for AdvancedUser
-class AdvancedUserRepository {
+// Repository for FreezedAdvancedUser
+class FreezedAdvancedUserRepository {
   final String databaseName;
 
-  const AdvancedUserRepository([this.databaseName = 'example_app']);
+  const FreezedAdvancedUserRepository([this.databaseName = 'example_app']);
 
-  /// Inserts a new AdvancedUser into the database.
+  /// Inserts a new FreezedAdvancedUser into the database.
   /// Returns the ID of the inserted row.
-  Future<int?> insert(AdvancedUser entity) async {
+  Future<int?> insert(FreezedAdvancedUser entity) async {
     final id = await NativeSqlite.insert(databaseName, 'advanced_users', {
       'name': entity.name,
       'login_duration': entity.loginDuration?.inMilliseconds,
       'profile_url': entity.profileUrl?.toString(),
-      'score': entity.score,
       'status': entity.status.index,
-      'priority': entity.priority?.name,
+      'priority': entity.priority?.index,
       'created_at': entity.createdAt.millisecondsSinceEpoch,
       'is_verified': entity.isVerified ? 1 : 0,
     });
     return id;
   }
 
-  /// Finds a AdvancedUser by its ID.
+  /// Finds a FreezedAdvancedUser by its ID.
   /// Returns null if not found.
-  Future<AdvancedUser?> findById(int? id) async {
+  Future<FreezedAdvancedUser?> findById(int? id) async {
     final result = await NativeSqlite.query(
       databaseName,
       'SELECT * FROM advanced_users WHERE id = ? LIMIT 1',
@@ -461,8 +407,8 @@ class AdvancedUserRepository {
     return _fromMap(rows.first);
   }
 
-  /// Finds all AdvancedUsers in the database.
-  Future<List<AdvancedUser>> findAll() async {
+  /// Finds all FreezedAdvancedUsers in the database.
+  Future<List<FreezedAdvancedUser>> findAll() async {
     final result = await NativeSqlite.query(
       databaseName,
       'SELECT * FROM advanced_users',
@@ -471,9 +417,9 @@ class AdvancedUserRepository {
     return result.toMapList().map(_fromMap).toList();
   }
 
-  /// Updates an existing AdvancedUser in the database.
+  /// Updates an existing FreezedAdvancedUser in the database.
   /// Returns the number of rows affected.
-  Future<int> update(AdvancedUser entity) async {
+  Future<int> update(FreezedAdvancedUser entity) async {
     return NativeSqlite.update(
       databaseName,
       'advanced_users',
@@ -481,9 +427,8 @@ class AdvancedUserRepository {
         'name': entity.name,
         'login_duration': entity.loginDuration?.inMilliseconds,
         'profile_url': entity.profileUrl?.toString(),
-        'score': entity.score,
         'status': entity.status.index,
-        'priority': entity.priority?.name,
+        'priority': entity.priority?.index,
         'created_at': entity.createdAt.millisecondsSinceEpoch,
         'is_verified': entity.isVerified ? 1 : 0,
       },
@@ -492,7 +437,7 @@ class AdvancedUserRepository {
     );
   }
 
-  /// Deletes a AdvancedUser by its ID.
+  /// Deletes a FreezedAdvancedUser by its ID.
   /// Returns the number of rows deleted.
   Future<int> delete(int? id) async {
     return NativeSqlite.delete(
@@ -523,12 +468,12 @@ class AdvancedUserRepository {
   }
 
   /// Creates a new query builder for type-safe queries.
-  AdvancedUserQueryBuilder queryBuilder() {
-    return AdvancedUserQueryBuilder(databaseName);
+  FreezedAdvancedUserQueryBuilder queryBuilder() {
+    return FreezedAdvancedUserQueryBuilder(databaseName);
   }
 
-  /// Executes a custom query and returns the results as AdvancedUser objects.
-  Future<List<AdvancedUser>> query(
+  /// Executes a custom query and returns the results as FreezedAdvancedUser objects.
+  Future<List<FreezedAdvancedUser>> query(
     String sql, [
     List<Object?>? arguments,
   ]) async {
@@ -536,9 +481,9 @@ class AdvancedUserRepository {
     return result.toMapList().map(_fromMap).toList();
   }
 
-  /// Converts a map to a AdvancedUser object.
-  AdvancedUser _fromMap(Map<String, Object?> map) {
-    return AdvancedUser(
+  /// Converts a map to a FreezedAdvancedUser object.
+  FreezedAdvancedUser _fromMap(Map<String, Object?> map) {
+    return FreezedAdvancedUser(
       id: map['id'] as int?,
       name: map['name'] as String,
       loginDuration: map['login_duration'] != null
@@ -547,10 +492,9 @@ class AdvancedUserRepository {
       profileUrl: map['profile_url'] != null
           ? Uri.parse(map['profile_url'] as String)
           : null,
-      score: map['score'] as num?,
       status: UserStatus.values[map['status'] as int],
       priority: map['priority'] != null
-          ? Priority.values.firstWhere((e) => e.name == map['priority'])
+          ? Priority.values[map['priority'] as int]
           : null,
       createdAt: DateTime.fromMillisecondsSinceEpoch(map['created_at'] as int),
       isVerified: (map['is_verified'] as int) == 1,

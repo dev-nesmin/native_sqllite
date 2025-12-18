@@ -1,7 +1,7 @@
 // dart format width=80
 // coverage:ignore-file
 // GENERATED CODE - DO NOT MODIFY BY HAND
-// Generated on: 2025-12-15T12:42:36.050650
+// Generated on: 2025-12-18T15:22:05.820278
 
 // ignore_for_file: type=lint, prefer_single_quotes, lines_longer_than_80_chars, depend_on_referenced_packages, unused_element, unused_import
 
@@ -499,8 +499,8 @@ class UserRepository {
 
   /// Inserts a new User into the database.
   /// Returns the ID of the inserted row.
-  Future<int> insert(User entity) async {
-    return NativeSqlite.insert(databaseName, 'users', {
+  Future<int?> insert(User entity) async {
+    final id = await NativeSqlite.insert(databaseName, 'users', {
       'name': entity.name,
       'email': entity.email,
       'phone_number': entity.phoneNumber,
@@ -510,6 +510,7 @@ class UserRepository {
       'created_at': entity.createdAt.millisecondsSinceEpoch,
       'updated_at': entity.updatedAt?.millisecondsSinceEpoch,
     });
+    return id;
   }
 
   /// Finds a User by its ID.

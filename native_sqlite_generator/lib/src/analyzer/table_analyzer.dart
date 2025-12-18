@@ -1,5 +1,6 @@
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/nullability_suffix.dart';
+import 'package:analyzer/dart/element/type.dart';
 import 'package:native_sqlite_generator/src/config/generator_options.dart';
 import 'package:native_sqlite_generator/src/helpers/error_handler.dart';
 import 'package:native_sqlite_generator/src/helpers/naming.dart';
@@ -39,6 +40,10 @@ class TableAnalyzer {
   );
   static final _jsonFieldChecker = TypeChecker.fromUrl(
     'package:native_sqlite_annotations/src/json_field.dart#JsonField',
+  );
+  // Freezed annotation checker - using simple name check or fromUrl if package known
+  static final _freezedChecker = TypeChecker.fromUrl(
+    'package:freezed_annotation/freezed_annotation.dart#Freezed',
   );
 
   /// Analyzes a class element and returns table information.
@@ -86,25 +91,58 @@ class TableAnalyzer {
 
   /// Validates that the class is suitable for table generation.
   void _validateClass(ClassElement element) {
-    GeneratorError.validate(
-      !element.isAbstract,
-      'Table class must not be abstract',
-      element,
-    );
+    final isFreezed = _isFreezed(element);
+
+    // Abstract classes are allowed ONLY if they are Freezed classes
+    if (element.isAbstract && !isFreezed) {
+      GeneratorError.throwError(
+        'Table class must not be abstract (unless using @freezed)',
+        element,
+      );
+    }
+  }
+
+  bool _isFreezed(ClassElement element) {
+    return _freezedChecker.hasAnnotationOf(element);
   }
 
   /// Analyzes all fields in the class and returns column information.
   List<ColumnInfo> _analyzeColumns(ClassElement element) {
     final columns = <ColumnInfo>[];
+    final isFreezed = _isFreezed(element);
 
-    for (final field in element.fields) {
-      // Skip static fields and ignored fields
-      if (field.isStatic || _isIgnored(field)) {
-        continue;
+    if (isFreezed) {
+      // For Frozen classes, examine the factory constructor parameters
+
+      final constructor = element.constructors.firstWhere(
+        (c) =>
+            c.isFactory &&
+            (c.name == 'default' || c.name == 'new' || (c.name ?? '').isEmpty),
+        orElse: () => throw InvalidGenerationSourceError(
+          'Freezed classes must have a default factory constructor.',
+          element: element,
+        ),
+      );
+
+      for (final param in constructor.formalParameters) {
+        if (_isIgnored(param)) {
+          continue;
+        }
+
+        final columnInfo = _analyzeParameter(param);
+        columns.add(columnInfo);
       }
+    } else {
+      // Regular classes - check fields
+      for (final field in element.fields) {
+        // Skip static fields and ignored fields
+        if (field.isStatic || _isIgnored(field)) {
+          continue;
+        }
 
-      final columnInfo = _analyzeColumn(field);
-      columns.add(columnInfo);
+        final columnInfo = _analyzeColumn(field);
+        columns.add(columnInfo);
+      }
     }
 
     // Validate that we have at least one column
@@ -117,42 +155,55 @@ class TableAnalyzer {
     return columns;
   }
 
+  // Wrapper to analyze a parameter (for freezed)
+  ColumnInfo _analyzeParameter(FormalParameterElement param) {
+    return _analyzeElement(element: param, name: param.name!, type: param.type);
+  }
+
   /// Analyzes a single field and returns column information.
   ColumnInfo _analyzeColumn(FieldElement field) {
-    final fieldName = field.name!;
-    final dartType = field.type;
+    return _analyzeElement(element: field, name: field.name!, type: field.type);
+  }
+
+  ColumnInfo _analyzeElement({
+    required Element element,
+    required String name,
+    required DartType type,
+  }) {
+    final fieldName = name;
+    final dartType = type;
 
     // Get enum type first (if this is an enum field)
-    final enumType = _getEnumType(field);
+    final enumType = _getEnumType(element);
 
     // Get column name
-    final columnName = _getColumnName(field);
+    final columnName = _getColumnName(element, name);
 
     // Get SQL type (passing enum type for enum fields)
-    final sqlType = _getSqlType(field, enumType);
+    final sqlType = _getSqlType(element, dartType, enumType);
 
     // Check if primary key
-    final isPrimaryKey = _isPrimaryKey(field);
+    final isPrimaryKey = _isPrimaryKey(element);
 
     // Check if auto increment
-    final isAutoIncrement = isPrimaryKey && _isAutoIncrement(field);
+    final isAutoIncrement = isPrimaryKey && _isAutoIncrement(element);
 
     // Check if use local UUID
-    final useLocalUuid = isPrimaryKey && _isUseLocalUuid(field);
+    final useLocalUuid = isPrimaryKey && _isUseLocalUuid(element);
 
     // PROPERTIES VALIDATION
     if (isPrimaryKey) {
       if (isAutoIncrement && useLocalUuid) {
         throw InvalidGenerationSourceError(
           'PrimaryKey cannot have both autoIncrement=true and useLocalUuid=true.',
-          element: field,
+          element: element,
         );
       }
 
       if (isAutoIncrement && !TypeUtils.isInt(dartType)) {
         throw InvalidGenerationSourceError(
           'PrimaryKey with autoIncrement=true must be an integer field.',
-          element: field,
+          element: element,
         );
       }
 
@@ -160,7 +211,7 @@ class TableAnalyzer {
         if (!TypeUtils.isString(dartType)) {
           throw InvalidGenerationSourceError(
             'PrimaryKey with useLocalUuid=true must be a String field.',
-            element: field,
+            element: element,
           );
         }
 
@@ -168,29 +219,29 @@ class TableAnalyzer {
         if (!TypeUtils.isNullable(dartType)) {
           throw InvalidGenerationSourceError(
             'PrimaryKey with useLocalUuid=true must be nullable. The UUID is generated when the field is null.',
-            element: field,
+            element: element,
           );
         }
       }
     }
 
     // Check nullability
-    final isNullable = _isColumnNullable(field);
+    final isNullable = _isColumnNullable(element, dartType);
 
     // Check if unique
-    final isUnique = _isUnique(field);
+    final isUnique = _isUnique(element);
 
     // Get default value
-    final defaultValue = _getDefaultValue(field);
+    final defaultValue = _getDefaultValue(element);
 
     // Get foreign key info
-    final foreignKeyInfo = _getForeignKeyInfo(field);
+    final foreignKeyInfo = _getForeignKeyInfo(element);
 
     // Get converter expression (if this field uses a custom type converter)
-    final converterExpression = _getConverterExpression(field);
+    final converterExpression = _getConverterExpression(element);
 
     // Check if this is a JSON field
-    final isJsonField = _isJsonField(field);
+    final isJsonField = _isJsonField(element);
 
     return ColumnInfo(
       dartName: fieldName,
@@ -214,13 +265,23 @@ class TableAnalyzer {
   }
 
   /// Checks if a field is ignored.
-  bool _isIgnored(FieldElement field) {
-    return _ignoreChecker.hasAnnotationOf(field);
+  bool _isIgnored(Element element) {
+    // Check for @Ignore
+    if (_ignoreChecker.hasAnnotationOf(element)) return true;
+
+    // Check for @DbColumn(ignore: true)
+    final annotation = _columnChecker.firstAnnotationOf(element);
+    if (annotation != null) {
+      final reader = ConstantReader(annotation);
+      return reader.peek('ignore')?.boolValue ?? false;
+    }
+
+    return false;
   }
 
   /// Gets the column name for a field.
-  String _getColumnName(FieldElement field) {
-    final annotation = _columnChecker.firstAnnotationOf(field);
+  String _getColumnName(Element element, String defaultName) {
+    final annotation = _columnChecker.firstAnnotationOf(element);
     if (annotation != null) {
       final reader = ConstantReader(annotation);
       final name = reader.peek('name')?.stringValue;
@@ -228,7 +289,7 @@ class TableAnalyzer {
     }
 
     // Apply naming convention from options
-    final dartName = field.name!;
+    final dartName = defaultName;
     if (options != null && options!.columnNameCase != 'none') {
       return NamingConventions.format(dartName, options!.columnNameCase);
     }
@@ -237,9 +298,9 @@ class TableAnalyzer {
   }
 
   /// Gets the SQL type for a field.
-  SqlType _getSqlType(FieldElement field, String enumType) {
+  SqlType _getSqlType(Element element, DartType type, String enumType) {
     // Check for explicit type annotation
-    final annotation = _columnChecker.firstAnnotationOf(field);
+    final annotation = _columnChecker.firstAnnotationOf(element);
     if (annotation != null) {
       final reader = ConstantReader(annotation);
       final explicitType = reader.peek('type')?.stringValue;
@@ -249,7 +310,7 @@ class TableAnalyzer {
     }
 
     // Infer from Dart type, passing enum type for enum fields
-    return SqlType.fromDartType(field.type, enumType: enumType);
+    return SqlType.fromDartType(type, enumType: enumType);
   }
 
   /// Parses an SQL type string.
@@ -272,13 +333,13 @@ class TableAnalyzer {
   }
 
   /// Checks if a field is a primary key.
-  bool _isPrimaryKey(FieldElement field) {
-    return _primaryKeyChecker.hasAnnotationOf(field);
+  bool _isPrimaryKey(Element element) {
+    return _primaryKeyChecker.hasAnnotationOf(element);
   }
 
   /// Checks if a field is auto-increment.
-  bool _isAutoIncrement(FieldElement field) {
-    final annotation = _primaryKeyChecker.firstAnnotationOf(field);
+  bool _isAutoIncrement(Element element) {
+    final annotation = _primaryKeyChecker.firstAnnotationOf(element);
     if (annotation == null) return false;
 
     final reader = ConstantReader(annotation);
@@ -286,8 +347,8 @@ class TableAnalyzer {
   }
 
   /// Checks if a field should use a local UUID.
-  bool _isUseLocalUuid(FieldElement field) {
-    final annotation = _primaryKeyChecker.firstAnnotationOf(field);
+  bool _isUseLocalUuid(Element element) {
+    final annotation = _primaryKeyChecker.firstAnnotationOf(element);
     if (annotation == null) return false;
 
     final reader = ConstantReader(annotation);
@@ -295,9 +356,9 @@ class TableAnalyzer {
   }
 
   /// Checks if a column is nullable.
-  bool _isColumnNullable(FieldElement field) {
+  bool _isColumnNullable(Element element, DartType type) {
     // Check if Column annotation explicitly sets nullable
-    final annotation = _columnChecker.firstAnnotationOf(field);
+    final annotation = _columnChecker.firstAnnotationOf(element);
     if (annotation != null) {
       final reader = ConstantReader(annotation);
       final nullable = reader.peek('nullable')?.boolValue;
@@ -307,13 +368,13 @@ class TableAnalyzer {
     }
 
     // Fall back to Dart type nullability
-    return field.type.nullabilitySuffix == NullabilitySuffix.question;
+    return type.nullabilitySuffix == NullabilitySuffix.question;
   }
 
   /// Checks if a field has a unique constraint.
-  bool _isUnique(FieldElement field) {
+  bool _isUnique(Element element) {
     // Check for unique in @DbColumn annotation
-    final annotation = _columnChecker.firstAnnotationOf(field);
+    final annotation = _columnChecker.firstAnnotationOf(element);
     if (annotation != null) {
       final reader = ConstantReader(annotation);
       return reader.peek('unique')?.boolValue ?? false;
@@ -323,8 +384,8 @@ class TableAnalyzer {
   }
 
   /// Gets the default value for a column.
-  String? _getDefaultValue(FieldElement field) {
-    final annotation = _columnChecker.firstAnnotationOf(field);
+  String? _getDefaultValue(Element element) {
+    final annotation = _columnChecker.firstAnnotationOf(element);
     if (annotation == null) return null;
 
     final reader = ConstantReader(annotation);
@@ -332,8 +393,8 @@ class TableAnalyzer {
   }
 
   /// Gets foreign key information for a field.
-  Map<String, dynamic>? _getForeignKeyInfo(FieldElement field) {
-    final annotation = _foreignKeyChecker.firstAnnotationOf(field);
+  Map<String, dynamic>? _getForeignKeyInfo(Element element) {
+    final annotation = _foreignKeyChecker.firstAnnotationOf(element);
     if (annotation == null) return null;
 
     final reader = ConstantReader(annotation);
@@ -347,8 +408,8 @@ class TableAnalyzer {
   }
 
   /// Gets enum storage type for a field.
-  String _getEnumType(FieldElement field) {
-    final annotation = _enumFieldChecker.firstAnnotationOf(field);
+  String _getEnumType(Element element) {
+    final annotation = _enumFieldChecker.firstAnnotationOf(element);
     if (annotation == null) return 'ordinal'; // Default to ordinal
 
     final reader = ConstantReader(annotation);
@@ -372,8 +433,8 @@ class TableAnalyzer {
   }
 
   /// Gets the type converter expression for a field.
-  String? _getConverterExpression(FieldElement field) {
-    final annotation = _useConverterChecker.firstAnnotationOf(field);
+  String? _getConverterExpression(Element element) {
+    final annotation = _useConverterChecker.firstAnnotationOf(element);
     if (annotation == null) return null;
 
     final reader = ConstantReader(annotation);
@@ -393,8 +454,8 @@ class TableAnalyzer {
   }
 
   /// Checks if a field is marked with @JsonField.
-  bool _isJsonField(FieldElement field) {
-    return _jsonFieldChecker.hasAnnotationOf(field);
+  bool _isJsonField(Element element) {
+    return _jsonFieldChecker.hasAnnotationOf(element);
   }
 
   /// Analyzes indexes on a class.

@@ -1,4 +1,3 @@
-
 /// Annotation to mark a field as a database column.
 class DbColumn {
   /// The name of the column in the database.
@@ -20,11 +19,15 @@ class DbColumn {
   /// By default, inferred from the Dart type.
   final String? type;
 
+  /// Whether this field should be ignored for database generation.
+  final bool ignore;
+
   const DbColumn({
     this.name,
     this.nullable,
     this.unique = false,
     this.defaultValue,
     this.type,
+    this.ignore = false,
   });
 }

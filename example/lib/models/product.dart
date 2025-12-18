@@ -98,5 +98,3 @@ class Product {
         'createdAt: $createdAt, updatedAt: $updatedAt}';
   }
 }
-
-// Force rebuild 2

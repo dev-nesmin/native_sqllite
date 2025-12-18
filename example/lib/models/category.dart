@@ -10,13 +10,11 @@ class Category {
   @PrimaryKey(autoIncrement: true)
   final int? id;
 
-  @DbColumn(unique: true, nullable: false)
+  @DbColumn(unique: true)
   final String name;
 
-  @DbColumn(nullable: true)
   final String? description;
 
-  @DbColumn(nullable: false)
   final DateTime createdAt;
 
   Category({this.id, required this.name, this.description, DateTime? createdAt})
@@ -41,5 +39,3 @@ class Category {
     return 'Category{id: $id, name: $name, description: $description, createdAt: $createdAt}';
   }
 }
-
-// Force rebuild 2

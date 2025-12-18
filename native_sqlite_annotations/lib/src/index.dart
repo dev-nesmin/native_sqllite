@@ -1,4 +1,3 @@
-part of native_sqlite;
 
 /// Annotation to create an index on specific columns.
 class Index {

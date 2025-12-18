@@ -1,4 +1,3 @@
-part of native_sqlite;
 
 /// Annotation to mark a field as JSON serializable.
 /// The field will be stored as TEXT in SQLite and automatically

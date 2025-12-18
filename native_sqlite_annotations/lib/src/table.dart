@@ -1,4 +1,3 @@
-part of native_sqlite;
 
 /// Annotation to mark a class as a database table.
 ///

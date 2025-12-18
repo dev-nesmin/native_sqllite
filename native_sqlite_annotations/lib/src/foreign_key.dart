@@ -1,4 +1,3 @@
-part of native_sqlite;
 
 /// Annotation to define a foreign key relationship.
 class ForeignKey {

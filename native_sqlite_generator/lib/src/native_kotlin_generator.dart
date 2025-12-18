@@ -1,4 +1,4 @@
-import 'native_generator.dart';
+import 'package:native_sqlite_generator/src/models/schema_snapshot.dart';
 
 /// Generates Kotlin code for Android
 class NativeKotlinGenerator {
@@ -12,7 +12,7 @@ class NativeKotlinGenerator {
     required this.includeExamples,
   });
 
-  String generateSchema(TableModel model) {
+  String generateSchema(TableSchemaSnapshot model) {
     final buffer = StringBuffer();
 
     buffer.writeln('package $packageName');
@@ -29,9 +29,9 @@ class NativeKotlinGenerator {
     buffer.writeln();
     buffer.writeln('    // Column names');
 
-    for (final field in model.fields) {
-      final constantName = _toScreamingSnakeCase(field.fieldName);
-      buffer.writeln('    const val $constantName = "${field.columnName}"');
+    for (final field in model.columns) {
+      final constantName = _toScreamingSnakeCase(field.dartName);
+      buffer.writeln('    const val $constantName = "${field.name}"');
     }
 
     buffer.writeln();
@@ -40,21 +40,21 @@ class NativeKotlinGenerator {
     buffer.write('        CREATE TABLE ${model.tableName} (');
 
     final columnDefs = <String>[];
-    for (final field in model.fields) {
-      final parts = <String>[field.columnName, field.sqlType];
+    for (final field in model.columns) {
+      final parts = <String>[field.name, field.type];
 
-      if (field.isPrimaryKey) {
+      if (field.primaryKey) {
         parts.add('PRIMARY KEY');
         if (field.autoIncrement) {
           parts.add('AUTOINCREMENT');
         }
       }
 
-      if (!field.isNullable && !field.isPrimaryKey) {
+      if (!field.nullable && !field.primaryKey) {
         parts.add('NOT NULL');
       }
 
-      if (field.isUnique && !field.isPrimaryKey) {
+      if (field.unique && !field.primaryKey) {
         parts.add('UNIQUE');
       }
 
@@ -70,11 +70,11 @@ class NativeKotlinGenerator {
     return buffer.toString();
   }
 
-  String generateHelper(TableModel model) {
+  String generateHelper(TableSchemaSnapshot model) {
     final buffer = StringBuffer();
-    final primaryKey = model.fields.firstWhere(
-      (f) => f.isPrimaryKey,
-      orElse: () => model.fields.first,
+    final primaryKey = model.columns.firstWhere(
+      (f) => f.primaryKey,
+      orElse: () => model.columns.first,
     );
 
     buffer.writeln('package $packageName');
@@ -90,12 +90,12 @@ class NativeKotlinGenerator {
     buffer.writeln('data class ${model.className}(');
 
     final params = <String>[];
-    for (final field in model.fields) {
+    for (final field in model.columns) {
       final kotlinType = _getKotlinType(field);
-      final defaultValue = field.isPrimaryKey && field.autoIncrement
+      final defaultValue = field.primaryKey && field.autoIncrement
           ? ' = null'
           : '';
-      params.add('    val ${field.fieldName}: $kotlinType$defaultValue');
+      params.add('    val ${field.dartName}: $kotlinType$defaultValue');
     }
     buffer.writeln(params.join(',\n'));
     buffer.writeln(')');
@@ -193,12 +193,12 @@ class NativeKotlinGenerator {
     // Insert method
     buffer.writeln('    fun insert(entity: ${model.className}): Long {');
     buffer.writeln('        val values = ContentValues().apply {');
-    for (final field in model.fields) {
-      if (field.isPrimaryKey && field.autoIncrement) continue;
+    for (final field in model.columns) {
+      if (field.primaryKey && field.autoIncrement) continue;
 
-      final value = _serializeKotlin(field, 'entity.${field.fieldName}');
+      final value = _serializeKotlin(field, 'entity.${field.dartName}');
       buffer.writeln(
-        '            put(${model.className}Schema.${_toScreamingSnakeCase(field.fieldName)}, $value)',
+        '            put(${model.className}Schema.${_toScreamingSnakeCase(field.dartName)}, $value)',
       );
     }
     buffer.writeln('        }');
@@ -213,7 +213,7 @@ class NativeKotlinGenerator {
     buffer.writeln('        val result = NativeSqliteManager.query(');
     buffer.writeln('            databaseName,');
     buffer.writeln(
-      '            "SELECT * FROM \${${model.className}Schema.TABLE_NAME} WHERE \${${model.className}Schema.${_toScreamingSnakeCase(primaryKey.fieldName)}} = ? LIMIT 1",',
+      '            "SELECT * FROM \${${model.className}Schema.TABLE_NAME} WHERE \${${model.className}Schema.${_toScreamingSnakeCase(primaryKey.dartName)}} = ? LIMIT 1",',
     );
     buffer.writeln('            listOf(id)');
     buffer.writeln('        )');
@@ -255,11 +255,11 @@ class NativeKotlinGenerator {
     buffer.writeln('     */');
     buffer.writeln('    fun update(entity: ${model.className}): Int {');
     buffer.writeln('        val values = ContentValues().apply {');
-    for (final field in model.fields) {
-      if (field.isPrimaryKey) continue; // Skip PK in updates
-      final value = _serializeKotlin(field, 'entity.${field.fieldName}');
+    for (final field in model.columns) {
+      if (field.primaryKey) continue; // Skip PK in updates
+      final value = _serializeKotlin(field, 'entity.${field.dartName}');
       buffer.writeln(
-        '            put(${model.className}Schema.${_toScreamingSnakeCase(field.fieldName)}, $value)',
+        '            put(${model.className}Schema.${_toScreamingSnakeCase(field.dartName)}, $value)',
       );
     }
     buffer.writeln('        }');
@@ -268,9 +268,9 @@ class NativeKotlinGenerator {
     buffer.writeln('            ${model.className}Schema.TABLE_NAME,');
     buffer.writeln('            values,');
     buffer.writeln(
-      '            "\${${model.className}Schema.${_toScreamingSnakeCase(primaryKey.fieldName)}} = ?",',
+      '            "\${${model.className}Schema.${_toScreamingSnakeCase(primaryKey.dartName)}} = ?",',
     );
-    buffer.writeln('            listOf(entity.${primaryKey.fieldName})');
+    buffer.writeln('            listOf(entity.${primaryKey.dartName})');
     buffer.writeln('        )');
     buffer.writeln('    }');
     buffer.writeln();
@@ -290,7 +290,7 @@ class NativeKotlinGenerator {
     buffer.writeln('            ${model.className}Schema.TABLE_NAME,');
     buffer.writeln('            updates,');
     buffer.writeln(
-      '            "\${${model.className}Schema.${_toScreamingSnakeCase(primaryKey.fieldName)}} = ?",',
+      '            "\${${model.className}Schema.${_toScreamingSnakeCase(primaryKey.dartName)}} = ?",',
     );
     buffer.writeln('            listOf(id)');
     buffer.writeln('        )');
@@ -308,7 +308,7 @@ class NativeKotlinGenerator {
     buffer.writeln('            databaseName,');
     buffer.writeln('            ${model.className}Schema.TABLE_NAME,');
     buffer.writeln(
-      '            "\${${model.className}Schema.${_toScreamingSnakeCase(primaryKey.fieldName)}} = ?",',
+      '            "\${${model.className}Schema.${_toScreamingSnakeCase(primaryKey.dartName)}} = ?",',
     );
     buffer.writeln('            listOf(id)');
     buffer.writeln('        )');
@@ -621,12 +621,12 @@ class NativeKotlinGenerator {
     buffer.writeln('        return ${model.className}(');
 
     final fieldInits = <String>[];
-    for (final field in model.fields) {
+    for (final field in model.columns) {
       final value = _deserializeKotlin(
         field,
-        'row[columnMap[${model.className}Schema.${_toScreamingSnakeCase(field.fieldName)}]!!]',
+        'row[columnMap[${model.className}Schema.${_toScreamingSnakeCase(field.dartName)}]!!]',
       );
-      fieldInits.add('            ${field.fieldName} = $value');
+      fieldInits.add('            ${field.dartName} = $value');
     }
     buffer.writeln(fieldInits.join(',\n'));
     buffer.writeln('        )');
@@ -636,7 +636,7 @@ class NativeKotlinGenerator {
     return buffer.toString();
   }
 
-  String _getKotlinType(FieldModel field) {
+  String _getKotlinType(ColumnSchemaSnapshot field) {
     final baseType = field.dartType.replaceAll('?', '');
     String kotlinType;
 
@@ -670,22 +670,22 @@ class NativeKotlinGenerator {
       kotlinType = 'Any';
     }
 
-    return field.isNullable ? '$kotlinType?' : kotlinType;
+    return field.nullable ? '$kotlinType?' : kotlinType;
   }
 
-  String _serializeKotlin(FieldModel field, String accessor) {
+  String _serializeKotlin(ColumnSchemaSnapshot field, String accessor) {
     final baseType = field.dartType.replaceAll('?', '');
 
     // Handle boolean conversion to integer
     if (baseType == 'bool' || baseType == 'Boolean') {
-      return field.isNullable
+      return field.nullable
           ? '$accessor?.let { if (it) 1 else 0 }'
           : 'if ($accessor) 1 else 0';
     }
 
     // Handle DateTime conversion to epoch milliseconds
     if (baseType == 'DateTime') {
-      return field.isNullable
+      return field.nullable
           ? '$accessor?.toEpochMilliseconds()'
           : '$accessor.toEpochMilliseconds()';
     }
@@ -697,7 +697,7 @@ class NativeKotlinGenerator {
 
     // Handle List serialization to JSON
     if (baseType.startsWith('List<')) {
-      if (field.isNullable) {
+      if (field.nullable) {
         return '$accessor?.let { Json.encodeToString(it) }';
       } else {
         return 'Json.encodeToString($accessor)';
@@ -706,7 +706,7 @@ class NativeKotlinGenerator {
 
     // Handle Map serialization to JSON
     if (baseType.startsWith('Map<')) {
-      if (field.isNullable) {
+      if (field.nullable) {
         return '$accessor?.let { Json.encodeToString(it) }';
       } else {
         return 'Json.encodeToString($accessor)';
@@ -717,16 +717,16 @@ class NativeKotlinGenerator {
     return accessor;
   }
 
-  String _deserializeKotlin(FieldModel field, String accessor) {
+  String _deserializeKotlin(ColumnSchemaSnapshot field, String accessor) {
     final baseType = field.dartType.replaceAll('?', '');
 
     // Handle integer types
     if (baseType == 'int' || baseType == 'Int') {
-      return '$accessor as Long${field.isNullable ? "?" : ""}';
+      return '$accessor as Long${field.nullable ? "?" : ""}';
     }
     // Handle DateTime (stored as epoch milliseconds)
     else if (baseType == 'DateTime') {
-      if (field.isNullable) {
+      if (field.nullable) {
         return '($accessor as? Long)?.let { DateTime.fromEpochMilliseconds(it) }';
       } else {
         return 'DateTime.fromEpochMilliseconds($accessor as Long)';
@@ -734,25 +734,25 @@ class NativeKotlinGenerator {
     }
     // Handle double types
     else if (baseType == 'double' || baseType == 'Double') {
-      return '$accessor as Double${field.isNullable ? "?" : ""}';
+      return '$accessor as Double${field.nullable ? "?" : ""}';
     }
     // Handle String types
     else if (baseType == 'String') {
-      return '$accessor as String${field.isNullable ? "?" : ""}';
+      return '$accessor as String${field.nullable ? "?" : ""}';
     }
     // Handle boolean (stored as integer)
     else if (baseType == 'bool' || baseType == 'Boolean') {
-      return field.isNullable
+      return field.nullable
           ? '($accessor as? Long)?.let { it == 1L }'
           : '($accessor as Long) == 1L';
     }
     // Handle binary data
     else if (baseType == 'Uint8List') {
-      return '$accessor as ByteArray${field.isNullable ? "?" : ""}';
+      return '$accessor as ByteArray${field.nullable ? "?" : ""}';
     }
     // Handle List deserialization from JSON
     else if (baseType.startsWith('List<')) {
-      if (field.isNullable) {
+      if (field.nullable) {
         return '($accessor as? String)?.let { Json.decodeFromString(it) }';
       } else {
         return 'Json.decodeFromString($accessor as String)';
@@ -760,7 +760,7 @@ class NativeKotlinGenerator {
     }
     // Handle Map deserialization from JSON
     else if (baseType.startsWith('Map<')) {
-      if (field.isNullable) {
+      if (field.nullable) {
         return '($accessor as? String)?.let { Json.decodeFromString(it) }';
       } else {
         return 'Json.decodeFromString($accessor as String)';

@@ -1,4 +1,3 @@
-part of native_sqlite;
 
 /// Base class for type converters.
 /// Implement this to create custom type converters for complex types.

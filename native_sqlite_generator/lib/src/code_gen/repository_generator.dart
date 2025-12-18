@@ -58,6 +58,12 @@ class RepositoryGenerator {
     // Helper methods
     _generateFromMapMethod(buffer, table);
 
+    // UUID helper
+    if (table.primaryKey?.useLocalUuid == true) {
+      buffer.writeln();
+      _generateUuidHelper(buffer);
+    }
+
     buffer.writeln('}');
 
     return buffer.toString();
@@ -65,24 +71,66 @@ class RepositoryGenerator {
 
   /// Generates the insert method.
   void _generateInsertMethod(StringBuffer buffer, TableInfo table) {
+    // If we have a primary key, we return it. Otherwise we return int (row ID).
+    // If we have a primary key, we return it. Otherwise we return int (row ID).
+    String returnType;
+    if (table.hasPrimaryKey) {
+      if (table.primaryKey!.useLocalUuid) {
+        returnType = 'Future<String>';
+      } else {
+        returnType = 'Future<${table.primaryKey!.typeDisplayName}>';
+      }
+    } else {
+      returnType = 'Future<int>';
+    }
+
     buffer.writeln('  /// Inserts a new ${table.dartName} into the database.');
     buffer.writeln('  /// Returns the ID of the inserted row.');
-    buffer.writeln('  Future<int> insert(${table.dartName} entity) async {');
-    buffer.writeln('    return NativeSqlite.insert(');
+    buffer.writeln('  $returnType insert(${table.dartName} entity) async {');
+
+    // Handle UUID generation if needed
+    final pk = table.primaryKey;
+    if (pk != null && pk.useLocalUuid) {
+      buffer.writeln(
+        '    final id = entity.${pk.dartName} ?? _generateUuid();',
+      );
+    }
+
+    buffer.writeln('    final id = await NativeSqlite.insert(');
     buffer.writeln('      databaseName,');
     buffer.writeln("      '${table.sqlName}',");
     buffer.writeln('      {');
 
-    final insertColumns = table.nonAutoIncrementColumns;
-    if (insertColumns.isNotEmpty) {
-      for (final column in insertColumns) {
-        final value = column.serializeExpression('entity.${column.dartName}');
-        buffer.writeln("        '${column.sqlName}': $value,");
+    // Add all columns except auto-increment PK
+    // for UUID PKs, we include them
+    for (final column in table.columns) {
+      if (column.isAutoIncrement) continue;
+
+      String value;
+      if (column.isPrimaryKey && column.useLocalUuid) {
+        value = 'id';
+      } else {
+        value = column.serializeExpression('entity.${column.dartName}');
       }
+      buffer.writeln("        '${column.sqlName}': $value,");
     }
 
     buffer.writeln('      },');
     buffer.writeln('    );');
+
+    // Return the appropriate ID
+    if (pk != null && pk.useLocalUuid) {
+      buffer.writeln('    return id as String;');
+    } else if (pk != null && !pk.isAutoIncrement) {
+      // If manually set ID (not auto-inc, not UUID), return what was passed
+      // But NativeSqlite.insert returns the ROWID (int), so we might need to return entity.id
+      // EXCEPT: If the PK is not an int (e.g. String), insert() still returns rowid.
+      // So we should return the entity's ID.
+      buffer.writeln('    return entity.${pk.dartName}!;');
+    } else {
+      // For auto-increment int, return the result from insert()
+      buffer.writeln('    return id;');
+    }
     buffer.writeln('  }');
   }
 
@@ -227,6 +275,25 @@ class RepositoryGenerator {
     }
 
     buffer.writeln('    );');
+    buffer.writeln('  }');
+  }
+
+  /// Generates a random UUID (v4-like).
+  void _generateUuidHelper(StringBuffer buffer) {
+    buffer.writeln('  /// Generates a random UUID.');
+    buffer.writeln('  String _generateUuid() {');
+    buffer.writeln('    final random = Random.secure();');
+    buffer.writeln(
+      '    final values = List<int>.generate(16, (i) => random.nextInt(256));',
+    );
+    buffer.writeln('    values[6] = (values[6] & 0x0f) | 0x40; // version 4');
+    buffer.writeln('    values[8] = (values[8] & 0x3f) | 0x80; // variant 10');
+    buffer.writeln(
+      '    return values.map((b) => b.toRadixString(16).padLeft(2, "0")).join("")',
+    );
+    buffer.writeln(
+      '        .replaceFirstMapped(RegExp(r"(.{8})(.{4})(.{4})(.{4})(.{12})"), (m) => "\${m[1]}-\${m[2]}-\${m[3]}-\${m[4]}-\${m[5]}");',
+    );
     buffer.writeln('  }');
   }
 }

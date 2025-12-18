@@ -20,6 +20,7 @@ class ColumnInfo {
     this.enumType = 'ordinal',
     this.converterExpression,
     this.isJsonField = false,
+    this.useLocalUuid = false,
   });
 
   /// The Dart field name.
@@ -70,6 +71,9 @@ class ColumnInfo {
 
   /// Whether this field should be serialized as JSON.
   final bool isJsonField;
+
+  /// Whether this column uses a locally generated UUID.
+  final bool useLocalUuid;
 
   /// Whether this column has a foreign key constraint.
   bool get hasForeignKey => foreignKeyTable != null;

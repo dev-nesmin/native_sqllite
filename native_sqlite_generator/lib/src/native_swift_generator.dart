@@ -1,4 +1,4 @@
-import 'native_generator.dart';
+import 'package:native_sqlite_generator/src/models/schema_snapshot.dart';
 
 /// Generates Swift code for iOS
 class NativeSwiftGenerator {
@@ -10,7 +10,7 @@ class NativeSwiftGenerator {
     required this.includeExamples,
   });
 
-  String generateSchema(TableModel model) {
+  String generateSchema(TableSchemaSnapshot model) {
     final buffer = StringBuffer();
 
     buffer.writeln('import Foundation');
@@ -27,11 +27,9 @@ class NativeSwiftGenerator {
     buffer.writeln();
     buffer.writeln('    // Column names');
 
-    for (final field in model.fields) {
-      final constantName = _toCamelCase(field.fieldName);
-      buffer.writeln(
-        '    public static let $constantName = "${field.columnName}"',
-      );
+    for (final field in model.columns) {
+      final constantName = _toCamelCase(field.dartName);
+      buffer.writeln('    public static let $constantName = "${field.name}"');
     }
 
     buffer.writeln();
@@ -40,21 +38,21 @@ class NativeSwiftGenerator {
     buffer.write('        CREATE TABLE ${model.tableName} (');
 
     final columnDefs = <String>[];
-    for (final field in model.fields) {
-      final parts = <String>[field.columnName, field.sqlType];
+    for (final field in model.columns) {
+      final parts = <String>[field.name, field.type];
 
-      if (field.isPrimaryKey) {
+      if (field.primaryKey) {
         parts.add('PRIMARY KEY');
         if (field.autoIncrement) {
           parts.add('AUTOINCREMENT');
         }
       }
 
-      if (!field.isNullable && !field.isPrimaryKey) {
+      if (!field.nullable && !field.primaryKey) {
         parts.add('NOT NULL');
       }
 
-      if (field.isUnique && !field.isPrimaryKey) {
+      if (field.unique && !field.primaryKey) {
         parts.add('UNIQUE');
       }
 
@@ -70,11 +68,11 @@ class NativeSwiftGenerator {
     return buffer.toString();
   }
 
-  String generateHelper(TableModel model) {
+  String generateHelper(TableSchemaSnapshot model) {
     final buffer = StringBuffer();
-    final primaryKey = model.fields.firstWhere(
-      (f) => f.isPrimaryKey,
-      orElse: () => model.fields.first,
+    final primaryKey = model.columns.firstWhere(
+      (f) => f.primaryKey,
+      orElse: () => model.columns.first,
     );
 
     buffer.writeln('import Foundation');
@@ -85,26 +83,26 @@ class NativeSwiftGenerator {
     buffer.writeln(' */');
     buffer.writeln('public struct ${model.className} {');
 
-    for (final field in model.fields) {
+    for (final field in model.columns) {
       final swiftType = _getSwiftType(field);
-      buffer.writeln('    public let ${field.fieldName}: $swiftType');
+      buffer.writeln('    public let ${field.dartName}: $swiftType');
     }
 
     buffer.writeln();
     buffer.writeln('    public init(');
     final initParams = <String>[];
-    for (final field in model.fields) {
+    for (final field in model.columns) {
       final swiftType = _getSwiftType(field);
-      final defaultValue = field.isPrimaryKey && field.autoIncrement
+      final defaultValue = field.primaryKey && field.autoIncrement
           ? ' = nil'
           : '';
-      initParams.add('        ${field.fieldName}: $swiftType$defaultValue');
+      initParams.add('        ${field.dartName}: $swiftType$defaultValue');
     }
     buffer.writeln(initParams.join(',\n'));
     buffer.writeln('    ) {');
 
-    for (final field in model.fields) {
-      buffer.writeln('        self.${field.fieldName} = ${field.fieldName}');
+    for (final field in model.columns) {
+      buffer.writeln('        self.${field.dartName} = ${field.dartName}');
     }
 
     buffer.writeln('    }');
@@ -230,12 +228,12 @@ class NativeSwiftGenerator {
       '    public func insert(_ entity: ${model.className}) throws -> Int {',
     );
     buffer.writeln('        var values: [String: Any] = [:]');
-    for (final field in model.fields) {
-      if (field.isPrimaryKey && field.autoIncrement) continue;
+    for (final field in model.columns) {
+      if (field.primaryKey && field.autoIncrement) continue;
 
-      final value = _serializeSwift(field, 'entity.${field.fieldName}');
+      final value = _serializeSwift(field, 'entity.${field.dartName}');
       buffer.writeln(
-        '        values[${model.className}Schema.${_toCamelCase(field.fieldName)}] = $value',
+        '        values[${model.className}Schema.${_toCamelCase(field.dartName)}] = $value',
       );
     }
     buffer.writeln(
@@ -251,7 +249,7 @@ class NativeSwiftGenerator {
     buffer.writeln('        let result = try manager.query(');
     buffer.writeln('            name: databaseName,');
     buffer.writeln(
-      '            sql: "SELECT * FROM \\(${model.className}Schema.tableName) WHERE \\(${model.className}Schema.${_toCamelCase(primaryKey.fieldName)}) = ? LIMIT 1",',
+      '            sql: "SELECT * FROM \\(${model.className}Schema.tableName) WHERE \\(${model.className}Schema.${_toCamelCase(primaryKey.dartName)}) = ? LIMIT 1",',
     );
     buffer.writeln('            arguments: [id]');
     buffer.writeln('        )');
@@ -309,11 +307,11 @@ class NativeSwiftGenerator {
       '    public func update(_ entity: ${model.className}) throws -> Int {',
     );
     buffer.writeln('        var values: [String: Any] = [:]');
-    for (final field in model.fields) {
-      if (field.isPrimaryKey) continue; // Skip PK in updates
-      final value = _serializeSwift(field, 'entity.${field.fieldName}');
+    for (final field in model.columns) {
+      if (field.primaryKey) continue; // Skip PK in updates
+      final value = _serializeSwift(field, 'entity.${field.dartName}');
       buffer.writeln(
-        '        values[${model.className}Schema.${_toCamelCase(field.fieldName)}] = $value',
+        '        values[${model.className}Schema.${_toCamelCase(field.dartName)}] = $value',
       );
     }
     buffer.writeln('        return try manager.update(');
@@ -321,9 +319,9 @@ class NativeSwiftGenerator {
     buffer.writeln('            table: ${model.className}Schema.tableName,');
     buffer.writeln('            values: values,');
     buffer.writeln(
-      '            whereClause: "\\(${model.className}Schema.${_toCamelCase(primaryKey.fieldName)}) = ?",',
+      '            whereClause: "\\(${model.className}Schema.${_toCamelCase(primaryKey.dartName)}) = ?",',
     );
-    buffer.writeln('            whereArgs: [entity.${primaryKey.fieldName}]');
+    buffer.writeln('            whereArgs: [entity.${primaryKey.dartName}]');
     buffer.writeln('        )');
     buffer.writeln('    }');
     buffer.writeln();
@@ -347,7 +345,7 @@ class NativeSwiftGenerator {
     buffer.writeln('            table: ${model.className}Schema.tableName,');
     buffer.writeln('            values: updates,');
     buffer.writeln(
-      '            whereClause: "\\(${model.className}Schema.${_toCamelCase(primaryKey.fieldName)}) = ?",',
+      '            whereClause: "\\(${model.className}Schema.${_toCamelCase(primaryKey.dartName)}) = ?",',
     );
     buffer.writeln('            whereArgs: [id]');
     buffer.writeln('        )');
@@ -366,7 +364,7 @@ class NativeSwiftGenerator {
     buffer.writeln('            name: databaseName,');
     buffer.writeln('            table: ${model.className}Schema.tableName,');
     buffer.writeln(
-      '            whereClause: "\\(${model.className}Schema.${_toCamelCase(primaryKey.fieldName)}) = ?",',
+      '            whereClause: "\\(${model.className}Schema.${_toCamelCase(primaryKey.dartName)}) = ?",',
     );
     buffer.writeln('            whereArgs: [id]');
     buffer.writeln('        )');
@@ -729,12 +727,12 @@ class NativeSwiftGenerator {
     buffer.writeln('        return ${model.className}(');
 
     final fieldInits = <String>[];
-    for (final field in model.fields) {
+    for (final field in model.columns) {
       final value = _deserializeSwift(
         field,
-        'row[columnMap[${model.className}Schema.${_toCamelCase(field.fieldName)}]!]',
+        'row[columnMap[${model.className}Schema.${_toCamelCase(field.dartName)}]!]',
       );
-      fieldInits.add('            ${field.fieldName}: $value');
+      fieldInits.add('            ${field.dartName}: $value');
     }
     buffer.writeln(fieldInits.join(',\n'));
     buffer.writeln('        )');
@@ -744,7 +742,7 @@ class NativeSwiftGenerator {
     return buffer.toString();
   }
 
-  String _getSwiftType(FieldModel field) {
+  String _getSwiftType(ColumnSchemaSnapshot field) {
     final baseType = field.dartType.replaceAll('?', '');
     String swiftType;
 
@@ -778,34 +776,34 @@ class NativeSwiftGenerator {
       swiftType = 'Any';
     }
 
-    return field.isNullable ? '$swiftType?' : swiftType;
+    return field.nullable ? '$swiftType?' : swiftType;
   }
 
-  String _serializeSwift(FieldModel field, String accessor) {
+  String _serializeSwift(ColumnSchemaSnapshot field, String accessor) {
     final baseType = field.dartType.replaceAll('?', '');
 
     // Handle boolean conversion to integer
     if (baseType == 'bool' || baseType == 'Boolean') {
-      return field.isNullable
+      return field.nullable
           ? '$accessor.map { \$0 ? 1 : 0 } ?? NSNull()'
           : '$accessor ? 1 : 0';
     }
 
     // Handle DateTime conversion to epoch milliseconds
     if (baseType == 'DateTime') {
-      return field.isNullable
+      return field.nullable
           ? '$accessor?.timeIntervalSince1970 ?? NSNull()'
           : 'Int($accessor.timeIntervalSince1970 * 1000)';
     }
 
     // Handle binary data (Uint8List -> Data)
     if (baseType == 'Uint8List') {
-      return field.isNullable ? '$accessor ?? NSNull()' : accessor;
+      return field.nullable ? '$accessor ?? NSNull()' : accessor;
     }
 
     // Handle List serialization to JSON
     if (baseType.startsWith('List<')) {
-      if (field.isNullable) {
+      if (field.nullable) {
         return '$accessor.flatMap { try? JSONEncoder().encode(\$0) }.flatMap { String(data: \$0, encoding: .utf8) } ?? NSNull()';
       } else {
         return 'try! String(data: JSONEncoder().encode($accessor), encoding: .utf8)!';
@@ -814,26 +812,26 @@ class NativeSwiftGenerator {
 
     // Handle Map serialization to JSON
     if (baseType.startsWith('Map<')) {
-      if (field.isNullable) {
+      if (field.nullable) {
         return '$accessor.flatMap { try? JSONSerialization.data(withJSONObject: \$0) }.flatMap { String(data: \$0, encoding: .utf8) } ?? NSNull()';
       } else {
         return 'String(data: try! JSONSerialization.data(withJSONObject: $accessor), encoding: .utf8)!';
       }
     }
 
-    return field.isNullable ? '$accessor ?? NSNull()' : accessor;
+    return field.nullable ? '$accessor ?? NSNull()' : accessor;
   }
 
-  String _deserializeSwift(FieldModel field, String accessor) {
+  String _deserializeSwift(ColumnSchemaSnapshot field, String accessor) {
     final baseType = field.dartType.replaceAll('?', '');
 
     // Handle integer types
     if (baseType == 'int' || baseType == 'Int') {
-      return field.isNullable ? '$accessor as? Int' : '$accessor as! Int';
+      return field.nullable ? '$accessor as? Int' : '$accessor as! Int';
     }
     // Handle DateTime (stored as epoch milliseconds)
     else if (baseType == 'DateTime') {
-      if (field.isNullable) {
+      if (field.nullable) {
         return '($accessor as? Int).map { Date(timeIntervalSince1970: TimeInterval(\$0) / 1000) }';
       } else {
         return 'Date(timeIntervalSince1970: TimeInterval($accessor as! Int) / 1000)';
@@ -841,25 +839,25 @@ class NativeSwiftGenerator {
     }
     // Handle double types
     else if (baseType == 'double' || baseType == 'Double') {
-      return field.isNullable ? '$accessor as? Double' : '$accessor as! Double';
+      return field.nullable ? '$accessor as? Double' : '$accessor as! Double';
     }
     // Handle String types
     else if (baseType == 'String') {
-      return field.isNullable ? '$accessor as? String' : '$accessor as! String';
+      return field.nullable ? '$accessor as? String' : '$accessor as! String';
     }
     // Handle boolean (stored as integer)
     else if (baseType == 'bool' || baseType == 'Boolean') {
-      return field.isNullable
+      return field.nullable
           ? '($accessor as? Int).map { \$0 == 1 }'
           : '($accessor as! Int) == 1';
     }
     // Handle binary data
     else if (baseType == 'Uint8List') {
-      return field.isNullable ? '$accessor as? Data' : '$accessor as! Data';
+      return field.nullable ? '$accessor as? Data' : '$accessor as! Data';
     }
     // Handle List deserialization from JSON
     else if (baseType.startsWith('List<')) {
-      if (field.isNullable) {
+      if (field.nullable) {
         return '($accessor as? String).flatMap { try? JSONDecoder().decode([Any].self, from: \$0.data(using: .utf8)!) }';
       } else {
         return 'try! JSONDecoder().decode([Any].self, from: ($accessor as! String).data(using: .utf8)!)';
@@ -867,7 +865,7 @@ class NativeSwiftGenerator {
     }
     // Handle Map deserialization from JSON
     else if (baseType.startsWith('Map<')) {
-      if (field.isNullable) {
+      if (field.nullable) {
         return '($accessor as? String).flatMap { try? JSONSerialization.jsonObject(with: \$0.data(using: .utf8)!) as? [String: Any] }';
       } else {
         return 'try! JSONSerialization.jsonObject(with: ($accessor as! String).data(using: .utf8)!) as! [String: Any]';

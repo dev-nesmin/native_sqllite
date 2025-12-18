@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:analyzer/dart/element/element.dart';
 import 'package:build/build.dart';
-import 'package:native_sqlite/native_sqlite.dart';
+import 'package:native_sqlite_annotations/native_sqlite_annotations.dart';
 import 'package:native_sqlite_generator/src/analyzer/table_analyzer.dart';
 import 'package:native_sqlite_generator/src/helpers/error_handler.dart';
 import 'package:native_sqlite_generator/src/helpers/schema_persistence.dart';

@@ -23,6 +23,8 @@ dependencies:
     sdk: flutter
   native_sqlite_platform_interface:
     path: ../native_sqlite_platform_interface
+  native_sqlite_annotations:
+    path: ../native_sqlite_annotations
   native_sqlite_android:
     path: ../native_sqlite_android
   native_sqlite_ios:

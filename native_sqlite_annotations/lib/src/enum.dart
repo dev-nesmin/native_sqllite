@@ -1,4 +1,3 @@
-part of native_sqlite;
 
 /// Strategy for storing enum values in the database.
 enum EnumType {

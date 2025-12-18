@@ -16,30 +16,29 @@ class TableAnalyzer {
 
   TableAnalyzer([this.options]);
 
-  /// Type checkers for annotations
   static final _primaryKeyChecker = TypeChecker.fromUrl(
-    'package:native_sqlite/native_sqlite.dart#PrimaryKey',
+    'package:native_sqlite_annotations/src/primary_key.dart#PrimaryKey',
   );
   static final _columnChecker = TypeChecker.fromUrl(
-    'package:native_sqlite/native_sqlite.dart#DbColumn',
+    'package:native_sqlite_annotations/src/column.dart#DbColumn',
   );
   static final _ignoreChecker = TypeChecker.fromUrl(
-    'package:native_sqlite/native_sqlite.dart#Ignore',
+    'package:native_sqlite_annotations/src/ignore.dart#Ignore',
   );
   static final _foreignKeyChecker = TypeChecker.fromUrl(
-    'package:native_sqlite/native_sqlite.dart#ForeignKey',
+    'package:native_sqlite_annotations/src/foreign_key.dart#ForeignKey',
   );
   static final _indexChecker = TypeChecker.fromUrl(
-    'package:native_sqlite/native_sqlite.dart#Index',
+    'package:native_sqlite_annotations/src/index.dart#Index',
   );
   static final _enumFieldChecker = TypeChecker.fromUrl(
-    'package:native_sqlite/native_sqlite.dart#EnumField',
+    'package:native_sqlite_annotations/src/enum.dart#EnumField',
   );
   static final _useConverterChecker = TypeChecker.fromUrl(
-    'package:native_sqlite/native_sqlite.dart#UseConverter',
+    'package:native_sqlite_annotations/src/type_converter.dart#UseConverter',
   );
   static final _jsonFieldChecker = TypeChecker.fromUrl(
-    'package:native_sqlite/native_sqlite.dart#JsonField',
+    'package:native_sqlite_annotations/src/json_field.dart#JsonField',
   );
 
   /// Analyzes a class element and returns table information.
@@ -138,6 +137,43 @@ class TableAnalyzer {
     // Check if auto increment
     final isAutoIncrement = isPrimaryKey && _isAutoIncrement(field);
 
+    // Check if use local UUID
+    final useLocalUuid = isPrimaryKey && _isUseLocalUuid(field);
+
+    // PROPERTIES VALIDATION
+    if (isPrimaryKey) {
+      if (isAutoIncrement && useLocalUuid) {
+        throw InvalidGenerationSourceError(
+          'PrimaryKey cannot have both autoIncrement=true and useLocalUuid=true.',
+          element: field,
+        );
+      }
+
+      if (isAutoIncrement && !TypeUtils.isInt(dartType)) {
+        throw InvalidGenerationSourceError(
+          'PrimaryKey with autoIncrement=true must be an integer field.',
+          element: field,
+        );
+      }
+
+      if (useLocalUuid) {
+        if (!TypeUtils.isString(dartType)) {
+          throw InvalidGenerationSourceError(
+            'PrimaryKey with useLocalUuid=true must be a String field.',
+            element: field,
+          );
+        }
+
+        // For auto-generation on insert, the field MUST be nullable so we can detect when to generate it
+        if (!TypeUtils.isNullable(dartType)) {
+          throw InvalidGenerationSourceError(
+            'PrimaryKey with useLocalUuid=true must be nullable. The UUID is generated when the field is null.',
+            element: field,
+          );
+        }
+      }
+    }
+
     // Check nullability
     final isNullable = _isColumnNullable(field);
 
@@ -163,6 +199,7 @@ class TableAnalyzer {
       sqlType: sqlType,
       isPrimaryKey: isPrimaryKey,
       isAutoIncrement: isAutoIncrement,
+      useLocalUuid: useLocalUuid,
       isNullable: isNullable,
       isUnique: isUnique,
       defaultValue: defaultValue,
@@ -246,6 +283,15 @@ class TableAnalyzer {
 
     final reader = ConstantReader(annotation);
     return reader.peek('autoIncrement')?.boolValue ?? false;
+  }
+
+  /// Checks if a field should use a local UUID.
+  bool _isUseLocalUuid(FieldElement field) {
+    final annotation = _primaryKeyChecker.firstAnnotationOf(field);
+    if (annotation == null) return false;
+
+    final reader = ConstantReader(annotation);
+    return reader.peek('useLocalUuid')?.boolValue ?? false;
   }
 
   /// Checks if a column is nullable.

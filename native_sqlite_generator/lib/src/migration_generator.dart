@@ -1,4 +1,4 @@
-import 'package:native_sqlite_generator/src/native_generator.dart';
+import 'package:native_sqlite_generator/src/models/schema_snapshot.dart';
 
 /// Generates migration helper classes for schema versioning
 class MigrationGenerator {
@@ -6,7 +6,7 @@ class MigrationGenerator {
   String generateKotlinMigration({
     required String packageName,
     required String databaseName,
-    required List<TableModel> tables,
+    required List<TableSchemaSnapshot> tables,
     required int fromVersion,
     required int toVersion,
   }) {
@@ -109,7 +109,7 @@ class MigrationGenerator {
   /// Generate Swift migration helper
   String generateSwiftMigration({
     required String databaseName,
-    required List<TableModel> tables,
+    required List<TableSchemaSnapshot> tables,
     required int fromVersion,
     required int toVersion,
   }) {

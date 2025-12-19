@@ -109,6 +109,10 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
         Category(name: 'Books', description: 'Books and magazines'),
       );
 
+      if (electronicsId == null || clothingId == null || booksId == null) {
+        throw Exception('Failed to insert categories');
+      }
+
       // Create users
       final user1Id = await _userRepository.insert(
         User(name: 'Alice Johnson', email: 'alice@example.com', age: 28),
@@ -119,6 +123,10 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
       final user3Id = await _userRepository.insert(
         User(name: 'Carol Davis', email: 'carol@example.com', age: 42),
       );
+
+      if (user1Id == null || user2Id == null || user3Id == null) {
+        throw Exception('Failed to insert users');
+      }
 
       // Create products
       final laptop = await _productRepository.insert(
@@ -157,6 +165,10 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
           categoryId: booksId,
         ),
       );
+
+      if (laptop == null || phone == null || shirt == null || book == null) {
+        throw Exception('Failed to insert products');
+      }
 
       // Create orders
       await _orderRepository.insert(

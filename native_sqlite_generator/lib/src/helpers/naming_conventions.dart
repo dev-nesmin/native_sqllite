@@ -31,7 +31,8 @@ class NamingConventions {
           // Check if previous char is lowercase or next char is lowercase
           final prevIsLower =
               i > 0 && input[i - 1] == input[i - 1].toLowerCase();
-          final nextIsLower = i < input.length - 1 &&
+          final nextIsLower =
+              i < input.length - 1 &&
               input[i + 1] == input[i + 1].toLowerCase();
 
           if (prevIsLower || nextIsLower) {

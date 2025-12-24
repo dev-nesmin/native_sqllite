@@ -16,6 +16,14 @@ builders:
     runs_before: ["native_sqlite_generator:table"]
     # Schema files are generated in lib/generated/schemas/ by default
 
+  schema_registry:
+    import: "package:native_sqlite_generator/builder.dart"
+    builder_factories: ["schemaRegistryBuilder"]
+    build_extensions: {".dart": [".database_manager.g.dart"]}
+    auto_apply: dependents
+    build_to: source
+    # Generates DatabaseManager from database_schema.dart - user calls DatabaseManager.init()
+
 post_process_builders:
   native_code:
     import: "package:native_sqlite_generator/src/post_build_hook.dart"

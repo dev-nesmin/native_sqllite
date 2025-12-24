@@ -7,10 +7,7 @@ class QueryResult {
   /// Each row is a list of values corresponding to the columns.
   final List<List<Object?>> rows;
 
-  const QueryResult({
-    required this.columns,
-    required this.rows,
-  });
+  const QueryResult({required this.columns, required this.rows});
 
   /// Converts the result to a list of maps, where each map represents a row.
   List<Map<String, Object?>> toMapList() {
@@ -29,10 +26,7 @@ class QueryResult {
   }
 
   Map<String, dynamic> toMap() {
-    return {
-      'columns': columns,
-      'rows': rows,
-    };
+    return {'columns': columns, 'rows': rows};
   }
 
   factory QueryResult.fromMap(Map<String, dynamic> map) {
@@ -41,10 +35,7 @@ class QueryResult {
         .map((row) => (row as List<dynamic>).cast<Object?>())
         .toList();
 
-    return QueryResult(
-      columns: columns,
-      rows: rows,
-    );
+    return QueryResult(columns: columns, rows: rows);
   }
 
   @override
@@ -140,8 +131,11 @@ class TypedRow {
   }
 
   /// Formats a numeric value as a fixed decimal string.
-  String getFormattedNumber(String key, int decimals,
-      [String defaultValue = '0.00']) {
+  String getFormattedNumber(
+    String key,
+    int decimals, [
+    String defaultValue = '0.00',
+  ]) {
     final value = _data[key];
     if (value == null) return defaultValue;
     if (value is num) return value.toStringAsFixed(decimals);

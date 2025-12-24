@@ -34,7 +34,8 @@ class SchemaGenerator {
     for (final column in table.columns) {
       final constantName = NamingUtils.getColumnConstantName(column.dartName);
       buffer.writeln(
-          "  static const String $constantName = '${column.sqlName}';");
+        "  static const String $constantName = '${column.sqlName}';",
+      );
     }
 
     buffer.writeln('}');
@@ -70,10 +71,7 @@ class SchemaGenerator {
 
   /// Generates a column definition.
   String _generateColumnDefinition(ColumnInfo column) {
-    final parts = <String>[
-      column.sqlName,
-      column.sqlType.sqlName,
-    ];
+    final parts = <String>[column.sqlName, column.sqlType.sqlName];
 
     if (column.isPrimaryKey) {
       parts.add('PRIMARY KEY');

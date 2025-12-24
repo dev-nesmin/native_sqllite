@@ -73,7 +73,7 @@ class NativeCodePostProcessBuilder implements PostProcessBuilder {
 
     final content = await pubspecFile.readAsString();
     return content.contains('native_sqlite:') &&
-           content.contains('generate_native: true');
+        content.contains('generate_native: true');
   }
 }
 

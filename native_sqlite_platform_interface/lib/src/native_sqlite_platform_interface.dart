@@ -47,19 +47,31 @@ abstract class NativeSqlitePlatform extends PlatformInterface {
   ///
   /// Use this for INSERT, UPDATE, DELETE, or other non-SELECT statements.
   /// Returns the number of rows affected.
-  Future<int> execute(String databaseName, String sql, List<Object?>? arguments) {
+  Future<int> execute(
+    String databaseName,
+    String sql,
+    List<Object?>? arguments,
+  ) {
     throw UnimplementedError('execute() has not been implemented.');
   }
 
   /// Executes a SELECT query and returns the results.
-  Future<QueryResult> query(String databaseName, String sql, List<Object?>? arguments) {
+  Future<QueryResult> query(
+    String databaseName,
+    String sql,
+    List<Object?>? arguments,
+  ) {
     throw UnimplementedError('query() has not been implemented.');
   }
 
   /// Inserts a row into the specified table.
   ///
   /// Returns the row ID of the inserted row.
-  Future<int> insert(String databaseName, String table, Map<String, Object?> values) {
+  Future<int> insert(
+    String databaseName,
+    String table,
+    Map<String, Object?> values,
+  ) {
     throw UnimplementedError('insert() has not been implemented.');
   }
 

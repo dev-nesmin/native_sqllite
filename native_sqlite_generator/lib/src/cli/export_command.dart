@@ -184,16 +184,18 @@ class ExportCommand {
             }
           }
 
-          fields.add(_FieldInfo(
-            name: fieldName,
-            type: fieldType,
-            columnName: columnName ?? _toSnakeCase(fieldName),
-            isPrimaryKey: isPrimaryKey,
-            isNullable: isNullable,
-            isUnique: isUnique,
-            hasIndex: hasIndex,
-            foreignKey: foreignKey,
-          ));
+          fields.add(
+            _FieldInfo(
+              name: fieldName,
+              type: fieldType,
+              columnName: columnName ?? _toSnakeCase(fieldName),
+              isPrimaryKey: isPrimaryKey,
+              isNullable: isNullable,
+              isUnique: isUnique,
+              hasIndex: hasIndex,
+              foreignKey: foreignKey,
+            ),
+          );
         }
       }
 
@@ -215,39 +217,40 @@ class ExportCommand {
       'generator': 'native_sqlite_generator',
       'tableCount': tables.length,
       'tables': tables
-          .map((t) => {
-                'name': t.name,
-                'tableName': t.tableName,
-                'filePath': t.filePath,
-                'fieldCount': t.fields.length,
-                'fields': t.fields
-                    .map((f) => {
-                          'name': f.name,
-                          'type': f.type,
-                          'columnName': f.columnName,
-                          'isPrimaryKey': f.isPrimaryKey,
-                          'isNullable': f.isNullable,
-                          'isUnique': f.isUnique,
-                          'hasIndex': f.hasIndex,
-                          if (f.foreignKey != null) 'foreignKey': f.foreignKey,
-                        })
-                    .toList(),
-                'primaryKeys': t.fields
-                    .where((f) => f.isPrimaryKey)
-                    .map((f) => f.name)
-                    .toList(),
-                'indexes': t.fields
-                    .where((f) => f.hasIndex)
-                    .map((f) => f.name)
-                    .toList(),
-                'foreignKeys': t.fields
-                    .where((f) => f.foreignKey != null)
-                    .map((f) => {
-                          'field': f.name,
-                          'references': f.foreignKey,
-                        })
-                    .toList(),
-              })
+          .map(
+            (t) => {
+              'name': t.name,
+              'tableName': t.tableName,
+              'filePath': t.filePath,
+              'fieldCount': t.fields.length,
+              'fields': t.fields
+                  .map(
+                    (f) => {
+                      'name': f.name,
+                      'type': f.type,
+                      'columnName': f.columnName,
+                      'isPrimaryKey': f.isPrimaryKey,
+                      'isNullable': f.isNullable,
+                      'isUnique': f.isUnique,
+                      'hasIndex': f.hasIndex,
+                      if (f.foreignKey != null) 'foreignKey': f.foreignKey,
+                    },
+                  )
+                  .toList(),
+              'primaryKeys': t.fields
+                  .where((f) => f.isPrimaryKey)
+                  .map((f) => f.name)
+                  .toList(),
+              'indexes': t.fields
+                  .where((f) => f.hasIndex)
+                  .map((f) => f.name)
+                  .toList(),
+              'foreignKeys': t.fields
+                  .where((f) => f.foreignKey != null)
+                  .map((f) => {'field': f.name, 'references': f.foreignKey})
+                  .toList(),
+            },
+          )
           .toList(),
     };
   }

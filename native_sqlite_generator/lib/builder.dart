@@ -1,5 +1,6 @@
 import 'package:build/build.dart';
 import 'package:native_sqlite_generator/src/config/generator_options.dart';
+import 'package:native_sqlite_generator/src/generators/schema_registry_generator.dart';
 import 'package:native_sqlite_generator/src/migration/migration_builder.dart';
 import 'package:native_sqlite_generator/src/table_generator.dart';
 import 'package:source_gen/source_gen.dart';
@@ -44,3 +45,14 @@ String _buildHeader(GeneratorOptions options) {
 /// All schemas are generated in lib/generated/schemas/ directory
 Builder migrationBuilder(BuilderOptions options) =>
     SchemaTrackingBuilder(options);
+
+/// Generates a centralized database manager in lib/.generated/
+Builder schemaRegistryBuilder(BuilderOptions options) {
+  final generatorOptions = GeneratorOptions.fromOptions(options);
+
+  return LibraryBuilder(
+    SchemaRegistryGenerator(generatorOptions),
+    generatedExtension: '.database_manager.g.dart',
+    header: _buildHeader(generatorOptions),
+  );
+}

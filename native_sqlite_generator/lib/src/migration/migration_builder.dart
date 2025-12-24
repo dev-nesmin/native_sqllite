@@ -24,7 +24,7 @@ class SchemaTrackingBuilder implements Builder {
   @override
   Map<String, List<String>> get buildExtensions {
     return const {
-      r'$lib$': ['generated/schemas/.schemas_generated'] // Marker file
+      r'$lib$': ['generated/schemas/.schemas_generated'], // Marker file
     };
   }
 
@@ -67,8 +67,10 @@ class SchemaTrackingBuilder implements Builder {
         if (element is! ClassElement) continue;
 
         // Analyze the table
-        final tableInfo =
-            analyzer.analyze(element, annotatedElement.annotation);
+        final tableInfo = analyzer.analyze(
+          element,
+          annotatedElement.annotation,
+        );
         final fileName = '${_toSnakeCase(tableInfo.dartName)}.schema.json';
         final filePath = 'lib/generated/schemas/$fileName';
 
@@ -77,28 +79,35 @@ class SchemaTrackingBuilder implements Builder {
         final oldVersion = oldSchemaJson?['version'] as int? ?? 0;
 
         // Check if schema changed
-        final newSnapshot =
-            SchemaSnapshotHelper.createSnapshot(tableInfo, oldVersion);
+        final newSnapshot = SchemaSnapshotHelper.createSnapshot(
+          tableInfo,
+          oldVersion,
+        );
         final oldHash = oldSchemaJson?['hash'] as String?;
         final schemaChanged = oldHash != newSnapshot.hash;
 
         final currentVersion = schemaChanged ? oldVersion + 1 : oldVersion;
-        final snapshot =
-            SchemaSnapshotHelper.createSnapshot(tableInfo, currentVersion);
+        final snapshot = SchemaSnapshotHelper.createSnapshot(
+          tableInfo,
+          currentVersion,
+        );
 
         // Write directly to filesystem (like slang does)
-        final jsonString =
-            const JsonEncoder.withIndent('  ').convert(snapshot.toJson());
+        final jsonString = const JsonEncoder.withIndent(
+          '  ',
+        ).convert(snapshot.toJson());
         File(filePath).writeAsStringSync(jsonString);
 
         schemaCount++;
 
         if (schemaChanged) {
           log.info(
-              '📝 Schema changed for ${tableInfo.dartName}: v$oldVersion → v$currentVersion (hash: ${snapshot.hash})');
+            '📝 Schema changed for ${tableInfo.dartName}: v$oldVersion → v$currentVersion (hash: ${snapshot.hash})',
+          );
         } else {
           log.fine(
-              'Schema unchanged for ${tableInfo.dartName} (v$currentVersion)');
+            'Schema unchanged for ${tableInfo.dartName} (v$currentVersion)',
+          );
         }
       }
     }

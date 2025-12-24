@@ -1,56 +1,33 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:native_sqlite/native_sqlite.dart';
 
-import 'models/category.dart';
-import 'models/order.dart';
-import 'models/product.dart';
-import 'models/user.dart';
+import 'database_schema.database_manager.g.dart';
 import 'screens/home_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize the database
-  await initializeDatabase();
+  // Initialize database - everything is handled automatically!
+  // Tables are created, migrations run, indexes added, etc.
+  await DatabaseManager.init(
+    name: 'example_app',
+    enableWAL: true,
+    enableForeignKeys: true,
+    dropRemovedTables: false, // Set to true to auto-drop removed tables
+    onCustomMigrate: (databaseName, oldVersion, newVersion) async {
+      // Optional: Add custom migration logic here
+      // Example:
+      // if (oldVersion < 123456) {
+      //   await NativeSqlite.execute(
+      //     databaseName,
+      //     'ALTER TABLE users ADD COLUMN avatar TEXT',
+      //   );
+      // }
+      debugPrint('Custom migration: v$oldVersion → v$newVersion');
+    },
+  );
 
   runApp(const MyApp());
-}
-
-/// Initialize database with all tables
-Future<void> initializeDatabase() async {
-  try {
-    await NativeSqlite.open(
-      config: DatabaseConfig(
-        name: 'example_app',
-        version: 1,
-        onCreate: [
-          // Create tables in correct order (tables with no dependencies first)
-          UserSchema.createTableSql,
-          CategorySchema.createTableSql,
-          ProductSchema.createTableSql,
-          OrderSchema.createTableSql,
-
-          // Create indexes (only UserSchema has indexes defined)
-          ...UserSchema.indexSql,
-        ],
-        onUpgrade: [
-          // Add migration logic here when upgrading database version
-          // Example:
-          // if (oldVersion < 2) {
-          //   'ALTER TABLE users ADD COLUMN avatar TEXT'
-          // }
-        ],
-        enableWAL: true, // Enable Write-Ahead Logging for better performance
-        enableForeignKeys: true, // Enable foreign key constraints
-      ),
-    );
-
-    debugPrint('Database initialized successfully');
-  } catch (e) {
-    debugPrint('Error initializing database: $e');
-    rethrow;
-  }
 }
 
 class MyApp extends StatelessWidget {

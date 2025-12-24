@@ -9,22 +9,14 @@ class GeneratorError {
   }
 
   /// Validates a condition and throws an error if it's false.
-  static void validate(
-    bool condition,
-    String message, [
-    Element? element,
-  ]) {
+  static void validate(bool condition, String message, [Element? element]) {
     if (!condition) {
       throwError(message, element);
     }
   }
 
   /// Checks if an element is not null, throws an error if it is.
-  static T requireNonNull<T>(
-    T? value,
-    String message, [
-    Element? element,
-  ]) {
+  static T requireNonNull<T>(T? value, String message, [Element? element]) {
     if (value == null) {
       throwError(message, element);
     }

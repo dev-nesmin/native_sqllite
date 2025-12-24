@@ -1,10 +1,6 @@
 /// Information about an index on a table.
 class IndexInfo {
-  IndexInfo({
-    required this.name,
-    required this.columns,
-    required this.unique,
-  });
+  IndexInfo({required this.name, required this.columns, required this.unique});
 
   /// The index name.
   final String name;

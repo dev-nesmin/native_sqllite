@@ -13,13 +13,11 @@ class CodeFormatter {
   ///
   /// [enabled] - Whether formatting is enabled (default: true)
   /// [pageWidth] - Maximum line width (default: 80)
-  CodeFormatter({
-    this.enabled = true,
-    int? pageWidth,
-  }) : _formatter = DartFormatter(
-          pageWidth: pageWidth ?? 80,
-          languageVersion: Version(3, 6, 0), // Use current Dart version
-        );
+  CodeFormatter({this.enabled = true, int? pageWidth})
+    : _formatter = DartFormatter(
+        pageWidth: pageWidth ?? 80,
+        languageVersion: Version(3, 6, 0), // Use current Dart version
+      );
 
   /// Formats the given Dart code.
   ///

@@ -90,24 +90,28 @@ class SchemaComparator {
 
     // If old schema is null, it's a new table
     if (oldSchema == null) {
-      changes.add(SchemaChange(
-        type: SchemaChangeType.createTable,
-        tableName: newSchema.tableName,
-        description: 'Create new table ${newSchema.tableName}',
-      ));
+      changes.add(
+        SchemaChange(
+          type: SchemaChangeType.createTable,
+          tableName: newSchema.tableName,
+          description: 'Create new table ${newSchema.tableName}',
+        ),
+      );
       return changes;
     }
 
     // Check if table was renamed
     if (oldSchema.className == newSchema.className &&
         oldSchema.tableName != newSchema.tableName) {
-      changes.add(SchemaChange(
-        type: SchemaChangeType.renameTable,
-        oldTableName: oldSchema.tableName,
-        newTableName: newSchema.tableName,
-        description:
-            'Rename table ${oldSchema.tableName} to ${newSchema.tableName}',
-      ));
+      changes.add(
+        SchemaChange(
+          type: SchemaChangeType.renameTable,
+          oldTableName: oldSchema.tableName,
+          newTableName: newSchema.tableName,
+          description:
+              'Rename table ${oldSchema.tableName} to ${newSchema.tableName}',
+        ),
+      );
     }
 
     // Compare columns
@@ -131,26 +135,30 @@ class SchemaComparator {
     // Find added columns
     for (final entry in newColumns.entries) {
       if (!oldColumns.containsKey(entry.key)) {
-        changes.add(SchemaChange(
-          type: SchemaChangeType.addColumn,
-          tableName: newSchema.tableName,
-          column: entry.value,
-          description:
-              'Add column ${entry.value.name} ${entry.value.type} to ${newSchema.tableName}',
-        ));
+        changes.add(
+          SchemaChange(
+            type: SchemaChangeType.addColumn,
+            tableName: newSchema.tableName,
+            column: entry.value,
+            description:
+                'Add column ${entry.value.name} ${entry.value.type} to ${newSchema.tableName}',
+          ),
+        );
       }
     }
 
     // Find dropped columns
     for (final entry in oldColumns.entries) {
       if (!newColumns.containsKey(entry.key)) {
-        changes.add(SchemaChange(
-          type: SchemaChangeType.dropColumn,
-          tableName: newSchema.tableName,
-          column: entry.value,
-          description:
-              'Drop column ${entry.value.name} from ${newSchema.tableName}',
-        ));
+        changes.add(
+          SchemaChange(
+            type: SchemaChangeType.dropColumn,
+            tableName: newSchema.tableName,
+            column: entry.value,
+            description:
+                'Drop column ${entry.value.name} from ${newSchema.tableName}',
+          ),
+        );
       }
     }
 
@@ -160,14 +168,16 @@ class SchemaComparator {
       if (oldColumn != null) {
         final newColumn = entry.value;
         if (_isColumnModified(oldColumn, newColumn)) {
-          changes.add(SchemaChange(
-            type: SchemaChangeType.modifyColumn,
-            tableName: newSchema.tableName,
-            oldColumn: oldColumn,
-            newColumn: newColumn,
-            description:
-                'Modify column ${newColumn.name} in ${newSchema.tableName}',
-          ));
+          changes.add(
+            SchemaChange(
+              type: SchemaChangeType.modifyColumn,
+              tableName: newSchema.tableName,
+              oldColumn: oldColumn,
+              newColumn: newColumn,
+              description:
+                  'Modify column ${newColumn.name} in ${newSchema.tableName}',
+            ),
+          );
         }
       }
     }
@@ -181,20 +191,24 @@ class SchemaComparator {
       final newColumn = entry.value;
       if (oldColumn != null && oldColumn.name != newColumn.name) {
         // This is a rename - remove the add/drop changes and add rename
-        changes.removeWhere((c) =>
-            c.type == SchemaChangeType.addColumn &&
-                c.column?.name == newColumn.name ||
-            c.type == SchemaChangeType.dropColumn &&
-                c.column?.name == oldColumn.name);
+        changes.removeWhere(
+          (c) =>
+              c.type == SchemaChangeType.addColumn &&
+                  c.column?.name == newColumn.name ||
+              c.type == SchemaChangeType.dropColumn &&
+                  c.column?.name == oldColumn.name,
+        );
 
-        changes.add(SchemaChange(
-          type: SchemaChangeType.renameColumn,
-          tableName: newSchema.tableName,
-          oldColumn: oldColumn,
-          newColumn: newColumn,
-          description:
-              'Rename column ${oldColumn.name} to ${newColumn.name} in ${newSchema.tableName}',
-        ));
+        changes.add(
+          SchemaChange(
+            type: SchemaChangeType.renameColumn,
+            tableName: newSchema.tableName,
+            oldColumn: oldColumn,
+            newColumn: newColumn,
+            description:
+                'Rename column ${oldColumn.name} to ${newColumn.name} in ${newSchema.tableName}',
+          ),
+        );
       }
     }
 
@@ -229,35 +243,39 @@ class SchemaComparator {
         '${idx.columns.join(",")}_${idx.unique}';
 
     final oldIndexes = {
-      for (var idx in oldSchema.indexes) indexSignature(idx): idx
+      for (var idx in oldSchema.indexes) indexSignature(idx): idx,
     };
     final newIndexes = {
-      for (var idx in newSchema.indexes) indexSignature(idx): idx
+      for (var idx in newSchema.indexes) indexSignature(idx): idx,
     };
 
     // Find added indexes
     for (final entry in newIndexes.entries) {
       if (!oldIndexes.containsKey(entry.key)) {
-        changes.add(SchemaChange(
-          type: SchemaChangeType.addIndex,
-          tableName: newSchema.tableName,
-          index: entry.value,
-          description:
-              'Add index on ${newSchema.tableName} (${entry.value.columns.join(", ")})',
-        ));
+        changes.add(
+          SchemaChange(
+            type: SchemaChangeType.addIndex,
+            tableName: newSchema.tableName,
+            index: entry.value,
+            description:
+                'Add index on ${newSchema.tableName} (${entry.value.columns.join(", ")})',
+          ),
+        );
       }
     }
 
     // Find dropped indexes
     for (final entry in oldIndexes.entries) {
       if (!newIndexes.containsKey(entry.key)) {
-        changes.add(SchemaChange(
-          type: SchemaChangeType.dropIndex,
-          tableName: newSchema.tableName,
-          index: entry.value,
-          description:
-              'Drop index on ${newSchema.tableName} (${entry.value.columns.join(", ")})',
-        ));
+        changes.add(
+          SchemaChange(
+            type: SchemaChangeType.dropIndex,
+            tableName: newSchema.tableName,
+            index: entry.value,
+            description:
+                'Drop index on ${newSchema.tableName} (${entry.value.columns.join(", ")})',
+          ),
+        );
       }
     }
 
@@ -266,9 +284,11 @@ class SchemaComparator {
 
   /// Checks if the changes require table recreation (SQLite limitation)
   static bool requiresTableRecreation(List<SchemaChange> changes) {
-    return changes.any((change) =>
-        change.type == SchemaChangeType.dropColumn ||
-        change.type == SchemaChangeType.renameColumn ||
-        change.type == SchemaChangeType.modifyColumn);
+    return changes.any(
+      (change) =>
+          change.type == SchemaChangeType.dropColumn ||
+          change.type == SchemaChangeType.renameColumn ||
+          change.type == SchemaChangeType.modifyColumn,
+    );
   }
 }

@@ -65,30 +65,57 @@ class QueryBuilderGenerator {
 
     if (TypeUtils.isString(dartType)) {
       _generateStringFilters(
-          buffer, fieldName, sqlName, queryClassName, column.isNullable);
+        buffer,
+        fieldName,
+        sqlName,
+        queryClassName,
+        column.isNullable,
+      );
     } else if (TypeUtils.isInt(dartType) ||
         TypeUtils.isDouble(dartType) ||
         TypeUtils.isNum(dartType)) {
-      _generateNumericFilters(buffer, fieldName, sqlName, queryClassName,
-          column.isNullable, TypeUtils.getBaseTypeName(dartType));
+      _generateNumericFilters(
+        buffer,
+        fieldName,
+        sqlName,
+        queryClassName,
+        column.isNullable,
+        TypeUtils.getBaseTypeName(dartType),
+      );
     } else if (TypeUtils.isDateTime(dartType)) {
       _generateDateTimeFilters(
-          buffer, fieldName, sqlName, queryClassName, column.isNullable);
+        buffer,
+        fieldName,
+        sqlName,
+        queryClassName,
+        column.isNullable,
+      );
     } else if (TypeUtils.isDuration(dartType)) {
       _generateDurationFilters(
-          buffer, fieldName, sqlName, queryClassName, column.isNullable);
+        buffer,
+        fieldName,
+        sqlName,
+        queryClassName,
+        column.isNullable,
+      );
     } else if (TypeUtils.isBool(dartType)) {
       _generateBoolFilters(
-          buffer, fieldName, sqlName, queryClassName, column.isNullable);
+        buffer,
+        fieldName,
+        sqlName,
+        queryClassName,
+        column.isNullable,
+      );
     } else if (TypeUtils.isEnum(dartType)) {
       _generateEnumFilters(
-          buffer,
-          fieldName,
-          sqlName,
-          queryClassName,
-          column.isNullable,
-          TypeUtils.getBaseTypeName(dartType),
-          column.enumType);
+        buffer,
+        fieldName,
+        sqlName,
+        queryClassName,
+        column.isNullable,
+        TypeUtils.getBaseTypeName(dartType),
+        column.enumType,
+      );
     }
 
     // Add isNull/isNotNull for nullable fields
@@ -119,7 +146,8 @@ class QueryBuilderGenerator {
 
     buffer.writeln('  /// Filter where $fieldName equals [value].');
     buffer.writeln(
-        '  $queryClassName ${fieldName}EqualTo(String$nullCheck value) {');
+      '  $queryClassName ${fieldName}EqualTo(String$nullCheck value) {',
+    );
     buffer.writeln('    _whereConditions.add(\'$sqlName = ?\');');
     buffer.writeln('    _whereArgs.add(value);');
     buffer.writeln('    return this;');
@@ -163,7 +191,8 @@ class QueryBuilderGenerator {
 
     buffer.writeln('  /// Filter where $fieldName equals [value].');
     buffer.writeln(
-        '  $queryClassName ${fieldName}EqualTo($typeName$nullCheck value) {');
+      '  $queryClassName ${fieldName}EqualTo($typeName$nullCheck value) {',
+    );
     buffer.writeln('    _whereConditions.add(\'$sqlName = ?\');');
     buffer.writeln('    _whereArgs.add(value);');
     buffer.writeln('    return this;');
@@ -172,7 +201,8 @@ class QueryBuilderGenerator {
 
     buffer.writeln('  /// Filter where $fieldName is greater than [value].');
     buffer.writeln(
-        '  $queryClassName ${fieldName}GreaterThan($typeName value) {');
+      '  $queryClassName ${fieldName}GreaterThan($typeName value) {',
+    );
     buffer.writeln('    _whereConditions.add(\'$sqlName > ?\');');
     buffer.writeln('    _whereArgs.add(value);');
     buffer.writeln('    return this;');
@@ -189,7 +219,8 @@ class QueryBuilderGenerator {
 
     buffer.writeln('  /// Filter where $fieldName is between [min] and [max].');
     buffer.writeln(
-        '  $queryClassName ${fieldName}Between($typeName min, $typeName max) {');
+      '  $queryClassName ${fieldName}Between($typeName min, $typeName max) {',
+    );
     buffer.writeln('    _whereConditions.add(\'$sqlName BETWEEN ? AND ?\');');
     buffer.writeln('    _whereArgs.add(min);');
     buffer.writeln('    _whereArgs.add(max);');
@@ -209,10 +240,12 @@ class QueryBuilderGenerator {
 
     buffer.writeln('  /// Filter where $fieldName equals [value].');
     buffer.writeln(
-        '  $queryClassName ${fieldName}EqualTo(DateTime$nullCheck value) {');
+      '  $queryClassName ${fieldName}EqualTo(DateTime$nullCheck value) {',
+    );
     buffer.writeln('    _whereConditions.add(\'$sqlName = ?\');');
     buffer.writeln(
-        '    _whereArgs.add(value${isNullable ? '?' : ''}.millisecondsSinceEpoch);');
+      '    _whereArgs.add(value${isNullable ? '?' : ''}.millisecondsSinceEpoch);',
+    );
     buffer.writeln('    return this;');
     buffer.writeln('  }');
     buffer.writeln();
@@ -233,10 +266,12 @@ class QueryBuilderGenerator {
     buffer.writeln('  }');
     buffer.writeln();
 
-    buffer
-        .writeln('  /// Filter where $fieldName is between [start] and [end].');
     buffer.writeln(
-        '  $queryClassName ${fieldName}Between(DateTime start, DateTime end) {');
+      '  /// Filter where $fieldName is between [start] and [end].',
+    );
+    buffer.writeln(
+      '  $queryClassName ${fieldName}Between(DateTime start, DateTime end) {',
+    );
     buffer.writeln('    _whereConditions.add(\'$sqlName BETWEEN ? AND ?\');');
     buffer.writeln('    _whereArgs.add(start.millisecondsSinceEpoch);');
     buffer.writeln('    _whereArgs.add(end.millisecondsSinceEpoch);');
@@ -256,17 +291,20 @@ class QueryBuilderGenerator {
 
     buffer.writeln('  /// Filter where $fieldName equals [value].');
     buffer.writeln(
-        '  $queryClassName ${fieldName}EqualTo(Duration$nullCheck value) {');
+      '  $queryClassName ${fieldName}EqualTo(Duration$nullCheck value) {',
+    );
     buffer.writeln('    _whereConditions.add(\'$sqlName = ?\');');
     buffer.writeln(
-        '    _whereArgs.add(value${isNullable ? '?' : ''}.inMilliseconds);');
+      '    _whereArgs.add(value${isNullable ? '?' : ''}.inMilliseconds);',
+    );
     buffer.writeln('    return this;');
     buffer.writeln('  }');
     buffer.writeln();
 
     buffer.writeln('  /// Filter where $fieldName is greater than [value].');
-    buffer
-        .writeln('  $queryClassName ${fieldName}GreaterThan(Duration value) {');
+    buffer.writeln(
+      '  $queryClassName ${fieldName}GreaterThan(Duration value) {',
+    );
     buffer.writeln('    _whereConditions.add(\'$sqlName > ?\');');
     buffer.writeln('    _whereArgs.add(value.inMilliseconds);');
     buffer.writeln('    return this;');
@@ -319,13 +357,15 @@ class QueryBuilderGenerator {
 
     buffer.writeln('  /// Filter where $fieldName equals [value].');
     buffer.writeln(
-        '  $queryClassName ${fieldName}EqualTo($enumType$nullCheck value) {');
+      '  $queryClassName ${fieldName}EqualTo($enumType$nullCheck value) {',
+    );
     buffer.writeln('    _whereConditions.add(\'$sqlName = ?\');');
     if (enumStorageType == 'name') {
       buffer.writeln('    _whereArgs.add(value${isNullable ? '?' : ''}.name);');
     } else {
-      buffer
-          .writeln('    _whereArgs.add(value${isNullable ? '?' : ''}.index);');
+      buffer.writeln(
+        '    _whereArgs.add(value${isNullable ? '?' : ''}.index);',
+      );
     }
     buffer.writeln('    return this;');
     buffer.writeln('  }');
@@ -342,7 +382,8 @@ class QueryBuilderGenerator {
 
     buffer.writeln('  /// Sort by $fieldName in ascending order.');
     buffer.writeln(
-        '  $queryClassName sortBy${NamingUtils.toPascalCase(fieldName)}Asc() {');
+      '  $queryClassName sortBy${NamingUtils.toPascalCase(fieldName)}Asc() {',
+    );
     buffer.writeln('    _orderBy = \'$sqlName ASC\';');
     buffer.writeln('    return this;');
     buffer.writeln('  }');
@@ -350,17 +391,15 @@ class QueryBuilderGenerator {
 
     buffer.writeln('  /// Sort by $fieldName in descending order.');
     buffer.writeln(
-        '  $queryClassName sortBy${NamingUtils.toPascalCase(fieldName)}Desc() {');
+      '  $queryClassName sortBy${NamingUtils.toPascalCase(fieldName)}Desc() {',
+    );
     buffer.writeln('    _orderBy = \'$sqlName DESC\';');
     buffer.writeln('    return this;');
     buffer.writeln('  }');
     buffer.writeln();
   }
 
-  void _generatePaginationMethods(
-    StringBuffer buffer,
-    String queryClassName,
-  ) {
+  void _generatePaginationMethods(StringBuffer buffer, String queryClassName) {
     buffer.writeln('  /// Limit the number of results.');
     buffer.writeln('  $queryClassName limit(int value) {');
     buffer.writeln('    _limit = value;');
@@ -388,13 +427,15 @@ class QueryBuilderGenerator {
     buffer.writeln('  Future<List<$className>> findAll() async {');
     buffer.writeln('    final sql = _buildQuery();');
     buffer.writeln(
-        '    final result = await NativeSqlite.query(_databaseName, sql, _whereArgs);');
+      '    final result = await NativeSqlite.query(_databaseName, sql, _whereArgs);',
+    );
     buffer.writeln('    return result.toMapList().map(_fromMap).toList();');
     buffer.writeln('  }');
     buffer.writeln();
 
     buffer.writeln(
-        '  /// Execute the query and return the first matching record.');
+      '  /// Execute the query and return the first matching record.',
+    );
     buffer.writeln('  Future<$className?> findFirst() async {');
     buffer.writeln('    _limit = 1;');
     buffer.writeln('    final results = await findAll();');
@@ -406,15 +447,19 @@ class QueryBuilderGenerator {
     buffer.writeln('  Future<int> count() async {');
     buffer.writeln('    final whereClause = _whereConditions.isEmpty');
     buffer.writeln('        ? \'\'');
-    buffer
-        .writeln('        : \' WHERE \${_whereConditions.join(\' AND \')}\';');
     buffer.writeln(
-        '    final sql = \'SELECT COUNT(*) as count FROM $tableName\$whereClause\';');
+      '        : \' WHERE \${_whereConditions.join(\' AND \')}\';',
+    );
     buffer.writeln(
-        '    final result = await NativeSqlite.query(_databaseName, sql, _whereArgs);');
+      '    final sql = \'SELECT COUNT(*) as count FROM $tableName\$whereClause\';',
+    );
+    buffer.writeln(
+      '    final result = await NativeSqlite.query(_databaseName, sql, _whereArgs);',
+    );
     buffer.writeln('    final rows = result.toMapList();');
-    buffer
-        .writeln('    return rows.isEmpty ? 0 : rows.first[\'count\'] as int;');
+    buffer.writeln(
+      '    return rows.isEmpty ? 0 : rows.first[\'count\'] as int;',
+    );
     buffer.writeln('  }');
     buffer.writeln();
 
@@ -433,26 +478,28 @@ class QueryBuilderGenerator {
     buffer.writeln();
   }
 
-  void _generateHelperMethods(
-    StringBuffer buffer,
-    TableInfo table,
-  ) {
+  void _generateHelperMethods(StringBuffer buffer, TableInfo table) {
     final tableName = table.sqlName;
     final className = table.dartName;
 
     buffer.writeln('  String _buildQuery() {');
     buffer.writeln('    final whereClause = _whereConditions.isEmpty');
     buffer.writeln('        ? \'\'');
-    buffer
-        .writeln('        : \' WHERE \${_whereConditions.join(\' AND \')}\';');
     buffer.writeln(
-        '    final orderClause = _orderBy == null ? \'\' : \' ORDER BY \$_orderBy\';');
+      '        : \' WHERE \${_whereConditions.join(\' AND \')}\';',
+    );
     buffer.writeln(
-        '    final limitClause = _limit == null ? \'\' : \' LIMIT \$_limit\';');
+      '    final orderClause = _orderBy == null ? \'\' : \' ORDER BY \$_orderBy\';',
+    );
     buffer.writeln(
-        '    final offsetClause = _offset == null ? \'\' : \' OFFSET \$_offset\';');
+      '    final limitClause = _limit == null ? \'\' : \' LIMIT \$_limit\';',
+    );
     buffer.writeln(
-        '    return \'SELECT * FROM $tableName\$whereClause\$orderClause\$limitClause\$offsetClause\';');
+      '    final offsetClause = _offset == null ? \'\' : \' OFFSET \$_offset\';',
+    );
+    buffer.writeln(
+      '    return \'SELECT * FROM $tableName\$whereClause\$orderClause\$limitClause\$offsetClause\';',
+    );
     buffer.writeln('  }');
     buffer.writeln();
 

@@ -1,4 +1,3 @@
-
 /// Annotation to mark a class as a database table.
 ///
 /// The class name will be used as the table name by default,
@@ -34,5 +33,14 @@ class DbTable {
   /// You can still override it by passing a different database name to the repository constructor.
   final String? database;
 
-  const DbTable({this.name, this.indexes, this.database});
+  /// Whether to automatically manage schema creation and migrations for this table.
+  ///
+  /// When `true` (default), the table will be included in the auto-generated
+  /// `DatabaseSchemaRegistry` and `DatabaseInitializer`, eliminating the need
+  /// for manual `onCreate` and `onUpgrade` configuration.
+  ///
+  /// Set to `false` if you want to manually manage this table's schema.
+  final bool auto;
+
+  const DbTable({this.name, this.indexes, this.database, this.auto = true});
 }

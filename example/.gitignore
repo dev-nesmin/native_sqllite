@@ -43,3 +43,7 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Generated database manager (auto-generated, hidden from user)
+**/database_schema.database_manager.g.dart
+**/database_schema.schema_registry.g.dart

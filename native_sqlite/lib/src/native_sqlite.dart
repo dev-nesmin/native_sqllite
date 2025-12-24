@@ -184,8 +184,13 @@ class NativeSqlite {
     String? where,
     List<Object?>? whereArgs,
   }) {
-    return _platform.update(databaseName, table, values,
-        where: where, whereArgs: whereArgs);
+    return _platform.update(
+      databaseName,
+      table,
+      values,
+      where: where,
+      whereArgs: whereArgs,
+    );
   }
 
   /// Deletes rows from the specified [table].
@@ -211,8 +216,12 @@ class NativeSqlite {
     String? where,
     List<Object?>? whereArgs,
   }) {
-    return _platform.delete(databaseName, table,
-        where: where, whereArgs: whereArgs);
+    return _platform.delete(
+      databaseName,
+      table,
+      where: where,
+      whereArgs: whereArgs,
+    );
   }
 
   /// Executes multiple SQL statements in a transaction.

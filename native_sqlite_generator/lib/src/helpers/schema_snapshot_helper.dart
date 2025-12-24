@@ -6,10 +6,7 @@ import 'package:native_sqlite_generator/src/models/table_info.dart';
 /// Helper class to convert TableInfo to schema snapshots
 class SchemaSnapshotHelper {
   /// Converts TableInfo to TableSchemaSnapshot
-  static TableSchemaSnapshot createSnapshot(
-    TableInfo tableInfo,
-    int version,
-  ) {
+  static TableSchemaSnapshot createSnapshot(TableInfo tableInfo, int version) {
     final columns = tableInfo.columns.map(_columnToSnapshot).toList();
     final indexes = tableInfo.indexes.map(_indexToSnapshot).toList();
 
@@ -44,9 +41,6 @@ class SchemaSnapshotHelper {
 
   /// Converts IndexInfo to IndexSchemaSnapshot
   static IndexSchemaSnapshot _indexToSnapshot(IndexInfo index) {
-    return IndexSchemaSnapshot(
-      columns: index.columns,
-      unique: index.unique,
-    );
+    return IndexSchemaSnapshot(columns: index.columns, unique: index.unique);
   }
 }

@@ -83,9 +83,11 @@ class TableSchemaSnapshot {
     final buffer = StringBuffer();
     buffer.write(tableName);
     for (final column in columns) {
-      buffer.write('|${column.name}:${column.type}:${column.nullable}:'
-          '${column.primaryKey}:${column.autoIncrement}:${column.unique}:'
-          '${column.defaultValue}');
+      buffer.write(
+        '|${column.name}:${column.type}:${column.nullable}:'
+        '${column.primaryKey}:${column.autoIncrement}:${column.unique}:'
+        '${column.defaultValue}',
+      );
     }
     for (final index in indexes) {
       buffer.write('|idx:${index.columns.join(',')}:${index.unique}');
@@ -201,17 +203,11 @@ class IndexSchemaSnapshot {
   /// Whether this is a unique index
   final bool unique;
 
-  const IndexSchemaSnapshot({
-    required this.columns,
-    required this.unique,
-  });
+  const IndexSchemaSnapshot({required this.columns, required this.unique});
 
   /// Converts to JSON
   Map<String, dynamic> toJson() {
-    return {
-      'columns': columns,
-      'unique': unique,
-    };
+    return {'columns': columns, 'unique': unique};
   }
 
   /// Creates from JSON

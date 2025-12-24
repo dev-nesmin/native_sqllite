@@ -12,6 +12,15 @@ class DatabaseConfig {
   /// SQL statements to execute when upgrading the database.
   final List<String>? onUpgrade;
 
+  /// Callback to handle automatic migration.
+  ///
+  /// This callback is invoked before onUpgrade SQL statements are executed,
+  /// allowing for dynamic migration logic based on old and new versions.
+  ///
+  /// Return SQL statements to be executed during migration.
+  final Future<List<String>> Function(int oldVersion, int newVersion)?
+  onMigrateCallback;
+
   /// Whether to enable Write-Ahead Logging (WAL) mode.
   ///
   /// WAL mode allows concurrent reads and writes, which is essential
@@ -30,6 +39,7 @@ class DatabaseConfig {
     this.version = 1,
     this.onCreate,
     this.onUpgrade,
+    this.onMigrateCallback,
     this.enableWAL = true,
     this.enableForeignKeys = true,
   });

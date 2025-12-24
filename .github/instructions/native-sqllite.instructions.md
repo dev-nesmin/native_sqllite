@@ -10,6 +10,7 @@ applyTo: '**'
 - Create/edit `.table.dart` files manually
 - Edit generated files
 - Create md files after each prompt 
+- create backwards compatibility files codes or methods 
 
 
 ## File Naming

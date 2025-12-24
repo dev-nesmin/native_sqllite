@@ -5,8 +5,7 @@ import 'package:sqlite3/wasm.dart' hide DatabaseConfig;
 
 /// The Web implementation of [NativeSqlitePlatform].
 ///
-/// Uses sqlite3 WASM to provide SQLite functionality in web browsers.
-/// This implementation maintains compatibility with native platforms while
+/// Uses sqlite3 WASM to provide SQLite functionality in web browsers,
 /// leveraging IndexedDB for persistence through sqlite3's VFS.
 class NativeSqliteWeb extends NativeSqlitePlatform {
   /// A map of database names to their sqlite3 Database instances
@@ -28,14 +27,14 @@ class NativeSqliteWeb extends NativeSqlitePlatform {
       // Initialize sqlite3 WASM
       // The sqlite3_web package automatically loads the WASM module
       // from the correct location and sets up persistence
-      await WasmSqlite3.loadFromUrl(
-        Uri.parse('sqlite3.wasm'),
-      );
+      await WasmSqlite3.loadFromUrl(Uri.parse('sqlite3.wasm'));
 
       _initialized = true;
     } catch (e) {
-      throw Exception('Failed to initialize sqlite3 WASM: $e\n'
-          'Make sure your app is running in a modern browser with WASM support.');
+      throw Exception(
+        'Failed to initialize sqlite3 WASM: $e\n'
+        'Make sure your app is running in a modern browser with WASM support.',
+      );
     }
   }
 
@@ -50,10 +49,7 @@ class NativeSqliteWeb extends NativeSqlitePlatform {
 
     try {
       // Open database with IndexedDB persistence
-      final db = sqlite3.open(
-        config.name,
-        mode: OpenMode.readWriteCreate,
-      );
+      final db = sqlite3.open(config.name, mode: OpenMode.readWriteCreate);
 
       // Configure database
       if (config.enableForeignKeys) {
@@ -105,7 +101,10 @@ class NativeSqliteWeb extends NativeSqlitePlatform {
 
   @override
   Future<int> execute(
-      String databaseName, String sql, List<Object?>? arguments) async {
+    String databaseName,
+    String sql,
+    List<Object?>? arguments,
+  ) async {
     final db = _getDatabase(databaseName);
 
     try {
@@ -128,7 +127,10 @@ class NativeSqliteWeb extends NativeSqlitePlatform {
 
   @override
   Future<QueryResult> query(
-      String databaseName, String sql, List<Object?>? arguments) async {
+    String databaseName,
+    String sql,
+    List<Object?>? arguments,
+  ) async {
     final db = _getDatabase(databaseName);
 
     try {
@@ -161,7 +163,10 @@ class NativeSqliteWeb extends NativeSqlitePlatform {
 
   @override
   Future<int> insert(
-      String databaseName, String table, Map<String, Object?> values) async {
+    String databaseName,
+    String table,
+    Map<String, Object?> values,
+  ) async {
     final db = _getDatabase(databaseName);
 
     if (values.isEmpty) {
@@ -259,7 +264,9 @@ class NativeSqliteWeb extends NativeSqlitePlatform {
 
   @override
   Future<bool> transaction(
-      String databaseName, List<String> sqlStatements) async {
+    String databaseName,
+    List<String> sqlStatements,
+  ) async {
     final db = _getDatabase(databaseName);
 
     try {

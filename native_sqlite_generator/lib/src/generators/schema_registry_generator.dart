@@ -434,39 +434,6 @@ class SchemaRegistryGenerator extends Generator {
     buffer.writeln();
   }
 
-  void _generateDeprecatedMethod(StringBuffer buffer) {
-    buffer.writeln('  /// @deprecated Use DatabaseManager.init() instead.');
-    buffer.writeln('  ///');
-    buffer.writeln(
-      '  /// Creates a DatabaseConfig with automatic migration support.',
-    );
-    buffer.writeln(
-      '  @Deprecated(\'Use DatabaseManager.init() instead for simpler setup\')',
-    );
-    buffer.writeln('  static DatabaseConfig createAutoMigratedConfig({');
-    buffer.writeln('    required String name,');
-    buffer.writeln('    bool enableWAL = true,');
-    buffer.writeln('    bool enableForeignKeys = true,');
-    buffer.writeln('    bool dropRemovedTables = false,');
-    buffer.writeln(
-      '    Future<void> Function(String databaseName, int oldVersion, int newVersion)? onCustomMigrate,',
-    );
-    buffer.writeln('  }) {');
-    buffer.writeln('    return AutoMigration.createConfig(');
-    buffer.writeln('      name: name,');
-    buffer.writeln('      schemaVersion: schemaVersion,');
-    buffer.writeln('      onCreateStatements: onCreateStatements,');
-    buffer.writeln('      tables: tables,');
-    buffer.writeln('      tableNames: tableNames,');
-    buffer.writeln('      enableWAL: enableWAL,');
-    buffer.writeln('      enableForeignKeys: enableForeignKeys,');
-    buffer.writeln('      dropRemovedTables: dropRemovedTables,');
-    buffer.writeln('      onCustomMigrate: onCustomMigrate,');
-    buffer.writeln('    );');
-    buffer.writeln('  }');
-    buffer.writeln();
-  }
-
   /// Calculates a simple hash of all table schemas for versioning.
   int _calculateSchemaHash(List<TableInfo> tables) {
     final content = tables.map((t) => t.sqlName).join(',');

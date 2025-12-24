@@ -14,7 +14,7 @@ import 'package:native_sqlite_generator/src/helpers/statistics_generator.dart';
 import 'package:source_gen/source_gen.dart';
 
 /// Generator that creates table schemas and repository classes
-/// from classes annotated with @DbTable or @Table (deprecated).
+/// from classes annotated with @DbTable.
 class TableGenerator extends GeneratorForAnnotation<DbTable> {
   final GeneratorOptions options;
   late final TableAnalyzer _analyzer;

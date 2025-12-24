@@ -175,8 +175,6 @@ class InspectorConnect {
       method,
       parameters,
     ) async {
-      // For now listDatabases returns full schema, so this might be redundant or specific
-      // But keeping it for compatibility
       return developer.ServiceExtensionResponse.result(
         jsonEncode({'result': {}}),
       );

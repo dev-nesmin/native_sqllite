@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:native_sqlite_generator/database_manager.dart';
 
-import 'database_schema.database_manager.g.dart';
 import 'screens/home_screen.dart';
 
 void main() async {

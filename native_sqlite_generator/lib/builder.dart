@@ -1,7 +1,7 @@
 import 'package:build/build.dart';
 import 'package:native_sqlite_generator/src/config/generator_options.dart';
-import 'package:native_sqlite_generator/src/generators/schema_registry_generator.dart';
-import 'package:native_sqlite_generator/src/migration/migration_builder.dart';
+import 'package:native_sqlite_generator/src/generators/schema_registry_builder.dart';
+import 'package:native_sqlite_generator/src/migration/schema_tracking_builder.dart';
 import 'package:native_sqlite_generator/src/table_generator.dart';
 import 'package:source_gen/source_gen.dart';
 
@@ -46,13 +46,9 @@ String _buildHeader(GeneratorOptions options) {
 Builder migrationBuilder(BuilderOptions options) =>
     SchemaTrackingBuilder(options);
 
-/// Generates a centralized database manager in lib/.generated/
+/// Generates DatabaseManager automatically (like Flutter l10n)
+/// NO trigger file needed - just run build_runner!
 Builder schemaRegistryBuilder(BuilderOptions options) {
   final generatorOptions = GeneratorOptions.fromOptions(options);
-
-  return LibraryBuilder(
-    SchemaRegistryGenerator(generatorOptions),
-    generatedExtension: '.database_manager.g.dart',
-    header: _buildHeader(generatorOptions),
-  );
+  return SchemaRegistryBuilder(generatorOptions);
 }

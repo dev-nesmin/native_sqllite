@@ -10,19 +10,19 @@ builders:
   migration:
     import: "package:native_sqlite_generator/builder.dart"
     builder_factories: ["migrationBuilder"]
-    build_extensions: {".dart": [".schema.json"]}
+    build_extensions: {"$lib$": [".schemas_marker"]}
     auto_apply: dependents
-    build_to: cache  # Use cache to allow flexible output paths
+    build_to: cache
     runs_before: ["native_sqlite_generator:table"]
-    # Schema files are generated in lib/generated/schemas/ by default
+    # Schemas saved in .dart_tool/native_sqlite_generator/native_sqllite_scheme_v{version}.db
 
   schema_registry:
     import: "package:native_sqlite_generator/builder.dart"
     builder_factories: ["schemaRegistryBuilder"]
-    build_extensions: {".dart": [".database_manager.g.dart"]}
+    build_extensions: {"$lib$": ["database_manager.dart"]}
     auto_apply: dependents
-    build_to: source
-    # Generates DatabaseManager from database_schema.dart - user calls DatabaseManager.init()
+    build_to: cache
+    runs_before: ["native_sqlite_generator:table"]
 
 post_process_builders:
   native_code:

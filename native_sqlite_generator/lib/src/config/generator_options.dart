@@ -57,6 +57,9 @@ class GeneratorOptions {
   /// Default database name to use when not specified in @DbTable annotation
   final String? defaultDatabase;
 
+  /// Output path for generated DatabaseManager and schema files (relative to lib/)
+  final String outputPath;
+
   const GeneratorOptions({
     this.format = true,
     this.generateHelpers = true,
@@ -79,6 +82,7 @@ class GeneratorOptions {
     this.generateAsPartFile = false,
     this.verbose = false,
     this.defaultDatabase,
+    this.outputPath = '',
   });
 
   /// Creates a [GeneratorOptions] instance from [BuilderOptions].
@@ -111,6 +115,7 @@ class GeneratorOptions {
       generateAsPartFile: config['generate_as_part_file'] as bool? ?? false,
       verbose: config['verbose'] as bool? ?? false,
       defaultDatabase: config['default_database'] as String?,
+      outputPath: config['output_path'] as String? ?? '',
     );
   }
 
@@ -139,6 +144,7 @@ class GeneratorOptions {
     'generate_as_part_file': generateAsPartFile,
     'verbose': verbose,
     'default_database': defaultDatabase,
+    'output_path': outputPath,
   };
 
   @override

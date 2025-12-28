@@ -1,6 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
-import 'dart:io';
 
 import 'package:analyzer/dart/element/element.dart';
 import 'package:build/build.dart';
@@ -24,7 +22,7 @@ class SchemaRegistryBuilder implements Builder {
   @override
   Map<String, List<String>> get buildExtensions {
     return const {
-      r'$lib$': ['database_manager.dart'],
+      r'$lib$': ['generated/database_manager.dart'],
     };
   }
 
@@ -94,45 +92,13 @@ class SchemaRegistryBuilder implements Builder {
     final sortedTables = _topologicalSort(tables);
     final code = _generateCode(sortedTables, tableFiles, packageName);
 
-    // Write to .dart_tool/native_sqlite_generator/database_manager.dart
-    final projectRoot = Directory.current.path;
-    final outputDir = Directory(
-      '$projectRoot/.dart_tool/native_sqlite_generator',
+    // Write to fixed location: lib/generated/database_manager.dart
+    await buildStep.writeAsString(
+      AssetId(packageName, 'lib/generated/database_manager.dart'),
+      code,
     );
-    if (!outputDir.existsSync()) {
-      outputDir.createSync(recursive: true);
-    }
 
-    final outputFile = File('${outputDir.path}/database_manager.dart');
-    outputFile.writeAsStringSync(code);
-
-    // Add to package_config.json for package:native_sqlite/
-    final packageConfigFile = File(
-      '$projectRoot/.dart_tool/package_config.json',
-    );
-    if (packageConfigFile.existsSync()) {
-      final configJson =
-          jsonDecode(packageConfigFile.readAsStringSync())
-              as Map<String, dynamic>;
-      final packages = configJson['packages'] as List;
-
-      // Remove existing native_sqlite_generator entries
-      packages.removeWhere(
-        (p) => (p as Map)['name'] == 'native_sqlite_generator',
-      );
-
-      // Add our generated package
-      packages.add({
-        'name': 'native_sqlite_generator',
-        'rootUri': '../.dart_tool/native_sqlite_generator',
-        'packageUri': './',
-        'languageVersion': '3.0',
-      });
-
-      packageConfigFile.writeAsStringSync(jsonEncode(configJson));
-    }
-
-    log.info('✅ database_manager.dart');
+    log.info('✅ generated/database_manager.dart');
   }
 
   List<TableInfo> _topologicalSort(List<TableInfo> tables) {

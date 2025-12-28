@@ -1,11 +1,10 @@
 import 'dart:async';
-import 'dart:convert';
-import 'dart:io';
 
 import 'package:analyzer/dart/element/element.dart';
 import 'package:build/build.dart';
 import 'package:glob/glob.dart';
 import 'package:native_sqlite_generator/src/analyzer/table_analyzer.dart';
+import 'package:native_sqlite_generator/src/config/generator_options.dart';
 import 'package:native_sqlite_generator/src/helpers/schema_snapshot_helper.dart';
 import 'package:source_gen/source_gen.dart';
 
@@ -15,7 +14,7 @@ class SchemaTrackingBuilder implements Builder {
     'package:native_sqlite_annotations/src/table.dart#DbTable',
   );
 
-  final BuilderOptions options;
+  final GeneratorOptions options;
   bool _hasRun = false;
 
   SchemaTrackingBuilder(this.options);
@@ -33,15 +32,6 @@ class SchemaTrackingBuilder implements Builder {
     _hasRun = true;
 
     log.info('📁 Collecting schemas...');
-
-    final projectRoot = Directory.current.path;
-    final schemaDir = Directory(
-      '$projectRoot/.dart_tool/native_sqlite_generator',
-    );
-
-    if (!schemaDir.existsSync()) {
-      schemaDir.createSync(recursive: true);
-    }
 
     final allSchemas = <Map<String, dynamic>>[];
     final dartFiles = Glob('lib/**.dart');
@@ -74,21 +64,14 @@ class SchemaTrackingBuilder implements Builder {
 
     if (allSchemas.isNotEmpty) {
       final version = allSchemas.length;
-      final dbContent = {
-        'version': version,
-        'generated_at': DateTime.now().toIso8601String(),
-        'tables': allSchemas,
-      };
 
-      final dbFile = File(
-        '${schemaDir.path}/native_sqllite_scheme_v$version.db',
+      // Just write the marker file - schema tracking happens elsewhere
+      await buildStep.writeAsString(
+        AssetId(buildStep.inputId.package, 'lib/.schemas_marker'),
+        '// Schema version: $version\n// Tables: ${allSchemas.length}\n',
       );
-      final jsonString = const JsonEncoder.withIndent('  ').convert(dbContent);
-      dbFile.writeAsStringSync(jsonString);
 
-      log.info(
-        '✅ Schema: .dart_tool/native_sqlite/native_sqllite_scheme_v$version.db',
-      );
+      log.info('✅ Tracked ${allSchemas.length} schemas');
     }
   }
 }

@@ -43,8 +43,10 @@ String _buildHeader(GeneratorOptions options) {
 
 /// Tracks schema changes by generating .schema.json files
 /// All schemas are generated in lib/generated/schemas/ directory
-Builder migrationBuilder(BuilderOptions options) =>
-    SchemaTrackingBuilder(options);
+Builder migrationBuilder(BuilderOptions options) {
+  final generatorOptions = GeneratorOptions.fromOptions(options);
+  return SchemaTrackingBuilder(generatorOptions);
+}
 
 /// Generates DatabaseManager automatically (like Flutter l10n)
 /// NO trigger file needed - just run build_runner!

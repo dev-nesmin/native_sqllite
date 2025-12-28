@@ -14,15 +14,15 @@ builders:
     auto_apply: dependents
     build_to: cache
     runs_before: ["native_sqlite_generator:table"]
-    # Schemas saved in .dart_tool/native_sqlite_generator/native_sqllite_scheme_v{version}.db
 
   schema_registry:
     import: "package:native_sqlite_generator/builder.dart"
     builder_factories: ["schemaRegistryBuilder"]
-    build_extensions: {"$lib$": ["database_manager.dart"]}
+    build_extensions: {"$lib$": ["generated/database_manager.dart"]}
     auto_apply: dependents
-    build_to: cache
+    build_to: source
     runs_before: ["native_sqlite_generator:table"]
+    # Generates to lib/generated/database_manager.dart
 
 post_process_builders:
   native_code:

@@ -1,7 +1,7 @@
 // dart format width=80
 // coverage:ignore-file
 // GENERATED CODE - DO NOT MODIFY BY HAND
-// Generated on: 2025-12-28T20:00:35.736536
+// Generated on: 2025-12-29T10:28:53.056968
 
 // ignore_for_file: type=lint, prefer_single_quotes, lines_longer_than_80_chars, depend_on_referenced_packages, unused_element, unused_import
 
@@ -18,7 +18,7 @@ abstract class AdvancedUserSchema {
   static const String createTableSql = '''
     CREATE TABLE advanced_users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL,
+      fullname TEXT NOT NULL,
       login_duration INTEGER,
       profile_url TEXT,
       score REAL,
@@ -31,7 +31,7 @@ abstract class AdvancedUserSchema {
 
   // Column names
   static const String ID = 'id';
-  static const String NAME = 'name';
+  static const String FULLNAME = 'fullname';
   static const String LOGIN_DURATION = 'login_duration';
   static const String PROFILE_URL = 'profile_url';
   static const String SCORE = 'score';
@@ -52,30 +52,30 @@ class AdvancedUserQueryBuilder {
 
   AdvancedUserQueryBuilder(this._databaseName);
 
-  /// Filter where name equals [value].
-  AdvancedUserQueryBuilder nameEqualTo(String value) {
-    _whereConditions.add('name = ?');
+  /// Filter where fullname equals [value].
+  AdvancedUserQueryBuilder fullnameEqualTo(String value) {
+    _whereConditions.add('fullname = ?');
     _whereArgs.add(value);
     return this;
   }
 
-  /// Filter where name contains [value].
-  AdvancedUserQueryBuilder nameContains(String value) {
-    _whereConditions.add('name LIKE ?');
+  /// Filter where fullname contains [value].
+  AdvancedUserQueryBuilder fullnameContains(String value) {
+    _whereConditions.add('fullname LIKE ?');
     _whereArgs.add('%$value%');
     return this;
   }
 
-  /// Filter where name starts with [value].
-  AdvancedUserQueryBuilder nameStartsWith(String value) {
-    _whereConditions.add('name LIKE ?');
+  /// Filter where fullname starts with [value].
+  AdvancedUserQueryBuilder fullnameStartsWith(String value) {
+    _whereConditions.add('fullname LIKE ?');
     _whereArgs.add('$value%');
     return this;
   }
 
-  /// Filter where name ends with [value].
-  AdvancedUserQueryBuilder nameEndsWith(String value) {
-    _whereConditions.add('name LIKE ?');
+  /// Filter where fullname ends with [value].
+  AdvancedUserQueryBuilder fullnameEndsWith(String value) {
+    _whereConditions.add('fullname LIKE ?');
     _whereArgs.add('%$value');
     return this;
   }
@@ -247,15 +247,15 @@ class AdvancedUserQueryBuilder {
     return this;
   }
 
-  /// Sort by name in ascending order.
-  AdvancedUserQueryBuilder sortByNameAsc() {
-    _orderBy = 'name ASC';
+  /// Sort by fullname in ascending order.
+  AdvancedUserQueryBuilder sortByFullnameAsc() {
+    _orderBy = 'fullname ASC';
     return this;
   }
 
-  /// Sort by name in descending order.
-  AdvancedUserQueryBuilder sortByNameDesc() {
-    _orderBy = 'name DESC';
+  /// Sort by fullname in descending order.
+  AdvancedUserQueryBuilder sortByFullnameDesc() {
+    _orderBy = 'fullname DESC';
     return this;
   }
 
@@ -406,7 +406,7 @@ class AdvancedUserQueryBuilder {
   AdvancedUser _fromMap(Map<String, Object?> map) {
     return AdvancedUser(
       id: map['id'] as int?,
-      name: map['name'] as String,
+      fullname: map['fullname'] as String,
       loginDuration: map['login_duration'] != null
           ? Duration(milliseconds: map['login_duration'] as int)
           : null,
@@ -434,7 +434,7 @@ class AdvancedUserRepository {
   /// Returns the ID of the inserted row.
   Future<int?> insert(AdvancedUser entity) async {
     final id = await NativeSqlite.insert(databaseName, 'advanced_users', {
-      'name': entity.name,
+      'fullname': entity.fullname,
       'login_duration': entity.loginDuration?.inMilliseconds,
       'profile_url': entity.profileUrl?.toString(),
       'score': entity.score,
@@ -478,7 +478,7 @@ class AdvancedUserRepository {
       databaseName,
       'advanced_users',
       {
-        'name': entity.name,
+        'fullname': entity.fullname,
         'login_duration': entity.loginDuration?.inMilliseconds,
         'profile_url': entity.profileUrl?.toString(),
         'score': entity.score,
@@ -540,7 +540,7 @@ class AdvancedUserRepository {
   AdvancedUser _fromMap(Map<String, Object?> map) {
     return AdvancedUser(
       id: map['id'] as int?,
-      name: map['name'] as String,
+      fullname: map['fullname'] as String,
       loginDuration: map['login_duration'] != null
           ? Duration(milliseconds: map['login_duration'] as int)
           : null,

@@ -10,39 +10,30 @@ import 'package:native_sqlite_generator/src/helpers/schema_snapshot_helper.dart'
 import 'package:source_gen/source_gen.dart';
 
 /// Builder that tracks schema changes by generating .schema.json files
-/// Generates all schemas in a single pass to lib/generated/schemas/
+/// Generates all schemas using build_runner's asset system
 class SchemaTrackingBuilder implements Builder {
   static final _tableChecker = TypeChecker.fromUrl(
-    'package:native_sqlite_annotation/src/annotations.dart#Table',
+    'package:native_sqlite_annotations/src/table.dart#DbTable',
   );
 
   final BuilderOptions options;
-  bool _hasRun = false; // Only run once per build
 
   SchemaTrackingBuilder(this.options);
 
   @override
   Map<String, List<String>> get buildExtensions {
+    // Generate single consolidated schemas file
     return const {
-      r'$lib$': ['generated/schemas/.schemas_generated'], // Marker file
+      r'$lib$': ['generated/schemas/all_schemas.json'],
     };
   }
 
   @override
   Future<void> build(BuildStep buildStep) async {
-    // Only run once per build (like slang does)
-    if (_hasRun) return;
-    _hasRun = true;
+    print('🔵 MIGRATION BUILDER STARTING');
+    log.info('📁 Collecting schemas...');
 
-    log.info('📁 Generating schema files...');
-
-    final packageName = buildStep.inputId.package;
-    final schemaDir = Directory('lib/generated/schemas');
-
-    // Create directory if it doesn't exist
-    if (!schemaDir.existsSync()) {
-      schemaDir.createSync(recursive: true);
-    }
+    final allSchemas = <Map<String, dynamic>>[];
 
     // Find all Dart files in lib/
     final dartFiles = Glob('lib/**.dart');
@@ -71,20 +62,20 @@ class SchemaTrackingBuilder implements Builder {
           element,
           annotatedElement.annotation,
         );
+
+        // Load previous schema to check for changes
         final fileName = '${_toSnakeCase(tableInfo.dartName)}.schema.json';
         final filePath = 'lib/generated/schemas/$fileName';
-
-        // Load previous schema to determine version
         final oldSchemaJson = await _loadOldSchema(filePath);
         final oldVersion = oldSchemaJson?['version'] as int? ?? 0;
 
         // Check if schema changed
-        final newSnapshot = SchemaSnapshotHelper.createSnapshot(
+        final testSnapshot = SchemaSnapshotHelper.createSnapshot(
           tableInfo,
           oldVersion,
         );
         final oldHash = oldSchemaJson?['hash'] as String?;
-        final schemaChanged = oldHash != newSnapshot.hash;
+        final schemaChanged = oldHash != testSnapshot.hash;
 
         final currentVersion = schemaChanged ? oldVersion + 1 : oldVersion;
         final snapshot = SchemaSnapshotHelper.createSnapshot(
@@ -92,33 +83,36 @@ class SchemaTrackingBuilder implements Builder {
           currentVersion,
         );
 
-        // Write directly to filesystem (like slang does)
-        final jsonString = const JsonEncoder.withIndent(
-          '  ',
-        ).convert(snapshot.toJson());
-        File(filePath).writeAsStringSync(jsonString);
-
-        schemaCount++;
+        // Add to all schemas
+        allSchemas.add(snapshot.toJson());
 
         if (schemaChanged) {
-          log.info(
-            '📝 Schema changed for ${tableInfo.dartName}: v$oldVersion → v$currentVersion (hash: ${snapshot.hash})',
-          );
-        } else {
-          log.fine(
-            'Schema unchanged for ${tableInfo.dartName} (v$currentVersion)',
-          );
+          log.info('📝 ${tableInfo.dartName}: v$oldVersion → v$currentVersion');
         }
       }
     }
 
-    // Write marker file (required by buildExtensions)
-    await buildStep.writeAsString(
-      AssetId(packageName, 'lib/generated/schemas/.schemas_generated'),
-      '// Schemas generated: $schemaCount files\n',
+    // Write consolidated schemas file
+    final output = {
+      'version': '1.0.0',
+      'generatedAt': DateTime.now().toIso8601String(),
+      'schemas': allSchemas,
+    };
+
+    final jsonString = const JsonEncoder.withIndent('  ').convert(output);
+
+    final outputAsset = AssetId(
+      buildStep.inputId.package,
+      'lib/generated/schemas/all_schemas.json',
     );
 
-    log.info('✅ Generated $schemaCount schema files in lib/generated/schemas/');
+    log.info(
+      'Writing to ${outputAsset.path} in package ${outputAsset.package}',
+    );
+
+    await buildStep.writeAsString(outputAsset, jsonString);
+
+    log.info('✅ Tracked ${allSchemas.length} schemas');
   }
 
   Future<Map<String, dynamic>?> _loadOldSchema(String filePath) async {

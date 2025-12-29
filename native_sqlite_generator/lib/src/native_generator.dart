@@ -134,6 +134,19 @@ class NativeCodeGenerator {
   }
 
   Future<List<File>> _findSchemaFiles() async {
+    // Check for schema file in lib/generated/ (same location as database_manager.dart)
+    final schemaFile = File('lib/generated/native_sqlite_schema.json');
+    if (await schemaFile.exists()) {
+      return [schemaFile];
+    }
+
+    // Fall back to old location for backwards compatibility
+    final oldFile = File('lib/generated/schemas/all_schemas.json');
+    if (await oldFile.exists()) {
+      return [oldFile];
+    }
+
+    // Fall back to individual schema files (legacy format)
     final glob = Glob('lib/generated/schemas/*.schema.json');
     final files = <File>[];
     await for (final entity in glob.list()) {
@@ -146,11 +159,27 @@ class NativeCodeGenerator {
 
   Future<List<TableSchemaSnapshot>> _loadSchemas(List<File> files) async {
     final schemas = <TableSchemaSnapshot>[];
+
     for (final file in files) {
       try {
         final content = await file.readAsString();
-        final jsonMap = json.decode(content) as Map<String, dynamic>;
-        schemas.add(TableSchemaSnapshot.fromJson(jsonMap));
+        final jsonData = json.decode(content) as Map<String, dynamic>;
+
+        // Check if it's the consolidated format
+        if (jsonData.containsKey('schemas')) {
+          final schemasList = jsonData['schemas'] as List;
+          for (final schemaJson in schemasList) {
+            schemas.add(
+              TableSchemaSnapshot.fromJson(schemaJson as Map<String, dynamic>),
+            );
+          }
+          logger.info(
+            '   Loaded ${schemasList.length} schemas from consolidated file',
+          );
+        } else {
+          // Individual schema file
+          schemas.add(TableSchemaSnapshot.fromJson(jsonData));
+        }
       } catch (e) {
         logger.warning(
           '   ❌ Failed to load schema from ${path.basename(file.path)}: $e',

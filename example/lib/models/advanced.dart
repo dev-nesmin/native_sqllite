@@ -19,7 +19,7 @@ class AdvancedUser {
   final int? id;
 
   @DbColumn()
-  final String name;
+  final String fullname;
 
   // Duration type - stored as milliseconds INTEGER
   @DbColumn()
@@ -52,7 +52,7 @@ class AdvancedUser {
 
   const AdvancedUser({
     this.id,
-    required this.name,
+    required this.fullname,
     this.loginDuration,
     this.profileUrl,
     this.score,
@@ -64,7 +64,7 @@ class AdvancedUser {
 
   AdvancedUser copyWith({
     int? id,
-    String? name,
+    String? fullname,
     Duration? loginDuration,
     Uri? profileUrl,
     num? score,
@@ -75,7 +75,7 @@ class AdvancedUser {
   }) {
     return AdvancedUser(
       id: id ?? this.id,
-      name: name ?? this.name,
+      fullname: fullname ?? this.fullname,
       loginDuration: loginDuration ?? this.loginDuration,
       profileUrl: profileUrl ?? this.profileUrl,
       score: score ?? this.score,

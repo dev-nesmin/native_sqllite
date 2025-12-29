@@ -31,6 +31,7 @@ class AutoMigration {
     required List<String> onCreateStatements,
     required Map<String, String> tables,
     required List<String> tableNames,
+    List<String> deletedTableNames = const [],
     bool enableWAL = true,
     bool enableForeignKeys = true,
     bool dropRemovedTables = false,
@@ -46,6 +47,7 @@ class AutoMigration {
           name: name,
           tables: tables,
           tableNames: tableNames,
+          deletedTableNames: deletedTableNames,
           dropRemovedTables: dropRemovedTables,
           onCustomMigrate: onCustomMigrate,
           oldVersion: oldVersion,
@@ -62,6 +64,7 @@ class AutoMigration {
     required String name,
     required Map<String, String> tables,
     required List<String> tableNames,
+    required List<String> deletedTableNames,
     required bool dropRemovedTables,
     required Future<void> Function(String, int, int)? onCustomMigrate,
     required int oldVersion,
@@ -69,11 +72,14 @@ class AutoMigration {
   }) async {
     final statements = <String>[];
 
-    // Note: We can't query existing tables from here since this runs
-    // before the database is fully opened. The platform implementation
-    // will need to handle this, or we need to adjust the flow.
+    // Drop deleted tables if flag is enabled
+    if (dropRemovedTables && deletedTableNames.isNotEmpty) {
+      for (final tableName in deletedTableNames) {
+        statements.add('DROP TABLE IF EXISTS $tableName');
+      }
+    }
 
-    // For now, we'll add new tables - the platform will check if they exist
+    // Add new tables - CREATE TABLE IF NOT EXISTS is safe
     for (final tableName in tableNames) {
       statements.add('CREATE TABLE IF NOT EXISTS ${tables[tableName]}');
     }

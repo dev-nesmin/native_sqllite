@@ -44,12 +44,3 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
-# Generated database manager (auto-generated, hidden from user)
-**/database_schema.database_manager.g.dart
-**/database_schema.schema_registry.g.dart
-
-# Generated schema file (auto-generated from models)
-**/native_sqlite_schema.json
-
-# Obsolete schema marker file (old implementation)
-**/.schemas_marker

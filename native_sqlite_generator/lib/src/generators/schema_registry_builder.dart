@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 
 import 'package:analyzer/dart/element/element.dart';
 import 'package:build/build.dart';
@@ -148,6 +150,10 @@ class SchemaRegistryBuilder implements Builder {
     buffer.writeln("import 'dart:convert';");
     buffer.writeln("import 'dart:io';");
     buffer.writeln();
+
+    // Load migrations from schema file at build time
+    final migrations = _loadMigrationsFromSchema();
+    final deletedTableNames = _loadDeletedTablesFromSchema();
     buffer.writeln("import 'package:flutter/foundation.dart';");
     buffer.writeln("import 'package:native_sqlite/native_sqlite.dart';");
     buffer.writeln();
@@ -228,6 +234,40 @@ class SchemaRegistryBuilder implements Builder {
     buffer.writeln('  ];');
     buffer.writeln();
 
+    // Generate static migration data
+    buffer.writeln('  /// Auto-generated migrations from schema changes');
+    buffer.writeln('  static const migrations = <Map<String, dynamic>>[');
+    for (final migration in migrations) {
+      buffer.writeln('    {');
+      buffer.writeln("      'tableName': '${migration['tableName']}',");
+      buffer.writeln("      'className': '${migration['className']}',");
+      buffer.writeln("      'fromVersion': ${migration['fromVersion']},");
+      buffer.writeln("      'toVersion': ${migration['toVersion']},");
+      buffer.writeln("      'sql': [");
+      final sql = migration['sql'] as List;
+      for (final statement in sql) {
+        final escaped = statement
+            .toString()
+            .replaceAll(r"'", r"\'")
+            .replaceAll(r'$', r'\$');
+        buffer.writeln("        '''$escaped''',");
+      }
+      buffer.writeln('      ],');
+      final summary = migration['summary'].toString().replaceAll(r"'", r"\'");
+      buffer.writeln("      'summary': '$summary',");
+      buffer.writeln('    },');
+    }
+    buffer.writeln('  ];');
+    buffer.writeln();
+
+    buffer.writeln('  /// List of deleted table names');
+    buffer.writeln('  static const deletedTableNames = <String>[');
+    for (final tableName in deletedTableNames) {
+      buffer.writeln("    '$tableName',");
+    }
+    buffer.writeln('  ];');
+    buffer.writeln();
+
     _generateInitMethod(buffer);
     _generateCloseMethod(buffer);
     _generateGetters(buffer);
@@ -238,29 +278,6 @@ class SchemaRegistryBuilder implements Builder {
   }
 
   void _generateInitMethod(StringBuffer buffer) {
-    buffer.writeln('  /// Get list of deleted tables from schema file');
-    buffer.writeln('  static List<String> get deletedTableNames {');
-    buffer.writeln('    try {');
-    buffer.writeln(
-      '      final file = File(\'lib/generated/native_sqlite_schema.json\');',
-    );
-    buffer.writeln('      if (!file.existsSync()) return [];');
-    buffer.writeln('      final content = file.readAsStringSync();');
-    buffer.writeln(
-      '      final json = jsonDecode(content) as Map<String, dynamic>;',
-    );
-    buffer.writeln(
-      '      final deleted = json[\'deletedTables\'] as List? ?? [];',
-    );
-    buffer.writeln('      return deleted');
-    buffer.writeln('          .cast<Map<String, dynamic>>()');
-    buffer.writeln('          .map((t) => t[\'tableName\'] as String)');
-    buffer.writeln('          .toList();');
-    buffer.writeln('    } catch (e) {');
-    buffer.writeln('      return [];');
-    buffer.writeln('    }');
-    buffer.writeln('  }');
-    buffer.writeln();
     buffer.writeln('  /// Initialize database with automatic setup.');
     buffer.writeln(
       '  /// Handles table creation, migrations, and schema updates automatically.',
@@ -299,6 +316,7 @@ class SchemaRegistryBuilder implements Builder {
     buffer.writeln('          onCreateStatements: onCreateStatements,');
     buffer.writeln('          tables: tables,');
     buffer.writeln('          tableNames: tableNames,');
+    buffer.writeln('          migrations: migrations,');
     buffer.writeln('          deletedTableNames: deletedTableNames,');
     buffer.writeln('          enableWAL: enableWAL,');
     buffer.writeln('          enableForeignKeys: enableForeignKeys,');
@@ -358,5 +376,80 @@ class SchemaRegistryBuilder implements Builder {
           (match) => '_${match.group(1)!.toLowerCase()}',
         )
         .replaceFirst(RegExp(r'^_'), '');
+  }
+
+  /// Load migrations from all versioned schema files at build time
+  /// This ensures all historical migrations are available at runtime
+  List<Map<String, dynamic>> _loadMigrationsFromSchema() {
+    try {
+      final schemasDir = Directory('lib/generated/schemas');
+      if (!schemasDir.existsSync()) {
+        log.info('📋 No schemas directory found');
+        return [];
+      }
+
+      // Find all versioned schema files
+      final schemaFiles = schemasDir
+          .listSync()
+          .whereType<File>()
+          .where(
+            (f) => f.path.endsWith('.json') && !f.path.endsWith('.gitkeep'),
+          )
+          .toList();
+
+      if (schemaFiles.isEmpty) {
+        log.info('📋 No versioned schema files found');
+        return [];
+      }
+
+      // Sort by version number
+      schemaFiles.sort((a, b) {
+        final aMatch = RegExp(r'_v(\d+)\.json').firstMatch(a.path);
+        final bMatch = RegExp(r'_v(\d+)\.json').firstMatch(b.path);
+        final aVersion = aMatch != null ? int.parse(aMatch.group(1)!) : 0;
+        final bVersion = bMatch != null ? int.parse(bMatch.group(1)!) : 0;
+        return aVersion.compareTo(bVersion);
+      });
+
+      // Collect migrations from all versions
+      final allMigrations = <Map<String, dynamic>>[];
+      for (final file in schemaFiles) {
+        final content = file.readAsStringSync();
+        final json = jsonDecode(content) as Map<String, dynamic>;
+        final migrations = json['migrations'] as List?;
+
+        if (migrations != null && migrations.isNotEmpty) {
+          allMigrations.addAll(migrations.cast<Map<String, dynamic>>());
+          log.info(
+            '📥 Loaded ${migrations.length} migration(s) from ${file.path.split('/').last}',
+          );
+        }
+      }
+
+      log.info('✅ Total migrations loaded: ${allMigrations.length}');
+      return allMigrations;
+    } catch (e) {
+      log.warning('⚠️  Failed to load migrations: $e');
+      return [];
+    }
+  }
+
+  /// Load deleted table names from schema JSON at build time
+  List<String> _loadDeletedTablesFromSchema() {
+    try {
+      final file = File('lib/generated/native_sqlite_schema.json');
+      if (!file.existsSync()) return [];
+
+      final content = file.readAsStringSync();
+      final json = jsonDecode(content) as Map<String, dynamic>;
+      final deleted = json['deletedTables'] as List? ?? [];
+
+      return deleted
+          .cast<Map<String, dynamic>>()
+          .map((t) => t['tableName'] as String)
+          .toList();
+    } catch (e) {
+      return [];
+    }
   }
 }

@@ -11,6 +11,7 @@ import 'package:native_sqlite/native_sqlite.dart';
 import 'package:native_sqlite_example/models/advanced.dart';
 import 'package:native_sqlite_example/models/category.dart';
 import 'package:native_sqlite_example/models/custom_converter.dart';
+import 'package:native_sqlite_example/models/freezed_advanced.dart';
 import 'package:native_sqlite_example/models/user.dart';
 import 'package:native_sqlite_example/models/product.dart';
 import 'package:native_sqlite_example/models/order.dart';
@@ -46,6 +47,7 @@ class DatabaseManager {
     'advanced_users': AdvancedUserSchema.createTableSql,
     'categories': CategorySchema.createTableSql,
     'styled_items': StyledItemSchema.createTableSql,
+    'freezed_advanced_users': FreezedAdvancedUserSchema.createTableSql,
     'users': UserSchema.createTableSql,
     'products': ProductSchema.createTableSql,
     'orders': OrderSchema.createTableSql,
@@ -56,6 +58,7 @@ class DatabaseManager {
     AdvancedUserSchema.createTableSql,
     CategorySchema.createTableSql,
     StyledItemSchema.createTableSql,
+    FreezedAdvancedUserSchema.createTableSql,
     UserSchema.createTableSql,
     ProductSchema.createTableSql,
     OrderSchema.createTableSql,
@@ -69,28 +72,40 @@ class DatabaseManager {
     'advanced_users',
     'categories',
     'styled_items',
+    'freezed_advanced_users',
     'users',
     'products',
     'orders',
     'profiles',
   ];
 
-  /// Get list of deleted tables from schema file
-  static List<String> get deletedTableNames {
-    try {
-      final file = File('lib/generated/native_sqlite_schema.json');
-      if (!file.existsSync()) return [];
-      final content = file.readAsStringSync();
-      final json = jsonDecode(content) as Map<String, dynamic>;
-      final deleted = json['deletedTables'] as List? ?? [];
-      return deleted
-          .cast<Map<String, dynamic>>()
-          .map((t) => t['tableName'] as String)
-          .toList();
-    } catch (e) {
-      return [];
-    }
-  }
+  /// Auto-generated migrations from schema changes
+  static const migrations = <Map<String, dynamic>>[
+    {
+      'tableName': 'advanced_users',
+      'className': 'AdvancedUser',
+      'fromVersion': 1,
+      'toVersion': 2,
+      'sql': [
+        '''ALTER TABLE advanced_users ADD COLUMN country TEXT;''',
+      ],
+      'summary': 'Added columns: country',
+    },
+    {
+      'tableName': 'advanced_users',
+      'className': 'AdvancedUser',
+      'fromVersion': 2,
+      'toVersion': 3,
+      'sql': [
+        '''ALTER TABLE advanced_users ADD COLUMN zipCode TEXT;''',
+      ],
+      'summary': 'Added columns: zipCode',
+    },
+  ];
+
+  /// List of deleted table names
+  static const deletedTableNames = <String>[
+  ];
 
   /// Initialize database with automatic setup.
   /// Handles table creation, migrations, and schema updates automatically.
@@ -120,6 +135,7 @@ class DatabaseManager {
           onCreateStatements: onCreateStatements,
           tables: tables,
           tableNames: tableNames,
+          migrations: migrations,
           deletedTableNames: deletedTableNames,
           enableWAL: enableWAL,
           enableForeignKeys: enableForeignKeys,

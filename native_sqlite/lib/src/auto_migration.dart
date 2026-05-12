@@ -31,6 +31,7 @@ class AutoMigration {
     required List<String> onCreateStatements,
     required Map<String, String> tables,
     required List<String> tableNames,
+    required List<Map<String, dynamic>> migrations,
     List<String> deletedTableNames = const [],
     bool enableWAL = true,
     bool enableForeignKeys = true,
@@ -47,6 +48,7 @@ class AutoMigration {
           name: name,
           tables: tables,
           tableNames: tableNames,
+          migrations: migrations,
           deletedTableNames: deletedTableNames,
           dropRemovedTables: dropRemovedTables,
           onCustomMigrate: onCustomMigrate,
@@ -64,6 +66,7 @@ class AutoMigration {
     required String name,
     required Map<String, String> tables,
     required List<String> tableNames,
+    required List<Map<String, dynamic>> migrations,
     required List<String> deletedTableNames,
     required bool dropRemovedTables,
     required Future<void> Function(String, int, int)? onCustomMigrate,
@@ -72,16 +75,29 @@ class AutoMigration {
   }) async {
     final statements = <String>[];
 
-    // Drop deleted tables if flag is enabled
-    if (dropRemovedTables && deletedTableNames.isNotEmpty) {
-      for (final tableName in deletedTableNames) {
-        statements.add('DROP TABLE IF EXISTS $tableName');
+    // Apply generated migrations (from DatabaseManager)
+    if (migrations.isNotEmpty) {
+      for (final migration in migrations) {
+        final sql = migration['sql'] as List?;
+        if (sql != null) {
+          for (final statement in sql) {
+            statements.add(statement as String);
+          }
+        }
       }
-    }
+    } else {
+      // Fallback: Basic migrations
+      // Drop deleted tables if flag is enabled
+      if (dropRemovedTables && deletedTableNames.isNotEmpty) {
+        for (final tableName in deletedTableNames) {
+          statements.add('DROP TABLE IF EXISTS $tableName');
+        }
+      }
 
-    // Add new tables - CREATE TABLE IF NOT EXISTS is safe
-    for (final tableName in tableNames) {
-      statements.add('CREATE TABLE IF NOT EXISTS ${tables[tableName]}');
+      // Add new tables - CREATE TABLE IF NOT EXISTS is safe
+      for (final tableName in tableNames) {
+        statements.add('CREATE TABLE IF NOT EXISTS ${tables[tableName]}');
+      }
     }
 
     // Call custom migration callback

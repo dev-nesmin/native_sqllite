@@ -17,7 +17,7 @@ enum Priority { low, medium, high, urgent }
 /// - num type support
 /// - Enhanced enum support (ordinal and name)
 @freezed
-@DbTable(name: 'advanced_users')
+@DbTable(name: 'freezed_advanced_users') // Renamed to avoid conflict
 abstract class FreezedAdvancedUser with _$FreezedAdvancedUser {
   const factory FreezedAdvancedUser({
     @PrimaryKey(autoIncrement: true) int? id,

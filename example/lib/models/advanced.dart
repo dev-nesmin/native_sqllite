@@ -19,8 +19,26 @@ class AdvancedUser {
   final int? id;
 
   @DbColumn()
-  final String fullname;
+  final String name; // Changed back from fullname for testing
 
+  @DbColumn()
+  final String? phoneNumber; // NEW COLUMN for migration testing
+
+  // REMOVED email field - testing table recreation migration
+
+  @DbColumn()
+  final String? address; // Yet another test column
+
+  @DbColumn()
+  final String? country; // NEW: Testing versioned schema generation
+
+  @DbColumn()
+  final String? zipCode; // NEW: Testing v3 generation
+
+  @DbColumn()
+  final int? age; // Age for migration testing
+  @DbColumn()
+  final String? city; // City for testing static migrations
   // Duration type - stored as milliseconds INTEGER
   @DbColumn()
   final Duration? loginDuration;
@@ -52,7 +70,13 @@ class AdvancedUser {
 
   const AdvancedUser({
     this.id,
-    required this.fullname,
+    required this.name,
+    this.phoneNumber,
+    this.address,
+    this.age,
+    this.city,
+    this.country,
+    this.zipCode,
     this.loginDuration,
     this.profileUrl,
     this.score,
@@ -64,7 +88,13 @@ class AdvancedUser {
 
   AdvancedUser copyWith({
     int? id,
-    String? fullname,
+    String? name,
+    String? phoneNumber,
+    String? address,
+    int? age,
+    String? city,
+    String? country,
+    String? zipCode,
     Duration? loginDuration,
     Uri? profileUrl,
     num? score,
@@ -75,7 +105,13 @@ class AdvancedUser {
   }) {
     return AdvancedUser(
       id: id ?? this.id,
-      fullname: fullname ?? this.fullname,
+      name: name ?? this.name,
+      phoneNumber: phoneNumber ?? this.phoneNumber,
+      address: address ?? this.address,
+      age: age ?? this.age,
+      city: city ?? this.city,
+      country: country ?? this.country,
+      zipCode: zipCode ?? this.zipCode,
       loginDuration: loginDuration ?? this.loginDuration,
       profileUrl: profileUrl ?? this.profileUrl,
       score: score ?? this.score,

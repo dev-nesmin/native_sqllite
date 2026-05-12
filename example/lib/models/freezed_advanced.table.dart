@@ -1,7 +1,7 @@
 // dart format width=80
 // coverage:ignore-file
 // GENERATED CODE - DO NOT MODIFY BY HAND
-// Generated on: 2025-12-29T10:27:30.759899
+// Generated on: 2025-12-30T22:38:29.063193
 
 // ignore_for_file: type=lint, prefer_single_quotes, lines_longer_than_80_chars, depend_on_referenced_packages, unused_element, unused_import
 
@@ -13,10 +13,10 @@ part of 'freezed_advanced.dart';
 
 // Table schema for FreezedAdvancedUser
 abstract class FreezedAdvancedUserSchema {
-  static const String tableName = 'advanced_users';
+  static const String tableName = 'freezed_advanced_users';
 
   static const String createTableSql = '''
-    CREATE TABLE advanced_users (
+    CREATE TABLE freezed_advanced_users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
       login_duration INTEGER,
@@ -322,7 +322,8 @@ class FreezedAdvancedUserQueryBuilder {
     final whereClause = _whereConditions.isEmpty
         ? ''
         : ' WHERE ${_whereConditions.join(' AND ')}';
-    final sql = 'SELECT COUNT(*) as count FROM advanced_users$whereClause';
+    final sql =
+        'SELECT COUNT(*) as count FROM freezed_advanced_users$whereClause';
     final result = await NativeSqlite.query(_databaseName, sql, _whereArgs);
     final rows = result.toMapList();
     return rows.isEmpty ? 0 : rows.first['count'] as int;
@@ -335,7 +336,7 @@ class FreezedAdvancedUserQueryBuilder {
         : _whereConditions.join(' AND ');
     return NativeSqlite.delete(
       _databaseName,
-      'advanced_users',
+      'freezed_advanced_users',
       where: whereClause,
       whereArgs: _whereArgs.isEmpty ? null : _whereArgs,
     );
@@ -348,7 +349,7 @@ class FreezedAdvancedUserQueryBuilder {
     final orderClause = _orderBy == null ? '' : ' ORDER BY $_orderBy';
     final limitClause = _limit == null ? '' : ' LIMIT $_limit';
     final offsetClause = _offset == null ? '' : ' OFFSET $_offset';
-    return 'SELECT * FROM advanced_users$whereClause$orderClause$limitClause$offsetClause';
+    return 'SELECT * FROM freezed_advanced_users$whereClause$orderClause$limitClause$offsetClause';
   }
 
   FreezedAdvancedUser _fromMap(Map<String, Object?> map) {
@@ -380,15 +381,16 @@ class FreezedAdvancedUserRepository {
   /// Inserts a new FreezedAdvancedUser into the database.
   /// Returns the ID of the inserted row.
   Future<int?> insert(FreezedAdvancedUser entity) async {
-    final id = await NativeSqlite.insert(databaseName, 'advanced_users', {
-      'name': entity.name,
-      'login_duration': entity.loginDuration?.inMilliseconds,
-      'profile_url': entity.profileUrl?.toString(),
-      'status': entity.status.index,
-      'priority': entity.priority?.index,
-      'created_at': entity.createdAt.millisecondsSinceEpoch,
-      'is_verified': entity.isVerified ? 1 : 0,
-    });
+    final id =
+        await NativeSqlite.insert(databaseName, 'freezed_advanced_users', {
+          'name': entity.name,
+          'login_duration': entity.loginDuration?.inMilliseconds,
+          'profile_url': entity.profileUrl?.toString(),
+          'status': entity.status.index,
+          'priority': entity.priority?.index,
+          'created_at': entity.createdAt.millisecondsSinceEpoch,
+          'is_verified': entity.isVerified ? 1 : 0,
+        });
     return id;
   }
 
@@ -397,7 +399,7 @@ class FreezedAdvancedUserRepository {
   Future<FreezedAdvancedUser?> findById(int? id) async {
     final result = await NativeSqlite.query(
       databaseName,
-      'SELECT * FROM advanced_users WHERE id = ? LIMIT 1',
+      'SELECT * FROM freezed_advanced_users WHERE id = ? LIMIT 1',
       [id],
     );
 
@@ -411,7 +413,7 @@ class FreezedAdvancedUserRepository {
   Future<List<FreezedAdvancedUser>> findAll() async {
     final result = await NativeSqlite.query(
       databaseName,
-      'SELECT * FROM advanced_users',
+      'SELECT * FROM freezed_advanced_users',
     );
 
     return result.toMapList().map(_fromMap).toList();
@@ -422,7 +424,7 @@ class FreezedAdvancedUserRepository {
   Future<int> update(FreezedAdvancedUser entity) async {
     return NativeSqlite.update(
       databaseName,
-      'advanced_users',
+      'freezed_advanced_users',
       {
         'name': entity.name,
         'login_duration': entity.loginDuration?.inMilliseconds,
@@ -442,7 +444,7 @@ class FreezedAdvancedUserRepository {
   Future<int> delete(int? id) async {
     return NativeSqlite.delete(
       databaseName,
-      'advanced_users',
+      'freezed_advanced_users',
       where: 'id = ?',
       whereArgs: [id],
     );
@@ -451,14 +453,14 @@ class FreezedAdvancedUserRepository {
   /// Deletes all records from the table.
   /// Returns the number of rows deleted.
   Future<int> deleteAll() async {
-    return NativeSqlite.delete(databaseName, 'advanced_users');
+    return NativeSqlite.delete(databaseName, 'freezed_advanced_users');
   }
 
   /// Returns the total count of records in the table.
   Future<int> count() async {
     final result = await NativeSqlite.query(
       databaseName,
-      'SELECT COUNT(*) as count FROM advanced_users',
+      'SELECT COUNT(*) as count FROM freezed_advanced_users',
     );
 
     final rows = result.toMapList();

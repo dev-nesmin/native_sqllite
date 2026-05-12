@@ -1,7 +1,7 @@
 // dart format width=80
 // coverage:ignore-file
 // GENERATED CODE - DO NOT MODIFY BY HAND
-// Generated on: 2025-12-29T10:28:53.056968
+// Generated on: 2025-12-30T22:39:15.922099
 
 // ignore_for_file: type=lint, prefer_single_quotes, lines_longer_than_80_chars, depend_on_referenced_packages, unused_element, unused_import
 
@@ -18,7 +18,13 @@ abstract class AdvancedUserSchema {
   static const String createTableSql = '''
     CREATE TABLE advanced_users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      fullname TEXT NOT NULL,
+      name TEXT NOT NULL,
+      phone_number TEXT,
+      address TEXT,
+      country TEXT,
+      zip_code TEXT,
+      age INTEGER,
+      city TEXT,
       login_duration INTEGER,
       profile_url TEXT,
       score REAL,
@@ -31,7 +37,13 @@ abstract class AdvancedUserSchema {
 
   // Column names
   static const String ID = 'id';
-  static const String FULLNAME = 'fullname';
+  static const String NAME = 'name';
+  static const String PHONE_NUMBER = 'phone_number';
+  static const String ADDRESS = 'address';
+  static const String COUNTRY = 'country';
+  static const String ZIP_CODE = 'zip_code';
+  static const String AGE = 'age';
+  static const String CITY = 'city';
   static const String LOGIN_DURATION = 'login_duration';
   static const String PROFILE_URL = 'profile_url';
   static const String SCORE = 'score';
@@ -52,31 +64,272 @@ class AdvancedUserQueryBuilder {
 
   AdvancedUserQueryBuilder(this._databaseName);
 
-  /// Filter where fullname equals [value].
-  AdvancedUserQueryBuilder fullnameEqualTo(String value) {
-    _whereConditions.add('fullname = ?');
+  /// Filter where name equals [value].
+  AdvancedUserQueryBuilder nameEqualTo(String value) {
+    _whereConditions.add('name = ?');
     _whereArgs.add(value);
     return this;
   }
 
-  /// Filter where fullname contains [value].
-  AdvancedUserQueryBuilder fullnameContains(String value) {
-    _whereConditions.add('fullname LIKE ?');
+  /// Filter where name contains [value].
+  AdvancedUserQueryBuilder nameContains(String value) {
+    _whereConditions.add('name LIKE ?');
     _whereArgs.add('%$value%');
     return this;
   }
 
-  /// Filter where fullname starts with [value].
-  AdvancedUserQueryBuilder fullnameStartsWith(String value) {
-    _whereConditions.add('fullname LIKE ?');
+  /// Filter where name starts with [value].
+  AdvancedUserQueryBuilder nameStartsWith(String value) {
+    _whereConditions.add('name LIKE ?');
     _whereArgs.add('$value%');
     return this;
   }
 
-  /// Filter where fullname ends with [value].
-  AdvancedUserQueryBuilder fullnameEndsWith(String value) {
-    _whereConditions.add('fullname LIKE ?');
+  /// Filter where name ends with [value].
+  AdvancedUserQueryBuilder nameEndsWith(String value) {
+    _whereConditions.add('name LIKE ?');
     _whereArgs.add('%$value');
+    return this;
+  }
+
+  /// Filter where phoneNumber equals [value].
+  AdvancedUserQueryBuilder phoneNumberEqualTo(String? value) {
+    _whereConditions.add('phone_number = ?');
+    _whereArgs.add(value);
+    return this;
+  }
+
+  /// Filter where phoneNumber contains [value].
+  AdvancedUserQueryBuilder phoneNumberContains(String value) {
+    _whereConditions.add('phone_number LIKE ?');
+    _whereArgs.add('%$value%');
+    return this;
+  }
+
+  /// Filter where phoneNumber starts with [value].
+  AdvancedUserQueryBuilder phoneNumberStartsWith(String value) {
+    _whereConditions.add('phone_number LIKE ?');
+    _whereArgs.add('$value%');
+    return this;
+  }
+
+  /// Filter where phoneNumber ends with [value].
+  AdvancedUserQueryBuilder phoneNumberEndsWith(String value) {
+    _whereConditions.add('phone_number LIKE ?');
+    _whereArgs.add('%$value');
+    return this;
+  }
+
+  /// Filter where phoneNumber is null.
+  AdvancedUserQueryBuilder phoneNumberIsNull() {
+    _whereConditions.add('phone_number IS NULL');
+    return this;
+  }
+
+  /// Filter where phoneNumber is not null.
+  AdvancedUserQueryBuilder phoneNumberIsNotNull() {
+    _whereConditions.add('phone_number IS NOT NULL');
+    return this;
+  }
+
+  /// Filter where address equals [value].
+  AdvancedUserQueryBuilder addressEqualTo(String? value) {
+    _whereConditions.add('address = ?');
+    _whereArgs.add(value);
+    return this;
+  }
+
+  /// Filter where address contains [value].
+  AdvancedUserQueryBuilder addressContains(String value) {
+    _whereConditions.add('address LIKE ?');
+    _whereArgs.add('%$value%');
+    return this;
+  }
+
+  /// Filter where address starts with [value].
+  AdvancedUserQueryBuilder addressStartsWith(String value) {
+    _whereConditions.add('address LIKE ?');
+    _whereArgs.add('$value%');
+    return this;
+  }
+
+  /// Filter where address ends with [value].
+  AdvancedUserQueryBuilder addressEndsWith(String value) {
+    _whereConditions.add('address LIKE ?');
+    _whereArgs.add('%$value');
+    return this;
+  }
+
+  /// Filter where address is null.
+  AdvancedUserQueryBuilder addressIsNull() {
+    _whereConditions.add('address IS NULL');
+    return this;
+  }
+
+  /// Filter where address is not null.
+  AdvancedUserQueryBuilder addressIsNotNull() {
+    _whereConditions.add('address IS NOT NULL');
+    return this;
+  }
+
+  /// Filter where country equals [value].
+  AdvancedUserQueryBuilder countryEqualTo(String? value) {
+    _whereConditions.add('country = ?');
+    _whereArgs.add(value);
+    return this;
+  }
+
+  /// Filter where country contains [value].
+  AdvancedUserQueryBuilder countryContains(String value) {
+    _whereConditions.add('country LIKE ?');
+    _whereArgs.add('%$value%');
+    return this;
+  }
+
+  /// Filter where country starts with [value].
+  AdvancedUserQueryBuilder countryStartsWith(String value) {
+    _whereConditions.add('country LIKE ?');
+    _whereArgs.add('$value%');
+    return this;
+  }
+
+  /// Filter where country ends with [value].
+  AdvancedUserQueryBuilder countryEndsWith(String value) {
+    _whereConditions.add('country LIKE ?');
+    _whereArgs.add('%$value');
+    return this;
+  }
+
+  /// Filter where country is null.
+  AdvancedUserQueryBuilder countryIsNull() {
+    _whereConditions.add('country IS NULL');
+    return this;
+  }
+
+  /// Filter where country is not null.
+  AdvancedUserQueryBuilder countryIsNotNull() {
+    _whereConditions.add('country IS NOT NULL');
+    return this;
+  }
+
+  /// Filter where zipCode equals [value].
+  AdvancedUserQueryBuilder zipCodeEqualTo(String? value) {
+    _whereConditions.add('zip_code = ?');
+    _whereArgs.add(value);
+    return this;
+  }
+
+  /// Filter where zipCode contains [value].
+  AdvancedUserQueryBuilder zipCodeContains(String value) {
+    _whereConditions.add('zip_code LIKE ?');
+    _whereArgs.add('%$value%');
+    return this;
+  }
+
+  /// Filter where zipCode starts with [value].
+  AdvancedUserQueryBuilder zipCodeStartsWith(String value) {
+    _whereConditions.add('zip_code LIKE ?');
+    _whereArgs.add('$value%');
+    return this;
+  }
+
+  /// Filter where zipCode ends with [value].
+  AdvancedUserQueryBuilder zipCodeEndsWith(String value) {
+    _whereConditions.add('zip_code LIKE ?');
+    _whereArgs.add('%$value');
+    return this;
+  }
+
+  /// Filter where zipCode is null.
+  AdvancedUserQueryBuilder zipCodeIsNull() {
+    _whereConditions.add('zip_code IS NULL');
+    return this;
+  }
+
+  /// Filter where zipCode is not null.
+  AdvancedUserQueryBuilder zipCodeIsNotNull() {
+    _whereConditions.add('zip_code IS NOT NULL');
+    return this;
+  }
+
+  /// Filter where age equals [value].
+  AdvancedUserQueryBuilder ageEqualTo(int? value) {
+    _whereConditions.add('age = ?');
+    _whereArgs.add(value);
+    return this;
+  }
+
+  /// Filter where age is greater than [value].
+  AdvancedUserQueryBuilder ageGreaterThan(int value) {
+    _whereConditions.add('age > ?');
+    _whereArgs.add(value);
+    return this;
+  }
+
+  /// Filter where age is less than [value].
+  AdvancedUserQueryBuilder ageLessThan(int value) {
+    _whereConditions.add('age < ?');
+    _whereArgs.add(value);
+    return this;
+  }
+
+  /// Filter where age is between [min] and [max].
+  AdvancedUserQueryBuilder ageBetween(int min, int max) {
+    _whereConditions.add('age BETWEEN ? AND ?');
+    _whereArgs.add(min);
+    _whereArgs.add(max);
+    return this;
+  }
+
+  /// Filter where age is null.
+  AdvancedUserQueryBuilder ageIsNull() {
+    _whereConditions.add('age IS NULL');
+    return this;
+  }
+
+  /// Filter where age is not null.
+  AdvancedUserQueryBuilder ageIsNotNull() {
+    _whereConditions.add('age IS NOT NULL');
+    return this;
+  }
+
+  /// Filter where city equals [value].
+  AdvancedUserQueryBuilder cityEqualTo(String? value) {
+    _whereConditions.add('city = ?');
+    _whereArgs.add(value);
+    return this;
+  }
+
+  /// Filter where city contains [value].
+  AdvancedUserQueryBuilder cityContains(String value) {
+    _whereConditions.add('city LIKE ?');
+    _whereArgs.add('%$value%');
+    return this;
+  }
+
+  /// Filter where city starts with [value].
+  AdvancedUserQueryBuilder cityStartsWith(String value) {
+    _whereConditions.add('city LIKE ?');
+    _whereArgs.add('$value%');
+    return this;
+  }
+
+  /// Filter where city ends with [value].
+  AdvancedUserQueryBuilder cityEndsWith(String value) {
+    _whereConditions.add('city LIKE ?');
+    _whereArgs.add('%$value');
+    return this;
+  }
+
+  /// Filter where city is null.
+  AdvancedUserQueryBuilder cityIsNull() {
+    _whereConditions.add('city IS NULL');
+    return this;
+  }
+
+  /// Filter where city is not null.
+  AdvancedUserQueryBuilder cityIsNotNull() {
+    _whereConditions.add('city IS NOT NULL');
     return this;
   }
 
@@ -247,15 +500,87 @@ class AdvancedUserQueryBuilder {
     return this;
   }
 
-  /// Sort by fullname in ascending order.
-  AdvancedUserQueryBuilder sortByFullnameAsc() {
-    _orderBy = 'fullname ASC';
+  /// Sort by name in ascending order.
+  AdvancedUserQueryBuilder sortByNameAsc() {
+    _orderBy = 'name ASC';
     return this;
   }
 
-  /// Sort by fullname in descending order.
-  AdvancedUserQueryBuilder sortByFullnameDesc() {
-    _orderBy = 'fullname DESC';
+  /// Sort by name in descending order.
+  AdvancedUserQueryBuilder sortByNameDesc() {
+    _orderBy = 'name DESC';
+    return this;
+  }
+
+  /// Sort by phoneNumber in ascending order.
+  AdvancedUserQueryBuilder sortByPhoneNumberAsc() {
+    _orderBy = 'phone_number ASC';
+    return this;
+  }
+
+  /// Sort by phoneNumber in descending order.
+  AdvancedUserQueryBuilder sortByPhoneNumberDesc() {
+    _orderBy = 'phone_number DESC';
+    return this;
+  }
+
+  /// Sort by address in ascending order.
+  AdvancedUserQueryBuilder sortByAddressAsc() {
+    _orderBy = 'address ASC';
+    return this;
+  }
+
+  /// Sort by address in descending order.
+  AdvancedUserQueryBuilder sortByAddressDesc() {
+    _orderBy = 'address DESC';
+    return this;
+  }
+
+  /// Sort by country in ascending order.
+  AdvancedUserQueryBuilder sortByCountryAsc() {
+    _orderBy = 'country ASC';
+    return this;
+  }
+
+  /// Sort by country in descending order.
+  AdvancedUserQueryBuilder sortByCountryDesc() {
+    _orderBy = 'country DESC';
+    return this;
+  }
+
+  /// Sort by zipCode in ascending order.
+  AdvancedUserQueryBuilder sortByZipCodeAsc() {
+    _orderBy = 'zip_code ASC';
+    return this;
+  }
+
+  /// Sort by zipCode in descending order.
+  AdvancedUserQueryBuilder sortByZipCodeDesc() {
+    _orderBy = 'zip_code DESC';
+    return this;
+  }
+
+  /// Sort by age in ascending order.
+  AdvancedUserQueryBuilder sortByAgeAsc() {
+    _orderBy = 'age ASC';
+    return this;
+  }
+
+  /// Sort by age in descending order.
+  AdvancedUserQueryBuilder sortByAgeDesc() {
+    _orderBy = 'age DESC';
+    return this;
+  }
+
+  /// Sort by city in ascending order.
+  AdvancedUserQueryBuilder sortByCityAsc() {
+    _orderBy = 'city ASC';
+    return this;
+  }
+
+  /// Sort by city in descending order.
+  AdvancedUserQueryBuilder sortByCityDesc() {
+    _orderBy = 'city DESC';
     return this;
   }
 
@@ -406,7 +731,13 @@ class AdvancedUserQueryBuilder {
   AdvancedUser _fromMap(Map<String, Object?> map) {
     return AdvancedUser(
       id: map['id'] as int?,
-      fullname: map['fullname'] as String,
+      name: map['name'] as String,
+      phoneNumber: map['phone_number'] as String?,
+      address: map['address'] as String?,
+      country: map['country'] as String?,
+      zipCode: map['zip_code'] as String?,
+      age: map['age'] as int?,
+      city: map['city'] as String?,
       loginDuration: map['login_duration'] != null
           ? Duration(milliseconds: map['login_duration'] as int)
           : null,
@@ -434,7 +765,13 @@ class AdvancedUserRepository {
   /// Returns the ID of the inserted row.
   Future<int?> insert(AdvancedUser entity) async {
     final id = await NativeSqlite.insert(databaseName, 'advanced_users', {
-      'fullname': entity.fullname,
+      'name': entity.name,
+      'phone_number': entity.phoneNumber,
+      'address': entity.address,
+      'country': entity.country,
+      'zip_code': entity.zipCode,
+      'age': entity.age,
+      'city': entity.city,
       'login_duration': entity.loginDuration?.inMilliseconds,
       'profile_url': entity.profileUrl?.toString(),
       'score': entity.score,
@@ -478,7 +815,13 @@ class AdvancedUserRepository {
       databaseName,
       'advanced_users',
       {
-        'fullname': entity.fullname,
+        'name': entity.name,
+        'phone_number': entity.phoneNumber,
+        'address': entity.address,
+        'country': entity.country,
+        'zip_code': entity.zipCode,
+        'age': entity.age,
+        'city': entity.city,
         'login_duration': entity.loginDuration?.inMilliseconds,
         'profile_url': entity.profileUrl?.toString(),
         'score': entity.score,
@@ -540,7 +883,13 @@ class AdvancedUserRepository {
   AdvancedUser _fromMap(Map<String, Object?> map) {
     return AdvancedUser(
       id: map['id'] as int?,
-      fullname: map['fullname'] as String,
+      name: map['name'] as String,
+      phoneNumber: map['phone_number'] as String?,
+      address: map['address'] as String?,
+      country: map['country'] as String?,
+      zipCode: map['zip_code'] as String?,
+      age: map['age'] as int?,
+      city: map['city'] as String?,
       loginDuration: map['login_duration'] != null
           ? Duration(milliseconds: map['login_duration'] as int)
           : null,

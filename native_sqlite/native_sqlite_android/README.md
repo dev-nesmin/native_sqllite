@@ -33,7 +33,7 @@ Migration_X_Y.kt         ← migration stub (addColumn, renameTable, migrateTabl
 native_sqlite:
   android:
     enabled: true
-    output_path: '../native_sqlite_android/android/src/main/kotlin/generated'
+    output_path: 'android/app/src/main/kotlin/com/example/myapp/generated'
     package: 'com.example.myapp.generated'
     generate_helpers: true
 ```

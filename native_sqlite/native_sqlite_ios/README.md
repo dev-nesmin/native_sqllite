@@ -33,7 +33,7 @@ Migration_X_Y.swift         ← migration stub (addColumn, renameTable, migrateT
 native_sqlite:
   ios:
     enabled: true
-    output_path: '../native_sqlite_ios/ios/Classes/Generated'
+    output_path: 'ios/Runner/Generated'
     generate_helpers: true
 ```
 

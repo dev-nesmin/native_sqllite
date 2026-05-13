@@ -417,13 +417,13 @@ native_sqlite:
 
   android:
     enabled: true
-    output_path: '../native_sqlite_android/android/src/main/kotlin/generated'
+    output_path: 'android/app/src/main/kotlin/com/example/myapp/generated'
     package: 'com.example.myapp.generated'
     generate_helpers: true  # generate XxxHelper.kt alongside XxxSchema.kt
 
   ios:
     enabled: true
-    output_path: '../native_sqlite_ios/ios/Classes/Generated'
+    output_path: 'ios/Runner/Generated'
     generate_helpers: true
 ```
 

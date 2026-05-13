@@ -133,6 +133,80 @@ class NativeCodeGenerator {
     }
   }
 
+  /// Called from within build_runner (via NativeCodeBuilder).
+  /// Accepts the schema JSON content that the build system already read so we
+  /// never touch dart:io for reading — the file may not be on disk yet during
+  /// a build session even though build_to:source is set.
+  Future<void> generateFromSchemaContent(String schemaJson) async {
+    final config = await NativeSqliteConfig.load();
+
+    if (config == null) {
+      logger.warning('⚠️  No native_sqlite configuration found.');
+      return;
+    }
+
+    if (!config.generateNative) {
+      logger.info(
+        'ℹ️  Native code generation is disabled (generate_native: false)',
+      );
+      return;
+    }
+
+    final schemas = _parseSchemasFromJson(schemaJson);
+
+    if (schemas.isEmpty) {
+      logger.warning('⚠️  No valid schemas found in schema JSON.');
+      return;
+    }
+
+    logger.info(
+      '   Loaded ${schemas.length} schema(s): ${schemas.map((s) => s.className).join(", ")}',
+    );
+
+    final generatedFiles = <String>[];
+
+    if (config.android.enabled) {
+      generatedFiles.addAll(await _generateAndroid(
+        schemas,
+        config.android,
+        config.databaseName,
+        config.schemaVersion,
+        config.includeExamples,
+      ));
+    }
+
+    if (config.ios.enabled) {
+      generatedFiles.addAll(await _generateIos(
+        schemas,
+        config.ios,
+        config.databaseName,
+        config.schemaVersion,
+        config.includeExamples,
+      ));
+    }
+
+    logger.info('📊 Generated ${generatedFiles.length} native file(s)');
+  }
+
+  List<TableSchemaSnapshot> _parseSchemasFromJson(String content) {
+    final schemas = <TableSchemaSnapshot>[];
+    try {
+      final jsonData = json.decode(content) as Map<String, dynamic>;
+      if (jsonData.containsKey('schemas')) {
+        for (final schemaJson in jsonData['schemas'] as List) {
+          schemas.add(
+            TableSchemaSnapshot.fromJson(schemaJson as Map<String, dynamic>),
+          );
+        }
+      } else {
+        schemas.add(TableSchemaSnapshot.fromJson(jsonData));
+      }
+    } catch (e) {
+      logger.warning('⚠️  Failed to parse schema JSON: $e');
+    }
+    return schemas;
+  }
+
   Future<List<File>> _findSchemaFiles() async {
     // Check for schema file in lib/generated/ (same location as database_manager.dart)
     final schemaFile = File('lib/generated/native_sqlite_schema.json');

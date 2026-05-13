@@ -42,16 +42,19 @@ class NativeCodeBuilder implements Builder {
       return;
     }
 
-    // Touch the asset so the build system registers the read dependency.
-    await buildStep.readAsString(schemaAsset);
+    // Read through the build system — this declares the dependency on migration
+    // and gives us the content without any dart:io timing uncertainty.
+    final schemaJson = await buildStep.readAsString(schemaAsset);
 
     log.info('');
     log.info('🔧 Running native code generation...');
 
     try {
       final generator = NativeCodeGenerator();
-      // runBuildRunner: false — we are already inside a build_runner run.
-      await generator.generate(runBuildRunner: false);
+      // Pass the already-read schema content so the generator never touches
+      // dart:io for reading (the file may not be flushed to disk yet during
+      // a build session even though build_to:source is configured).
+      await generator.generateFromSchemaContent(schemaJson);
 
       log.info('✓ Native code generation completed');
       log.info('');

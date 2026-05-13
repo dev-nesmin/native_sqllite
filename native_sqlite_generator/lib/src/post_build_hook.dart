@@ -12,12 +12,12 @@ class NativeCodePostProcessBuilder implements PostProcessBuilder {
   static DateTime? _lastRunTime;
 
   @override
-  final inputExtensions = const ['.table.g.dart'];
+  final inputExtensions = const ['.table.dart'];
 
   @override
   FutureOr<void> build(PostProcessBuildStep buildStep) async {
     // Only trigger on generated table files
-    if (!buildStep.inputId.path.endsWith('.table.g.dart')) {
+    if (!buildStep.inputId.path.endsWith('.table.dart')) {
       return;
     }
 
@@ -65,12 +65,18 @@ class NativeCodePostProcessBuilder implements PostProcessBuilder {
   }
 
   Future<bool> _shouldGenerateNativeCode() async {
-    // Check for configuration
+    // Prefer native_sqlite_config.yaml, fall back to pubspec.yaml
+    final configFile = File('native_sqlite_config.yaml');
+    if (await configFile.exists()) {
+      final content = await configFile.readAsString();
+      return content.contains('generate_native:') &&
+          content.contains('generate_native: true');
+    }
+
     final pubspecFile = File('pubspec.yaml');
     if (!await pubspecFile.exists()) {
       return false;
     }
-
     final content = await pubspecFile.readAsString();
     return content.contains('native_sqlite:') &&
         content.contains('generate_native: true');

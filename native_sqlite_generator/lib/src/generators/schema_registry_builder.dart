@@ -41,6 +41,14 @@ class SchemaRegistryBuilder implements Builder {
     final tables = <TableInfo>[];
     final tableFiles = <String, String>{};
 
+    // Read schema via build system to declare dependency on migration builder
+    // and avoid dart:io timing issues (file may not be flushed to disk yet).
+    final schemaAsset = AssetId(packageName, 'lib/generated/native_sqlite_schema.json');
+    String? schemaContent;
+    if (await buildStep.canRead(schemaAsset)) {
+      schemaContent = await buildStep.readAsString(schemaAsset);
+    }
+
     // Scan all Dart files for @DbTable annotations
     final dartFiles = Glob('lib/**.dart');
     final assets = await buildStep.findAssets(dartFiles).toList();
@@ -92,7 +100,7 @@ class SchemaRegistryBuilder implements Builder {
     log.info('✅ Found ${tables.length} tables');
 
     final sortedTables = _topologicalSort(tables);
-    final code = _generateCode(sortedTables, tableFiles, packageName);
+    final code = _generateCode(sortedTables, tableFiles, packageName, schemaContent);
 
     // Write to fixed location: lib/generated/database_manager.dart
     await buildStep.writeAsString(
@@ -140,6 +148,7 @@ class SchemaRegistryBuilder implements Builder {
     List<TableInfo> tables,
     Map<String, String> tableFiles,
     String packageName,
+    String? schemaContent,
   ) {
     final buffer = StringBuffer();
 
@@ -153,7 +162,7 @@ class SchemaRegistryBuilder implements Builder {
 
     // Load migrations from schema file at build time
     final migrations = _loadMigrationsFromSchema();
-    final deletedTableNames = _loadDeletedTablesFromSchema();
+    final deletedTableNames = _loadDeletedTablesFromSchema(schemaContent);
     buffer.writeln("import 'package:flutter/foundation.dart';");
     buffer.writeln("import 'package:native_sqlite/native_sqlite.dart';");
     buffer.writeln();
@@ -434,23 +443,14 @@ class SchemaRegistryBuilder implements Builder {
     }
   }
 
-  /// Load deleted table names from schema JSON at build time
-  List<String> _loadDeletedTablesFromSchema() {
+  /// Load deleted table names from schema JSON at build time.
+  /// [schemaContent] is read via the build system; if null the schema isn't
+  /// ready yet (first build) and we return [] silently.
+  List<String> _loadDeletedTablesFromSchema(String? schemaContent) {
+    if (schemaContent == null) return [];
     try {
-      final file = File(options.schemaOutputPath);
-      if (!file.existsSync()) {
-        log.warning(
-          '⚠️  Schema file not found at ${options.schemaOutputPath}. '
-          'Run build_runner at least once to generate it, or set '
-          'schema_output_path in build.yaml if you use a custom path.',
-        );
-        return [];
-      }
-
-      final content = file.readAsStringSync();
-      final json = jsonDecode(content) as Map<String, dynamic>;
+      final json = jsonDecode(schemaContent) as Map<String, dynamic>;
       final deleted = json['deletedTables'] as List? ?? [];
-
       return deleted
           .cast<Map<String, dynamic>>()
           .map((t) => t['tableName'] as String)

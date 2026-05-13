@@ -10,13 +10,14 @@ Write annotated Dart model classes and let the generator produce repositories, q
 
 ```
 native_sqllite/
-├── native_sqlite/                   ← Main package  (add this to your app)
+├── native_sqlite/
+│   ├── native_sqlite/               ← Main package  (add this to your app)
+│   ├── native_sqlite_android/       ← Android (Kotlin) implementation
+│   ├── native_sqlite_ios/           ← iOS (Swift) implementation
+│   ├── native_sqlite_web/           ← Web (sqlite3 WASM) implementation
+│   └── native_sqlite_platform_interface/ ← Platform abstraction layer
 ├── native_sqlite_annotations/       ← Annotation definitions
 ├── native_sqlite_generator/         ← build_runner code generator
-├── native_sqlite_platform_interface/ ← Platform abstraction layer
-├── native_sqlite_android/           ← Android (Kotlin) implementation
-├── native_sqlite_ios/               ← iOS (Swift) implementation
-├── native_sqlite_web/               ← Web implementation
 └── native_sqlite_inspector/         ← DevTools-style database inspector
 ```
 

@@ -186,7 +186,7 @@ class SchemaRegistryBuilder implements Builder {
     );
     buffer.writeln('    try {');
     buffer.writeln(
-      '      final file = File(\'lib/generated/native_sqlite_schema.json\');',
+      "      final file = File('${options.schemaOutputPath}');",
     );
     buffer.writeln('      if (!file.existsSync()) return 0;');
     buffer.writeln('      final content = file.readAsStringSync();');
@@ -437,8 +437,15 @@ class SchemaRegistryBuilder implements Builder {
   /// Load deleted table names from schema JSON at build time
   List<String> _loadDeletedTablesFromSchema() {
     try {
-      final file = File('lib/generated/native_sqlite_schema.json');
-      if (!file.existsSync()) return [];
+      final file = File(options.schemaOutputPath);
+      if (!file.existsSync()) {
+        log.warning(
+          '⚠️  Schema file not found at ${options.schemaOutputPath}. '
+          'Run build_runner at least once to generate it, or set '
+          'schema_output_path in build.yaml if you use a custom path.',
+        );
+        return [];
+      }
 
       final content = file.readAsStringSync();
       final json = jsonDecode(content) as Map<String, dynamic>;

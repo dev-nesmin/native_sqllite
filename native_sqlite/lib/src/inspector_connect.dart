@@ -112,49 +112,10 @@ class InspectorConnect {
         for (final name in _databases) {
           final path = await NativeSqlite.getDatabasePath(name);
           if (path != null) {
-            // Get tables for this database
-            final tablesResult = await NativeSqlite.query(
-              name,
-              "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'",
-            );
-
-            final tables = <Map<String, dynamic>>[];
-            for (final row in tablesResult.toMapList()) {
-              final tableName = row['name'] as String;
-              // Get table info
-              final columnsResult = await NativeSqlite.query(
-                name,
-                "PRAGMA table_info($tableName)",
-              );
-
-              final columns = columnsResult
-                  .toMapList()
-                  .map(
-                    (c) => {
-                      'name': c['name'],
-                      'type': c['type'],
-                      'nullable': c['notnull'] == 0,
-                      'defaultValue': c['dflt_value'],
-                      'primaryKey': c['pk'] == 1,
-                    },
-                  )
-                  .toList();
-
-              tables.add({
-                'name': tableName,
-                'columns': columns,
-                'indexes': await _getIndexes(name, tableName),
-                'primaryKey': columns.firstWhere(
-                  (c) => c['primaryKey'] == true,
-                  orElse: () => {},
-                )['name'],
-              });
-            }
-
             dbs.add({
               'name': name,
               'path': path,
-              'tables': tables,
+              'tables': await _getTablesForDatabase(name),
               'size': await _getDatabaseSize(name),
             });
           }
@@ -170,14 +131,40 @@ class InspectorConnect {
       }
     });
 
-    // Get Schema (reused logic from listDatabases for now, but specific to one db if needed)
+    // Get Schema for a specific database
     developer.registerExtension('ext.native_sqlite.getSchema', (
       method,
       parameters,
     ) async {
-      return developer.ServiceExtensionResponse.result(
-        jsonEncode({'result': {}}),
-      );
+      try {
+        final argsJson = parameters['args'];
+        if (argsJson == null) {
+          return developer.ServiceExtensionResponse.error(
+            developer.ServiceExtensionResponse.invalidParams,
+            'Missing args parameter',
+          );
+        }
+
+        final args = jsonDecode(argsJson) as Map<String, dynamic>;
+        final database = args['database'] as String?;
+
+        if (database == null || !_databases.contains(database)) {
+          return developer.ServiceExtensionResponse.error(
+            developer.ServiceExtensionResponse.invalidParams,
+            'Missing or unknown database parameter',
+          );
+        }
+
+        final tables = await _getTablesForDatabase(database);
+        return developer.ServiceExtensionResponse.result(
+          jsonEncode({'result': tables}),
+        );
+      } catch (e) {
+        return developer.ServiceExtensionResponse.error(
+          developer.ServiceExtensionResponse.extensionError,
+          e.toString(),
+        );
+      }
     });
 
     // Execute Query
@@ -318,19 +305,16 @@ class InspectorConnect {
         final id = args['id'];
         final values = Map<String, Object?>.from(args['values'] as Map);
 
-        // Find primary key name (assuming 'id' for now or need to fetch schema)
-        // For simplicity, let's assume the primary key is passed or we can infer it?
-        // The inspector usually knows the PK. But here we just get 'id'.
-        // Let's assume standard 'id' or try to find it.
-        // Actually, let's just use the 'id' value and assume the column is 'id' or 'rowid' if not specified.
-        // Better: The inspector should probably pass the PK column name, but if not, we might need to look it up.
-        // For this implementation, let's assume 'id' column.
+        // Use pkColumn from args if provided; otherwise look it up via PRAGMA.
+        final pkColumn =
+            args['pkColumn'] as String? ??
+            await _getPrimaryKeyColumn(database, table);
 
         await NativeSqlite.update(
           database,
           table,
           values,
-          where: 'id = ?',
+          where: '$pkColumn = ?',
           whereArgs: [id],
         );
         _notifyDataChanged();
@@ -362,10 +346,15 @@ class InspectorConnect {
         final table = args['table'] as String;
         final id = args['id'];
 
+        // Use pkColumn from args if provided; otherwise look it up via PRAGMA.
+        final pkColumn =
+            args['pkColumn'] as String? ??
+            await _getPrimaryKeyColumn(database, table);
+
         await NativeSqlite.delete(
           database,
           table,
-          where: 'id = ?',
+          where: '$pkColumn = ?',
           whereArgs: [id],
         );
         _notifyDataChanged();
@@ -383,6 +372,67 @@ class InspectorConnect {
 
   static void _notifyDataChanged() {
     developer.postEvent('ext.native_sqlite.data_changed', {});
+  }
+
+  /// Returns the primary-key column name for [table], falling back to `'id'`.
+  static Future<String> _getPrimaryKeyColumn(
+    String database,
+    String table,
+  ) async {
+    try {
+      final result = await NativeSqlite.query(
+        database,
+        'PRAGMA table_info($table)',
+      );
+      for (final row in result.toMapList()) {
+        if (row['pk'] == 1) {
+          return row['name'] as String;
+        }
+      }
+    } catch (_) {}
+    return 'id';
+  }
+
+  static Future<List<Map<String, dynamic>>> _getTablesForDatabase(
+    String name,
+  ) async {
+    final tablesResult = await NativeSqlite.query(
+      name,
+      "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'",
+    );
+
+    final tables = <Map<String, dynamic>>[];
+    for (final row in tablesResult.toMapList()) {
+      final tableName = row['name'] as String;
+      final columnsResult = await NativeSqlite.query(
+        name,
+        'PRAGMA table_info($tableName)',
+      );
+
+      final columns = columnsResult
+          .toMapList()
+          .map(
+            (c) => {
+              'name': c['name'],
+              'type': c['type'],
+              'nullable': c['notnull'] == 0,
+              'defaultValue': c['dflt_value'],
+              'primaryKey': c['pk'] == 1,
+            },
+          )
+          .toList();
+
+      tables.add({
+        'name': tableName,
+        'columns': columns,
+        'indexes': await _getIndexes(name, tableName),
+        'primaryKey': columns.firstWhere(
+          (c) => c['primaryKey'] == true,
+          orElse: () => {},
+        )['name'],
+      });
+    }
+    return tables;
   }
 
   static Future<List<String>> _getIndexes(

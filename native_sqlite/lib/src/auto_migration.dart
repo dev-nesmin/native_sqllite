@@ -94,9 +94,14 @@ class AutoMigration {
         }
       }
 
-      // Add new tables - CREATE TABLE IF NOT EXISTS is safe
+      // Add new tables - replace CREATE TABLE with CREATE TABLE IF NOT EXISTS
       for (final tableName in tableNames) {
-        statements.add('CREATE TABLE IF NOT EXISTS ${tables[tableName]}');
+        statements.add(
+          tables[tableName]!.replaceFirst(
+            'CREATE TABLE ',
+            'CREATE TABLE IF NOT EXISTS ',
+          ),
+        );
       }
     }
 

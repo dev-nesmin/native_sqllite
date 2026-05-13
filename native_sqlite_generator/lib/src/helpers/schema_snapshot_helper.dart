@@ -33,6 +33,8 @@ class SchemaSnapshotHelper {
       foreignKey: column.foreignKeyTable != null
           ? '${column.foreignKeyTable}.${column.foreignKeyColumn}'
           : null,
+      foreignKeyOnDelete: column.foreignKeyOnDelete,
+      foreignKeyOnUpdate: column.foreignKeyOnUpdate,
       isJsonField: column.isJsonField,
       hasConverter: column.hasConverter,
       dartType: column.dartType.getDisplayString(),

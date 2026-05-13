@@ -60,6 +60,10 @@ class GeneratorOptions {
   /// Output path for generated DatabaseManager and schema files (relative to lib/)
   final String outputPath;
 
+  /// Path to the generated schema JSON file, used to read the schema version
+  /// at build time. Configurable via `schema_output_path` in build.yaml.
+  final String schemaOutputPath;
+
   const GeneratorOptions({
     this.format = true,
     this.generateHelpers = true,
@@ -83,6 +87,7 @@ class GeneratorOptions {
     this.verbose = false,
     this.defaultDatabase,
     this.outputPath = '',
+    this.schemaOutputPath = 'lib/generated/native_sqlite_schema.json',
   });
 
   /// Creates a [GeneratorOptions] instance from [BuilderOptions].
@@ -116,6 +121,8 @@ class GeneratorOptions {
       verbose: config['verbose'] as bool? ?? false,
       defaultDatabase: config['default_database'] as String?,
       outputPath: config['output_path'] as String? ?? '',
+      schemaOutputPath: config['schema_output_path'] as String? ??
+          'lib/generated/native_sqlite_schema.json',
     );
   }
 
@@ -145,6 +152,7 @@ class GeneratorOptions {
     'verbose': verbose,
     'default_database': defaultDatabase,
     'output_path': outputPath,
+    'schema_output_path': schemaOutputPath,
   };
 
   @override

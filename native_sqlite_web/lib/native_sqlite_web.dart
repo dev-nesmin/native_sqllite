@@ -1,7 +1,22 @@
+import 'dart:js_interop';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter_web_plugins/flutter_web_plugins.dart';
 import 'package:native_sqlite_platform_interface/native_sqlite_platform_interface.dart';
 import 'package:sqlite3/sqlite3.dart' hide DatabaseConfig;
 import 'package:sqlite3/wasm.dart' hide DatabaseConfig;
+
+// JS interop bindings for IndexedDB deletion.
+@JS('window')
+external _JsWindow get _jsWindow;
+
+extension type _JsWindow._(JSObject _) implements JSObject {
+  external _JsIdbFactory? get indexedDB;
+}
+
+extension type _JsIdbFactory._(JSObject _) implements JSObject {
+  external JSObject deleteDatabase(String name);
+}
 
 /// The Web implementation of [NativeSqlitePlatform].
 ///
@@ -56,13 +71,16 @@ class NativeSqliteWeb extends NativeSqlitePlatform {
         db.execute('PRAGMA foreign_keys = ON');
       }
 
-      // WAL mode is not fully supported on web, but we can use memory mode
-      // which provides similar concurrency benefits
       if (config.enableWAL) {
+        if (kDebugMode) {
+          debugPrint(
+            'native_sqlite: WAL mode is not supported on web. '
+            'Falling back to MEMORY journal mode.',
+          );
+        }
         try {
           db.execute('PRAGMA journal_mode = MEMORY');
         } catch (_) {
-          // Fallback to DELETE mode if MEMORY is not available
           db.execute('PRAGMA journal_mode = DELETE');
         }
       }
@@ -287,20 +305,14 @@ class NativeSqliteWeb extends NativeSqlitePlatform {
 
   @override
   Future<void> deleteDatabase(String databaseName) async {
-    // Close if open
     await closeDatabase(databaseName);
 
-    await _ensureInitialized();
-
+    // Remove the persisted IndexedDB entry so the database does not
+    // reappear on the next page load.
     try {
-      // Delete the database file from IndexedDB
-      // Note: The sqlite3 web implementation stores databases in IndexedDB
-      // Opening and disposing removes the connection, but the file persists
-      // For a complete deletion, we would need to use the file system API
-      sqlite3.open(databaseName).dispose();
-    } catch (e) {
-      // Silently fail if database doesn't exist
-      // This matches the behavior of native platforms
+      _jsWindow.indexedDB?.deleteDatabase(databaseName);
+    } catch (_) {
+      // Ignore — IndexedDB may not be available or the entry may not exist.
     }
   }
 

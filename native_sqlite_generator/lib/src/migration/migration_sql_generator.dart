@@ -180,6 +180,18 @@ class MigrationSqlGenerator {
         parts.add('DEFAULT ${col['defaultValue']}');
       }
 
+      if (col['foreignKey'] != null) {
+        final fkParts = (col['foreignKey'] as String).split('.');
+        if (fkParts.length == 2) {
+          var fkClause = 'REFERENCES ${fkParts[0]}(${fkParts[1]})';
+          final onDelete = col['foreignKeyOnDelete'] as String?;
+          final onUpdate = col['foreignKeyOnUpdate'] as String?;
+          if (onDelete != null) fkClause += ' ON DELETE $onDelete';
+          if (onUpdate != null) fkClause += ' ON UPDATE $onUpdate';
+          parts.add(fkClause);
+        }
+      }
+
       columnDefs.add(parts.join(' '));
     }
 

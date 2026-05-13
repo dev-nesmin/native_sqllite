@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:yaml/yaml.dart';
@@ -43,6 +44,13 @@ class NativeSqliteConfig {
       return null;
     }
 
+    // Prefer an explicit schema_version from the YAML, then fall back to
+    // reading the version that build_runner wrote to the JSON snapshot.
+    final schemaVersion =
+        nativeConfig['schema_version'] as int? ??
+        await _readSchemaVersionFromJson() ??
+        1;
+
     return NativeSqliteConfig(
       generateNative: nativeConfig['generate_native'] ?? false,
       android: AndroidConfig.fromYaml(nativeConfig['android']),
@@ -53,9 +61,23 @@ class NativeSqliteConfig {
               .toList() ??
           [],
       databaseName: nativeConfig['database_name'] ?? 'app_db',
-      schemaVersion: nativeConfig['schema_version'] ?? 1,
+      schemaVersion: schemaVersion,
       includeExamples: nativeConfig['include_examples'] ?? true,
     );
+  }
+
+  /// Reads the schema version from the generated JSON snapshot produced by
+  /// build_runner, so native code generation automatically tracks migrations.
+  static Future<int?> _readSchemaVersionFromJson() async {
+    try {
+      final file = File('lib/generated/native_sqlite_schema.json');
+      if (!file.existsSync()) return null;
+      final decoded =
+          jsonDecode(await file.readAsString()) as Map<String, dynamic>;
+      return decoded['schemaVersion'] as int?;
+    } catch (_) {
+      return null;
+    }
   }
 }
 

@@ -134,6 +134,12 @@ class ColumnSchemaSnapshot {
   /// Foreign key reference (table.column)
   final String? foreignKey;
 
+  /// ON DELETE action for the foreign key (e.g. 'CASCADE', 'SET NULL')
+  final String? foreignKeyOnDelete;
+
+  /// ON UPDATE action for the foreign key (e.g. 'CASCADE', 'RESTRICT')
+  final String? foreignKeyOnUpdate;
+
   /// Whether this is a JSON field
   final bool isJsonField;
 
@@ -153,6 +159,8 @@ class ColumnSchemaSnapshot {
     required this.unique,
     this.defaultValue,
     this.foreignKey,
+    this.foreignKeyOnDelete,
+    this.foreignKeyOnUpdate,
     required this.isJsonField,
     required this.hasConverter,
     required this.dartType,
@@ -170,6 +178,8 @@ class ColumnSchemaSnapshot {
       'unique': unique,
       if (defaultValue != null) 'defaultValue': defaultValue,
       if (foreignKey != null) 'foreignKey': foreignKey,
+      if (foreignKeyOnDelete != null) 'foreignKeyOnDelete': foreignKeyOnDelete,
+      if (foreignKeyOnUpdate != null) 'foreignKeyOnUpdate': foreignKeyOnUpdate,
       'isJsonField': isJsonField,
       'hasConverter': hasConverter,
       'dartType': dartType,
@@ -188,6 +198,8 @@ class ColumnSchemaSnapshot {
       unique: json['unique'] as bool,
       defaultValue: json['defaultValue'] as String?,
       foreignKey: json['foreignKey'] as String?,
+      foreignKeyOnDelete: json['foreignKeyOnDelete'] as String?,
+      foreignKeyOnUpdate: json['foreignKeyOnUpdate'] as String?,
       isJsonField: json['isJsonField'] as bool,
       hasConverter: json['hasConverter'] as bool,
       dartType: json['dartType'] as String,

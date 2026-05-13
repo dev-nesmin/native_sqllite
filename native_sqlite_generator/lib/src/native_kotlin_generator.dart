@@ -770,6 +770,135 @@ class NativeKotlinGenerator {
     return accessor;
   }
 
+  String generateDatabaseManager(
+    List<TableSchemaSnapshot> schemas,
+    int schemaVersion,
+  ) {
+    final buffer = StringBuffer();
+
+    buffer.writeln('package $packageName');
+    buffer.writeln();
+    buffer.writeln('import android.content.Context');
+    buffer.writeln('import dev.nesmin.native_sqlite.DatabaseConfig');
+    buffer.writeln('import dev.nesmin.native_sqlite.NativeSqliteManager');
+    buffer.writeln('import $packageName.migrations.SchemaVersionManager');
+    buffer.writeln();
+    buffer.writeln('/**');
+    buffer.writeln(' * Auto-generated native database manager.');
+    buffer.writeln(
+      ' * Mirrors DatabaseManager.dart — call DatabaseManager.init() from',
+    );
+    buffer.writeln(
+      ' * native Android code (WorkManager, Services, App Widgets).',
+    );
+    buffer.writeln(' * AUTO-GENERATED - DO NOT EDIT MANUALLY');
+    buffer.writeln(' */');
+    buffer.writeln('object DatabaseManager {');
+    buffer.writeln();
+    buffer.writeln('    private var initialized = false');
+    buffer.writeln('    private var currentDatabaseName: String? = null');
+    buffer.writeln();
+    buffer.writeln('    val onCreateStatements: List<String> = listOf(');
+    for (final schema in schemas) {
+      buffer.writeln('        ${schema.className}Schema.CREATE_TABLE_SQL,');
+    }
+    buffer.writeln('    )');
+    buffer.writeln();
+    buffer.writeln('    val tableNames: List<String> = listOf(');
+    for (final schema in schemas) {
+      buffer.writeln('        "${schema.tableName}",');
+    }
+    buffer.writeln('    )');
+    buffer.writeln();
+    buffer.writeln('    /**');
+    buffer.writeln('     * Initialize the database.');
+    buffer.writeln(
+      '     * Creates tables on first run and runs pending migrations.',
+    );
+    buffer.writeln('     *');
+    buffer.writeln('     * @param context Android application context');
+    buffer.writeln(
+      '     * @param name Database name (default: "$databaseName")',
+    );
+    buffer.writeln(
+      '     * @param enableWAL Enable Write-Ahead Logging for better concurrency',
+    );
+    buffer.writeln(
+      '     * @param enableForeignKeys Enable foreign key constraints',
+    );
+    buffer.writeln('     */');
+    buffer.writeln('    fun init(');
+    buffer.writeln('        context: Context,');
+    buffer.writeln('        name: String = "$databaseName",');
+    buffer.writeln('        enableWAL: Boolean = true,');
+    buffer.writeln('        enableForeignKeys: Boolean = true,');
+    buffer.writeln('    ) {');
+    buffer.writeln('        if (initialized) {');
+    buffer.writeln(
+      '            android.util.Log.d("DatabaseManager", "Already initialized")',
+    );
+    buffer.writeln('            return');
+    buffer.writeln('        }');
+    buffer.writeln();
+    buffer.writeln('        try {');
+    buffer.writeln('            NativeSqliteManager.Instance.initialize(context)');
+    buffer.writeln();
+    buffer.writeln(
+      '            NativeSqliteManager.Instance.openDatabase(',
+    );
+    buffer.writeln('                DatabaseConfig(');
+    buffer.writeln('                    name = name,');
+    buffer.writeln(
+      '                    version = SchemaVersionManager.CURRENT_VERSION,',
+    );
+    buffer.writeln('                    onCreate = onCreateStatements,');
+    buffer.writeln('                    onUpgrade = null,');
+    buffer.writeln('                    enableWAL = enableWAL,');
+    buffer.writeln('                    enableForeignKeys = enableForeignKeys,');
+    buffer.writeln('                )');
+    buffer.writeln('            )');
+    buffer.writeln();
+    buffer.writeln(
+      '            SchemaVersionManager.migrate(name)',
+    );
+    buffer.writeln();
+    buffer.writeln('            currentDatabaseName = name');
+    buffer.writeln('            initialized = true');
+    buffer.writeln(
+      '            android.util.Log.d("DatabaseManager", "✅ Initialized (v\${SchemaVersionManager.CURRENT_VERSION})")',
+    );
+    buffer.writeln('        } catch (e: Exception) {');
+    buffer.writeln(
+      '            android.util.Log.e("DatabaseManager", "❌ Init failed: \${e.message}", e)',
+    );
+    buffer.writeln('            throw e');
+    buffer.writeln('        }');
+    buffer.writeln('    }');
+    buffer.writeln();
+    buffer.writeln('    fun close() {');
+    buffer.writeln(
+      '        currentDatabaseName?.let { NativeSqliteManager.Instance.closeDatabase(it) }',
+    );
+    buffer.writeln('        initialized = false');
+    buffer.writeln('        currentDatabaseName = null');
+    buffer.writeln('    }');
+    buffer.writeln();
+    buffer.writeln('    val isInitialized: Boolean get() = initialized');
+    buffer.writeln();
+    buffer.writeln('    val currentDatabase: String');
+    buffer.writeln('        get() {');
+    buffer.writeln(
+      '            check(initialized && currentDatabaseName != null) {',
+    );
+    buffer.writeln('                "Call DatabaseManager.init() first"');
+    buffer.writeln('            }');
+    buffer.writeln('            return currentDatabaseName!!');
+    buffer.writeln('        }');
+    buffer.writeln('}');
+
+    return buffer.toString();
+  }
+
   String _toSnakeCase(String input) {
     return input
         .replaceAllMapped(

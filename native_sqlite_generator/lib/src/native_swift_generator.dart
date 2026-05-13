@@ -875,6 +875,133 @@ class NativeSwiftGenerator {
     return accessor;
   }
 
+  String generateDatabaseManager(
+    List<TableSchemaSnapshot> schemas,
+    int schemaVersion,
+  ) {
+    final buffer = StringBuffer();
+
+    buffer.writeln('import Foundation');
+    buffer.writeln();
+    buffer.writeln('/**');
+    buffer.writeln(' * Auto-generated native database manager.');
+    buffer.writeln(
+      ' * Mirrors DatabaseManager.dart — call DatabaseManager.shared.initialize() from',
+    );
+    buffer.writeln(
+      ' * native iOS code (BGTaskScheduler, App Extensions, Share Extensions).',
+    );
+    buffer.writeln(' * AUTO-GENERATED - DO NOT EDIT MANUALLY');
+    buffer.writeln(' */');
+    buffer.writeln('public class DatabaseManager {');
+    buffer.writeln('    public static let shared = DatabaseManager()');
+    buffer.writeln();
+    buffer.writeln('    private var initialized = false');
+    buffer.writeln('    private var currentDatabaseName: String?');
+    buffer.writeln();
+    buffer.writeln('    private init() {}');
+    buffer.writeln();
+    buffer.writeln('    public static let onCreateStatements: [String] = [');
+    for (final schema in schemas) {
+      buffer.writeln('        ${schema.className}Schema.createTableSql,');
+    }
+    buffer.writeln('    ]');
+    buffer.writeln();
+    buffer.writeln('    public static let tableNames: [String] = [');
+    for (final schema in schemas) {
+      buffer.writeln('        "${schema.tableName}",');
+    }
+    buffer.writeln('    ]');
+    buffer.writeln();
+    buffer.writeln('    /**');
+    buffer.writeln('     * Initialize the database.');
+    buffer.writeln(
+      '     * Creates tables on first run and runs pending migrations.',
+    );
+    buffer.writeln('     *');
+    buffer.writeln(
+      '     * - Parameters:',
+    );
+    buffer.writeln(
+      '     *   - name: Database name (default: "$databaseName")',
+    );
+    buffer.writeln(
+      '     *   - enableWAL: Enable Write-Ahead Logging for better concurrency',
+    );
+    buffer.writeln(
+      '     *   - enableForeignKeys: Enable foreign key constraints',
+    );
+    buffer.writeln('     */');
+    buffer.writeln('    public func initialize(');
+    buffer.writeln('        name: String = "$databaseName",');
+    buffer.writeln('        enableWAL: Bool = true,');
+    buffer.writeln('        enableForeignKeys: Bool = true');
+    buffer.writeln('    ) throws {');
+    buffer.writeln('        guard !initialized else {');
+    buffer.writeln(
+      '            print("DatabaseManager: Already initialized")',
+    );
+    buffer.writeln('            return');
+    buffer.writeln('        }');
+    buffer.writeln();
+    buffer.writeln(
+      '        _ = try NativeSqliteManager.shared.openDatabase(config: DatabaseConfig(',
+    );
+    buffer.writeln('            name: name,');
+    buffer.writeln(
+      '            version: SchemaVersionManager.currentVersion,',
+    );
+    buffer.writeln(
+      '            onCreate: DatabaseManager.onCreateStatements,',
+    );
+    buffer.writeln('            onUpgrade: nil,');
+    buffer.writeln('            enableWAL: enableWAL,');
+    buffer.writeln('            enableForeignKeys: enableForeignKeys');
+    buffer.writeln('        ))');
+    buffer.writeln();
+    buffer.writeln(
+      '        try SchemaVersionManager.migrate(databaseName: name)',
+    );
+    buffer.writeln();
+    buffer.writeln('        currentDatabaseName = name');
+    buffer.writeln('        initialized = true');
+    buffer.writeln(
+      '        print("✅ DatabaseManager initialized (v\\(SchemaVersionManager.currentVersion))")',
+    );
+    buffer.writeln('    }');
+    buffer.writeln();
+    buffer.writeln('    public func close() throws {');
+    buffer.writeln('        if let name = currentDatabaseName {');
+    buffer.writeln(
+      '            try NativeSqliteManager.shared.closeDatabase(name: name)',
+    );
+    buffer.writeln('        }');
+    buffer.writeln('        initialized = false');
+    buffer.writeln('        currentDatabaseName = nil');
+    buffer.writeln('    }');
+    buffer.writeln();
+    buffer.writeln('    public var isInitialized: Bool { initialized }');
+    buffer.writeln();
+    buffer.writeln('    public var currentDatabase: String {');
+    buffer.writeln('        get throws {');
+    buffer.writeln(
+      '            guard initialized, let name = currentDatabaseName else {',
+    );
+    buffer.writeln(
+      '                throw NSError(domain: "DatabaseManager", code: -1,',
+    );
+    buffer.writeln(
+      '                    userInfo: [NSLocalizedDescriptionKey: "Call DatabaseManager.shared.initialize() first"])',
+    );
+    buffer.writeln('            }');
+    buffer.writeln('            return name');
+    buffer.writeln('        }');
+    buffer.writeln('    }');
+    buffer.writeln('}');
+
+    return buffer.toString();
+  }
+
   String _toSnakeCase(String input) {
     return input
         .replaceAllMapped(

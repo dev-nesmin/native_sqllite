@@ -288,21 +288,19 @@ class MigrationGenerator {
     );
     buffer.writeln();
     buffer.writeln(
-      '        val currentVersion = getCurrentVersion(databaseName)',
+      '        var version = getCurrentVersion(databaseName)',
     );
-    buffer.writeln('        if (currentVersion >= CURRENT_VERSION) return');
+    buffer.writeln('        if (version >= CURRENT_VERSION) return');
     buffer.writeln();
-    buffer.writeln('        // Add migration steps here');
-    buffer.writeln('        // when (currentVersion) {');
-    buffer.writeln('        //     0 -> {');
-    buffer.writeln('        //         Migration_0_1.migrate(databaseName)');
-    buffer.writeln('        //         logMigration(databaseName, 1)');
-    buffer.writeln('        //     }');
-    buffer.writeln('        //     1 -> {');
-    buffer.writeln('        //         Migration_1_2.migrate(databaseName)');
-    buffer.writeln('        //         logMigration(databaseName, 2)');
-    buffer.writeln('        //     }');
-    buffer.writeln('        // }');
+    buffer.writeln('        while (version < CURRENT_VERSION) {');
+    buffer.writeln('            when (version) {');
+    for (var v = 1; v < currentVersion; v++) {
+      buffer.writeln('                $v -> Migration_${v}_${v + 1}.migrate(databaseName)');
+    }
+    buffer.writeln('            }');
+    buffer.writeln('            logMigration(databaseName, version + 1)');
+    buffer.writeln('            version++');
+    buffer.writeln('        }');
     buffer.writeln();
     buffer.writeln('        setVersion(databaseName, CURRENT_VERSION)');
     buffer.writeln('    }');
@@ -385,31 +383,28 @@ class MigrationGenerator {
     );
     buffer.writeln();
     buffer.writeln(
-      '        let currentVersion = try getCurrentVersion(databaseName: databaseName)',
+      '        var version = try getCurrentVersion(databaseName: databaseName)',
     );
-    buffer.writeln('        if currentVersion >= currentVersion { return }');
+    buffer.writeln('        if version >= Self.currentVersion { return }');
     buffer.writeln();
-    buffer.writeln('        // Add migration steps here');
-    buffer.writeln('        // switch currentVersion {');
-    buffer.writeln('        // case 0: ');
+    buffer.writeln('        while version < Self.currentVersion {');
+    buffer.writeln('            switch version {');
+    for (var v = 1; v < currentVersion; v++) {
+      buffer.writeln('            case $v:');
+      buffer.writeln(
+        '                try Migration_${v}_${v + 1}.migrate(databaseName: databaseName)',
+      );
+    }
+    buffer.writeln('            default: break');
+    buffer.writeln('            }');
     buffer.writeln(
-      '        //     try Migration_0_1.migrate(databaseName: databaseName)',
+      '            try logMigration(databaseName: databaseName, version: version + 1)',
     );
-    buffer.writeln(
-      '        //     try logMigration(databaseName: databaseName, version: 1)',
-    );
-    buffer.writeln('        // case 1: ');
-    buffer.writeln(
-      '        //     try Migration_1_2.migrate(databaseName: databaseName)',
-    );
-    buffer.writeln(
-      '        //     try logMigration(databaseName: databaseName, version: 2)',
-    );
-    buffer.writeln('        // default: break');
-    buffer.writeln('        // }');
+    buffer.writeln('            version += 1');
+    buffer.writeln('        }');
     buffer.writeln();
     buffer.writeln(
-      '        try setVersion(databaseName: databaseName, version: currentVersion)',
+      '        try setVersion(databaseName: databaseName, version: Self.currentVersion)',
     );
     buffer.writeln('    }');
     buffer.writeln('}');

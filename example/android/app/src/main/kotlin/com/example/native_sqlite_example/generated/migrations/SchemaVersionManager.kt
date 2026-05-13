@@ -42,20 +42,17 @@ object SchemaVersionManager {
         // Ensure migrations table exists
         NativeSqliteManager.execute(databaseName, CREATE_MIGRATIONS_TABLE)
 
-        val currentVersion = getCurrentVersion(databaseName)
-        if (currentVersion >= CURRENT_VERSION) return
+        var version = getCurrentVersion(databaseName)
+        if (version >= CURRENT_VERSION) return
 
-        // Add migration steps here
-        // when (currentVersion) {
-        //     0 -> {
-        //         Migration_0_1.migrate(databaseName)
-        //         logMigration(databaseName, 1)
-        //     }
-        //     1 -> {
-        //         Migration_1_2.migrate(databaseName)
-        //         logMigration(databaseName, 2)
-        //     }
-        // }
+        while (version < CURRENT_VERSION) {
+            when (version) {
+                1 -> Migration_1_2.migrate(databaseName)
+                2 -> Migration_2_3.migrate(databaseName)
+            }
+            logMigration(databaseName, version + 1)
+            version++
+        }
 
         setVersion(databaseName, CURRENT_VERSION)
     }

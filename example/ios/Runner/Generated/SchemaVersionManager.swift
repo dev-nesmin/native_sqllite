@@ -46,20 +46,21 @@ public class SchemaVersionManager {
         // Ensure migrations table exists
         try NativeSqliteManager.shared.execute(name: databaseName, sql: createMigrationsTable)
 
-        let currentVersion = try getCurrentVersion(databaseName: databaseName)
-        if currentVersion >= currentVersion { return }
+        var version = try getCurrentVersion(databaseName: databaseName)
+        if version >= Self.currentVersion { return }
 
-        // Add migration steps here
-        // switch currentVersion {
-        // case 0: 
-        //     try Migration_0_1.migrate(databaseName: databaseName)
-        //     try logMigration(databaseName: databaseName, version: 1)
-        // case 1: 
-        //     try Migration_1_2.migrate(databaseName: databaseName)
-        //     try logMigration(databaseName: databaseName, version: 2)
-        // default: break
-        // }
+        while version < Self.currentVersion {
+            switch version {
+            case 1:
+                try Migration_1_2.migrate(databaseName: databaseName)
+            case 2:
+                try Migration_2_3.migrate(databaseName: databaseName)
+            default: break
+            }
+            try logMigration(databaseName: databaseName, version: version + 1)
+            version += 1
+        }
 
-        try setVersion(databaseName: databaseName, version: currentVersion)
+        try setVersion(databaseName: databaseName, version: Self.currentVersion)
     }
 }

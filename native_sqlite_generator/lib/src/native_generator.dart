@@ -230,6 +230,19 @@ class NativeCodeGenerator {
       }
     }
 
+    if (config.generateHelpers) {
+      final dbManagerCode = generator.generateDatabaseManager(
+        schemas,
+        schemaVersion,
+      );
+      final dbManagerFile = File(
+        path.join(config.outputPath, 'DatabaseManager.kt'),
+      );
+      await dbManagerFile.writeAsString(dbManagerCode);
+      generatedFiles.add(dbManagerFile.path);
+      logger.info('   ✓ Generated DatabaseManager.kt');
+    }
+
     final migrationGen = MigrationGenerator();
     final migrationsDir = Directory(path.join(config.outputPath, 'migrations'));
 
@@ -317,6 +330,19 @@ class NativeCodeGenerator {
         generatedFiles.add(helperFile.path);
         logger.info('   ✓ Generated ${path.basename(helperFile.path)}');
       }
+    }
+
+    if (config.generateHelpers) {
+      final dbManagerCode = generator.generateDatabaseManager(
+        schemas,
+        schemaVersion,
+      );
+      final dbManagerFile = File(
+        path.join(config.outputPath, 'DatabaseManager.swift'),
+      );
+      await dbManagerFile.writeAsString(dbManagerCode);
+      generatedFiles.add(dbManagerFile.path);
+      logger.info('   ✓ Generated DatabaseManager.swift');
     }
 
     final migrationGen = MigrationGenerator();

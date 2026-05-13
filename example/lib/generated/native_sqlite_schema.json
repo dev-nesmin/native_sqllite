@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
   "schemaVersion": 3,
-  "generatedAt": "2025-12-30T22:39:22.101450",
+  "generatedAt": "2026-05-13T21:45:27.460007",
   "schemas": [
     {
       "className": "AdvancedUser",
@@ -190,15 +190,7 @@
       ],
       "indexes": [],
       "version": 3,
-      "hash": "1785b29e",
-      "migrations": {
-        "fromVersion": 2,
-        "toVersion": 3,
-        "sql": [
-          "ALTER TABLE advanced_users ADD COLUMN zipCode TEXT;"
-        ],
-        "summary": "Added columns: zipCode"
-      }
+      "hash": "1785b29e"
     },
     {
       "className": "Category",
@@ -468,6 +460,8 @@
           "autoIncrement": false,
           "unique": false,
           "foreignKey": "users.id",
+          "foreignKeyOnDelete": "CASCADE",
+          "foreignKeyOnUpdate": "CASCADE",
           "isJsonField": false,
           "hasConverter": false,
           "dartType": "int"
@@ -481,6 +475,8 @@
           "autoIncrement": false,
           "unique": false,
           "foreignKey": "products.id",
+          "foreignKeyOnDelete": "CASCADE",
+          "foreignKeyOnUpdate": "CASCADE",
           "isJsonField": false,
           "hasConverter": false,
           "dartType": "int"
@@ -676,6 +672,8 @@
           "autoIncrement": false,
           "unique": false,
           "foreignKey": "categories.id",
+          "foreignKeyOnDelete": "CASCADE",
+          "foreignKeyOnUpdate": "CASCADE",
           "isJsonField": false,
           "hasConverter": false,
           "dartType": "int"
@@ -986,18 +984,7 @@
     }
   ],
   "deletedTables": [],
-  "migrations": [
-    {
-      "tableName": "advanced_users",
-      "className": "AdvancedUser",
-      "fromVersion": 2,
-      "toVersion": 3,
-      "sql": [
-        "ALTER TABLE advanced_users ADD COLUMN zipCode TEXT;"
-      ],
-      "summary": "Added columns: zipCode"
-    }
-  ],
+  "migrations": [],
   "previousSchemas": [
     {
       "className": "AdvancedUser",
@@ -1054,6 +1041,18 @@
         {
           "dartName": "country",
           "name": "country",
+          "type": "TEXT",
+          "nullable": true,
+          "primaryKey": false,
+          "autoIncrement": false,
+          "unique": false,
+          "isJsonField": false,
+          "hasConverter": false,
+          "dartType": "String?"
+        },
+        {
+          "dartName": "zipCode",
+          "name": "zipCode",
           "type": "TEXT",
           "nullable": true,
           "primaryKey": false,
@@ -1173,15 +1172,15 @@
         }
       ],
       "indexes": [],
-      "version": 2,
-      "hash": "3143301f",
+      "version": 3,
+      "hash": "1785b29e",
       "migrations": {
-        "fromVersion": 1,
-        "toVersion": 2,
+        "fromVersion": 2,
+        "toVersion": 3,
         "sql": [
-          "ALTER TABLE advanced_users ADD COLUMN country TEXT;"
+          "ALTER TABLE advanced_users ADD COLUMN zipCode TEXT;"
         ],
-        "summary": "Added columns: country"
+        "summary": "Added columns: zipCode"
       }
     },
     {

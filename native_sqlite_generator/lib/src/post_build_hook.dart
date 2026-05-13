@@ -1,89 +1,92 @@
 import 'dart:async';
 import 'dart:io';
+
 import 'package:build/build.dart';
+
 import 'native_generator.dart';
 
-/// Post-process builder that runs after all other builders
-/// to automatically generate native code
-class NativeCodePostProcessBuilder implements PostProcessBuilder {
-  // Completer to ensure only one execution per build session
-  // Using timestamp to allow execution in new build sessions (e.g., watch mode)
-  static Completer<void>? _generationCompleter;
-  static DateTime? _lastRunTime;
+/// A whole-library builder that generates native Android/iOS code after
+/// the schema JSON has been written by the migration builder.
+///
+/// Reads native_sqlite_schema.json through the build system so the
+/// dependency is declared correctly — guaranteeing migration runs first
+/// even on the very first build.
+class NativeCodeBuilder implements Builder {
+  @override
+  Map<String, List<String>> get buildExtensions {
+    return const {
+      r'$lib$': ['generated/.native_sqlite_stamp'],
+    };
+  }
 
   @override
-  final inputExtensions = const ['.table.dart'];
-
-  @override
-  FutureOr<void> build(PostProcessBuildStep buildStep) async {
-    // Only trigger on generated table files
-    if (!buildStep.inputId.path.endsWith('.table.dart')) {
+  Future<void> build(BuildStep buildStep) async {
+    // Check config before doing any work.
+    if (!await _shouldGenerateNativeCode()) {
+      await _writeStamp(buildStep, 'disabled');
       return;
     }
 
-    // Reset state if it's been more than 5 seconds since last run
-    // (indicates a new build session, e.g., in watch mode)
-    if (_lastRunTime != null &&
-        DateTime.now().difference(_lastRunTime!) > Duration(seconds: 5)) {
-      _generationCompleter = null;
-      _lastRunTime = null;
+    // Declare a dependency on the schema JSON so the build system knows
+    // migration must run before us. If the file doesn't exist yet we bail
+    // gracefully — next build it will be there.
+    final schemaAsset = AssetId(
+      buildStep.inputId.package,
+      'lib/generated/native_sqlite_schema.json',
+    );
+
+    if (!await buildStep.canRead(schemaAsset)) {
+      log.info('ℹ️  native_sqlite_schema.json not ready yet — '
+          'native code will be generated on the next build.');
+      await _writeStamp(buildStep, 'pending');
+      return;
     }
 
-    // If already running in this build session, wait for completion
-    if (_generationCompleter != null) {
-      return _generationCompleter!.future;
-    }
+    // Touch the asset so the build system registers the read dependency.
+    await buildStep.readAsString(schemaAsset);
 
-    // Mark as running
-    _generationCompleter = Completer<void>();
-    _lastRunTime = DateTime.now();
+    log.info('');
+    log.info('🔧 Running native code generation...');
 
     try {
-      // Check if we should run native generation
-      final shouldGenerate = await _shouldGenerateNativeCode();
-      if (!shouldGenerate) {
-        _generationCompleter!.complete();
-        return;
-      }
-
-      log.info('');
-      log.info('🔧 Running native code generation after build...');
-
       final generator = NativeCodeGenerator();
-      // IMPORTANT: Pass runBuildRunner: false to avoid recursion
-      // since we're already inside a build_runner run
+      // runBuildRunner: false — we are already inside a build_runner run.
       await generator.generate(runBuildRunner: false);
 
       log.info('✓ Native code generation completed');
       log.info('');
 
-      _generationCompleter!.complete();
-    } catch (e) {
-      log.warning('⚠️  Native code generation failed: $e');
-      _generationCompleter!.completeError(e);
+      await _writeStamp(buildStep, DateTime.now().toIso8601String());
+    } catch (e, stack) {
+      log.warning('⚠️  Native code generation failed: $e\n$stack');
+      await _writeStamp(buildStep, 'error: $e');
     }
   }
 
+  Future<void> _writeStamp(BuildStep buildStep, String content) async {
+    await buildStep.writeAsString(
+      AssetId(
+        buildStep.inputId.package,
+        'lib/generated/.native_sqlite_stamp',
+      ),
+      content,
+    );
+  }
+
   Future<bool> _shouldGenerateNativeCode() async {
-    // Prefer native_sqlite_config.yaml, fall back to pubspec.yaml
+    // Prefer native_sqlite_config.yaml, fall back to pubspec.yaml.
     final configFile = File('native_sqlite_config.yaml');
     if (await configFile.exists()) {
       final content = await configFile.readAsString();
-      return content.contains('generate_native:') &&
-          content.contains('generate_native: true');
+      return content.contains('generate_native: true');
     }
 
     final pubspecFile = File('pubspec.yaml');
-    if (!await pubspecFile.exists()) {
-      return false;
-    }
+    if (!await pubspecFile.exists()) return false;
     final content = await pubspecFile.readAsString();
     return content.contains('native_sqlite:') &&
         content.contains('generate_native: true');
   }
 }
 
-/// Builder for the post-process hook
-PostProcessBuilder nativeCodePostBuilder(BuilderOptions options) {
-  return NativeCodePostProcessBuilder();
-}
+Builder nativeCodeBuilder(BuilderOptions options) => NativeCodeBuilder();

@@ -3,6 +3,7 @@ description: "Web implementation of native_sqlite using sqlite3 WASM"
 version: 0.0.1
 homepage: https://nesmin.dev
 publish_to: none
+resolution: workspace
 
 environment:
   sdk: '>=3.9.0 <4.0.0'
@@ -23,8 +24,7 @@ dependencies:
     sdk: flutter
   sqlite3: ^2.9.3
   sqlite3_web: ^0.3.2
-  native_sqlite_platform_interface:
-    path: ../native_sqlite_platform_interface
+  native_sqlite_platform_interface: any
 
 dev_dependencies:
   flutter_test:

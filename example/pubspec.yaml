@@ -2,6 +2,7 @@ name: native_sqlite_example
 description: A comprehensive example app demonstrating all features of the native_sqlite plugin
 version: 1.0.0+1
 publish_to: 'none'
+resolution: workspace
 
 environment:
   sdk: '>=3.9.0 <4.0.0'
@@ -11,8 +12,7 @@ dependencies:
     sdk: flutter
 
   # Native SQLite plugin dependencies
-  native_sqlite:
-    path: ../native_sqlite/native_sqlite
+  native_sqlite: any
 
   # UI dependencies
   cupertino_icons: ^1.0.2

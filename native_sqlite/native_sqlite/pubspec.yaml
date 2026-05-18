@@ -3,6 +3,7 @@ description: "A simple yet powerful SQLite plugin accessible from both native (A
 version: 0.0.1
 homepage: https://nesmin.dev
 publish_to: none
+resolution: workspace
 
 environment:
   sdk: '>=3.9.0 <4.0.0'
@@ -21,16 +22,11 @@ flutter:
 dependencies:
   flutter:
     sdk: flutter
-  native_sqlite_platform_interface:
-    path: ../native_sqlite_platform_interface
-  native_sqlite_annotations:
-    path: ../../native_sqlite_annotations
-  native_sqlite_android:
-    path: ../native_sqlite_android
-  native_sqlite_ios:
-    path: ../native_sqlite_ios
-  native_sqlite_web:
-    path: ../native_sqlite_web
+  native_sqlite_platform_interface: any
+  native_sqlite_annotations: any
+  native_sqlite_android: any
+  native_sqlite_ios: any
+  native_sqlite_web: any
 
 dev_dependencies:
   flutter_test:

@@ -1,0 +1,32 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cat > *)",
+      "Bash(melos list *)",
+      "Bash(melos --verbose list --private)",
+      "Bash(melos init *)",
+      "Bash(flutter --version)",
+      "Bash(puro dart *)",
+      "Bash(dart --version)",
+      "Bash(melos --sdk-path auto list --private)",
+      "Bash(puro flutter *)",
+      "Read(//Users/nesmin/.puro/envs/3.35.7/flutter/bin/**)",
+      "Bash(MELOS_SDK_PATH=/Users/nesmin/.puro/envs/3.35.7/flutter melos list --private)",
+      "Bash(puro pub *)",
+      "Bash(melos --version)",
+      "Read(//Users/nesmin/.puro/shared/pub_cache/global_packages/melos/bin/**)",
+      "Bash(dart /Users/nesmin/.puro/shared/pub_cache/global_packages/melos/bin/melos.dart-3.11.5.snapshot --version)",
+      "Bash(dart /Users/nesmin/.puro/shared/pub_cache/global_packages/melos/bin/melos.dart-3.9.2.snapshot list)",
+      "Bash(~/.puro/envs/default/flutter/bin/dart --version)",
+      "Bash(~/.puro/envs/default/flutter/bin/dart /Users/nesmin/.puro/shared/pub_cache/global_packages/melos/bin/melos.dart-3.11.5.snapshot list)",
+      "Bash(~/.puro/envs/default/flutter/bin/dart /Users/nesmin/.puro/shared/pub_cache/global_packages/melos/bin/melos.dart-3.11.5.snapshot --verbose list)",
+      "Bash(cat /Users/nesmin/.puro/shared/pub_cache/hosted/pub.dev/melos-7.7.0/README.md | head -80 2>&1)",
+      "Read(//Users/nesmin/.puro/shared/pub_cache/hosted/pub.dev/melos-7.7.0/**)",
+      "Bash(grep -rn \"lockFileRoot\\\\|pubspec.lock\\\\|workspace\" /Users/nesmin/.puro/shared/pub_cache/hosted/pub.dev/cli_launcher-0.3.3+1/lib/ 2>/dev/null | head -20)",
+      "Read(//Users/nesmin/.puro/shared/pub_cache/hosted/pub.dev/cli_launcher-0.3.3+1/lib/**)"
+    ],
+    "additionalDirectories": [
+      "/tmp"
+    ]
+  }
+}

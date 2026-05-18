@@ -1,0 +1,80 @@
+name: native_sqlite_workspace
+description: Workspace root for the native_sqlite monorepo.
+publish_to: none
+
+environment:
+  sdk: '>=3.9.0 <4.0.0'
+
+workspace:
+  - native_sqlite/native_sqlite
+  - native_sqlite/native_sqlite_android
+  - native_sqlite/native_sqlite_ios
+  - native_sqlite/native_sqlite_web
+  - native_sqlite/native_sqlite_platform_interface
+  - native_sqlite_annotations
+  - example
+
+dev_dependencies:
+  melos: ^7.0.0
+
+melos:
+  repository: https://github.com/nesmin/native_sqllite
+
+  command:
+    version:
+      updateGitTagRefs: true
+      workspaceChangelog: true
+
+  scripts:
+    analyze:
+      run: melos exec -- flutter analyze
+      description: Run flutter analyze in all Flutter packages
+      packageFilters:
+        flutter: true
+
+    analyze:dart:
+      run: melos exec -- dart analyze
+      description: Run dart analyze in pure Dart packages
+      packageFilters:
+        flutter: false
+
+    test:
+      run: melos exec -- flutter test
+      description: Run tests in all packages
+      packageFilters:
+        flutter: true
+        dirExists: test
+
+    format:
+      run: melos exec -- dart format .
+      description: Format all Dart files
+
+    format:check:
+      run: melos exec -- dart format --output=none --set-exit-if-changed .
+      description: Check formatting without making changes (CI)
+
+    build:runner:
+      run: melos exec -- dart run build_runner build --delete-conflicting-outputs
+      description: Run build_runner in packages that use code generation
+      packageFilters:
+        dependsOn: build_runner
+
+    build:runner:watch:
+      run: melos exec -- dart run build_runner watch --delete-conflicting-outputs
+      description: Run build_runner in watch mode
+      packageFilters:
+        dependsOn: build_runner
+
+    clean:
+      run: melos exec -- flutter clean
+      description: Run flutter clean in all Flutter packages
+      packageFilters:
+        flutter: true
+
+    publish:dry:
+      run: melos publish --dry-run
+      description: Dry run publish for all publishable packages
+
+    publish:
+      run: melos publish
+      description: Publish all publishable packages to pub.dev

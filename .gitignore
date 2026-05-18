@@ -1,5 +1,9 @@
 /.DS_Store
 
+# Melos
+.melos_tool/
+.dart_tool/
+
 # Flutter/Dart/Pub related
 **/doc/api/
 .dart_tool/

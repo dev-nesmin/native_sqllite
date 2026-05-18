@@ -2,5 +2,7 @@ name: native_sqlite_annotations
 description: Annotations for native_sqlite generator.
 version: 0.0.1
 homepage: https://nesmin.dev
+resolution: workspace
+
 environment:
   sdk: '>=3.9.0 <4.0.0'

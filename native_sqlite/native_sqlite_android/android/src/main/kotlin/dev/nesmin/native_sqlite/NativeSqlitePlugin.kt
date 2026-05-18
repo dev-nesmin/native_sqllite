@@ -115,7 +115,10 @@ class NativeSqlitePlugin(
                 else -> result.notImplemented()
             }
         } catch (e: Exception) {
-            result.error("NATIVE_SQLITE_ERROR", e.message, e.stackTraceToString())
+            // Stack traces are included in debug builds to aid development.
+            // In release builds they are omitted to avoid leaking internals.
+            val details = if (BuildConfig.DEBUG) e.stackTraceToString() else null
+            result.error("NATIVE_SQLITE_ERROR", e.message, details)
         }
     }
 

@@ -90,7 +90,7 @@ class AutoMigration {
       // Drop deleted tables if flag is enabled
       if (dropRemovedTables && deletedTableNames.isNotEmpty) {
         for (final tableName in deletedTableNames) {
-          statements.add('DROP TABLE IF EXISTS $tableName');
+          statements.add('DROP TABLE IF EXISTS "$tableName"');
         }
       }
 
@@ -153,7 +153,7 @@ class AutoMigration {
 
     for (final tableName in existingTables) {
       if (!tableNames.contains(tableName)) {
-        dropStatements.add('DROP TABLE IF EXISTS $tableName');
+        dropStatements.add('DROP TABLE IF EXISTS "$tableName"');
       }
     }
 

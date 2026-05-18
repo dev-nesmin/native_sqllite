@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:vm_service/vm_service.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
@@ -24,15 +25,15 @@ class ConnectClient {
   static Future<ConnectClient> connect(String port, String secret) async {
     // WebSocket URL format: ws://127.0.0.1:port/secret=/ws
     final wsUrl = Uri.parse('ws://127.0.0.1:$port/$secret=/ws');
-    print('Inspector: Attempting to connect to $wsUrl');
+    debugPrint('Inspector: Attempting to connect to $wsUrl');
 
     try {
       final channel = WebSocketChannel.connect(wsUrl);
-      print('Inspector: WebSocket channel created');
+      debugPrint('Inspector: WebSocket channel created');
 
       // Handle errors
       final stream = channel.stream.handleError((error) {
-        print('Inspector: WebSocket error: $error');
+        debugPrint('Inspector: WebSocket error: $error');
       });
 
       final service = VmService(
@@ -41,17 +42,17 @@ class ConnectClient {
         disposeHandler: channel.sink.close,
       );
 
-      print('Inspector: VmService initialized, getting VM...');
+      debugPrint('Inspector: VmService initialized, getting VM...');
 
       // Add timeout for initial connection
       final vm = await service.getVM().timeout(const Duration(seconds: 5));
-      print('Inspector: VM received: ${vm.name}');
+      debugPrint('Inspector: VM received: ${vm.name}');
 
       final isolateId = vm.isolates!.where((e) => e.name == 'main').first.id!;
-      print('Inspector: Main isolate found: $isolateId');
+      debugPrint('Inspector: Main isolate found: $isolateId');
 
       await service.streamListen(EventStreams.kExtension);
-      print('Inspector: Listening to extension events');
+      debugPrint('Inspector: Listening to extension events');
 
       final client = ConnectClient(service, isolateId);
 
@@ -67,17 +68,17 @@ class ConnectClient {
         handlers[event.extensionKind]?.call(data);
       });
 
-      print('Inspector: Client ready');
+      debugPrint('Inspector: Client ready');
       return client;
     } on TimeoutException {
-      print('Inspector: Connection timed out');
+      debugPrint('Inspector: Connection timed out');
       throw Exception(
         'Connection timed out. If you are using the hosted inspector (https), '
         'your browser might be blocking the insecure WebSocket connection (ws://). '
         'Please allow "Insecure Content" for this site in your browser settings.',
       );
     } catch (e) {
-      print('Inspector: Connection failed with error: $e');
+      debugPrint('Inspector: Connection failed with error: $e');
       throw Exception('Failed to connect: $e');
     }
   }

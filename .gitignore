@@ -11,6 +11,9 @@
 build/
 pubspec.lock
 
+# Track the example app's lockfile so its dependencies are reproducible.
+!example/pubspec.lock
+
 # IDE/Editor related
 .idea/
 *.iml

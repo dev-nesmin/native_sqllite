@@ -299,11 +299,33 @@ public class NativeSqliteManager {
 
     /**
      * Gets the absolute path to a database file.
+     *
+     * Databases are stored in Library/Application Support, which is:
+     * - Not exposed via iTunes File Sharing
+     * - Excluded from user-visible Documents
+     * - Backed up to iCloud only when the app opts in
+     *
+     * The name is sanitised to alphanumerics, underscores, and hyphens so
+     * a crafted name cannot escape the application sandbox via path traversal.
      */
     public func getDatabasePath(name: String) -> String {
-        let paths = NSSearchPathForDirectoriesInDomains(.documentDirectory, .userDomainMask, true)
-        let documentsDirectory = paths[0]
-        return "\(documentsDirectory)/\(name).db"
+        // Sanitise: keep only alphanumerics, underscores, and hyphens.
+        let safeName = name.unicodeScalars.filter {
+            CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "_-")).contains($0)
+        }.map(Character.init).reduce("") { $0 + String($1) }
+
+        let appSupportDir = FileManager.default
+            .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("NativeSqlite", isDirectory: true)
+
+        // Create the directory if it doesn't exist yet.
+        try? FileManager.default.createDirectory(
+            at: appSupportDir,
+            withIntermediateDirectories: true,
+            attributes: nil
+        )
+
+        return appSupportDir.appendingPathComponent("\(safeName).db").path
     }
 
     /**
@@ -342,13 +364,17 @@ public class NativeSqliteManager {
     }
 
     private func bindArguments(statement: OpaquePointer, arguments: [Any?]) throws {
+        // SQLITE_TRANSIENT (-1) tells SQLite to copy the value immediately so
+        // we don't need to keep the Swift string alive for the statement's lifetime.
+        let SQLITE_TRANSIENT = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
+
         for (index, arg) in arguments.enumerated() {
             let bindIndex = Int32(index + 1)
 
             if arg == nil {
                 sqlite3_bind_null(statement, bindIndex)
             } else if let value = arg as? String {
-                sqlite3_bind_text(statement, bindIndex, (value as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(statement, bindIndex, (value as NSString).utf8String, -1, SQLITE_TRANSIENT)
             } else if let value = arg as? Int {
                 sqlite3_bind_int64(statement, bindIndex, Int64(value))
             } else if let value = arg as? Int64 {
@@ -358,9 +384,9 @@ public class NativeSqliteManager {
             } else if let value = arg as? Bool {
                 sqlite3_bind_int(statement, bindIndex, value ? 1 : 0)
             } else if let value = arg as? Data {
-                sqlite3_bind_blob(statement, bindIndex, (value as NSData).bytes, Int32(value.count), nil)
+                sqlite3_bind_blob(statement, bindIndex, (value as NSData).bytes, Int32(value.count), SQLITE_TRANSIENT)
             } else {
-                sqlite3_bind_text(statement, bindIndex, (String(describing: arg) as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(statement, bindIndex, (String(describing: arg) as NSString).utf8String, -1, SQLITE_TRANSIENT)
             }
         }
     }

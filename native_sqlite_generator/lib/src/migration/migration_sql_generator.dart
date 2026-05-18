@@ -1,3 +1,7 @@
+/// Wraps a SQL identifier in double-quotes to prevent keyword conflicts and
+/// injection through schema-derived names.
+String _q(String identifier) => '"$identifier"';
+
 /// Generates SQL migration statements by comparing old and new schemas
 class MigrationSqlGenerator {
   /// Generate migration SQL for a table that changed
@@ -98,7 +102,7 @@ class MigrationSqlGenerator {
     final defaultValue = column['defaultValue'] as String?;
 
     final parts = <String>[
-      'ALTER TABLE $tableName ADD COLUMN $colName $colType',
+      'ALTER TABLE ${_q(tableName)} ADD COLUMN ${_q(colName)} $colType',
     ];
 
     if (!nullable) {
@@ -132,18 +136,20 @@ class MigrationSqlGenerator {
         .toList();
 
     if (commonColumns.isNotEmpty) {
-      final columnsList = commonColumns.join(', ');
+      final columnsList = commonColumns.map(_q).join(', ');
       migrations.add(
-        'INSERT INTO ${tableName}_new ($columnsList) '
-        'SELECT $columnsList FROM $tableName;',
+        'INSERT INTO ${_q('${tableName}_new')} ($columnsList) '
+        'SELECT $columnsList FROM ${_q(tableName)};',
       );
     }
 
     // 3. Drop old table
-    migrations.add('DROP TABLE $tableName;');
+    migrations.add('DROP TABLE ${_q(tableName)};');
 
     // 4. Rename new table to original name
-    migrations.add('ALTER TABLE ${tableName}_new RENAME TO $tableName;');
+    migrations.add(
+      'ALTER TABLE ${_q('${tableName}_new')} RENAME TO ${_q(tableName)};',
+    );
 
     return migrations;
   }
@@ -159,7 +165,7 @@ class MigrationSqlGenerator {
       final colName = col['name'] as String;
       final colType = col['type'] as String;
 
-      parts.add('$colName $colType');
+      parts.add('${_q(colName)} $colType');
 
       if (col['primaryKey'] == true) {
         parts.add('PRIMARY KEY');
@@ -183,7 +189,7 @@ class MigrationSqlGenerator {
       if (col['foreignKey'] != null) {
         final fkParts = (col['foreignKey'] as String).split('.');
         if (fkParts.length == 2) {
-          var fkClause = 'REFERENCES ${fkParts[0]}(${fkParts[1]})';
+          var fkClause = 'REFERENCES ${_q(fkParts[0])}(${_q(fkParts[1])})';
           final onDelete = col['foreignKeyOnDelete'] as String?;
           final onUpdate = col['foreignKeyOnUpdate'] as String?;
           if (onDelete != null) fkClause += ' ON DELETE $onDelete';
@@ -195,7 +201,7 @@ class MigrationSqlGenerator {
       columnDefs.add(parts.join(' '));
     }
 
-    return 'CREATE TABLE $tableName (${columnDefs.join(', ')});';
+    return 'CREATE TABLE ${_q(tableName)} (${columnDefs.join(', ')});';
   }
 
   /// Generate user-friendly migration summary

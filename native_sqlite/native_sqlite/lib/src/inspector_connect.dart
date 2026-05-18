@@ -5,6 +5,10 @@ import 'package:flutter/foundation.dart';
 
 import 'native_sqlite.dart';
 
+/// Validates that a string is a safe SQL identifier (letters, digits, underscores).
+bool _isValidIdentifier(String name) =>
+    RegExp(r'^[a-zA-Z_][a-zA-Z0-9_]*$').hasMatch(name);
+
 /// Handles communication with the Native SQLite Inspector.
 class InspectorConnect {
   static final Set<String> _databases = {};
@@ -16,6 +20,11 @@ class InspectorConnect {
 
   /// Initializes the inspector connection for the given database.
   static void init(String databaseName) {
+    // Inspector is only available in debug and profile modes.
+    // In release mode the Dart VM Service is disabled, so extensions are
+    // unreachable — but we guard explicitly to avoid the unnecessary work.
+    if (kReleaseMode) return;
+
     _databases.add(databaseName);
 
     if (!_initialized) {
@@ -41,26 +50,26 @@ class InspectorConnect {
       }
 
       if (serviceUri == null) {
-        print(
+        debugPrint(
           '╔════════════════════════════════════════════════════════════════════════════╗',
         );
-        print(
+        debugPrint(
           '║  Native SQLite Inspector                                                   ║',
         );
-        print(
+        debugPrint(
           '║                                                                            ║',
         );
-        print(
+        debugPrint(
           '║  Could not auto-detect VM Service URI.                                     ║',
         );
-        print(
+        debugPrint(
           '║  Please copy the URI printed above (starts with http://127.0.0.1:...)      ║',
         );
-        print(
+        debugPrint(
           '║  and use it to connect at:                                                 ║',
         );
-        print('║  $inspectorUrl                                            ║');
-        print(
+        debugPrint('║  $inspectorUrl                                            ║');
+        debugPrint(
           '╚════════════════════════════════════════════════════════════════════════════╝',
         );
         return;
@@ -80,24 +89,24 @@ class InspectorConnect {
       // Format: https://dev-nesmin.web.app/#/PORT/SECRET
       final url = '$inspectorUrl#/$port/$secret';
 
-      print(
+      debugPrint(
         '╔════════════════════════════════════════════════════════════════════════════╗',
       );
-      print(
+      debugPrint(
         '║                                                                            ║',
       );
-      print(
+      debugPrint(
         '║  Native SQLite Inspector is available at:                                  ║',
       );
-      print('║  $url  ║');
-      print(
+      debugPrint('║  $url  ║');
+      debugPrint(
         '║                                                                            ║',
       );
-      print(
+      debugPrint(
         '╚════════════════════════════════════════════════════════════════════════════╝',
       );
     } catch (e) {
-      print('Failed to get VM Service info: $e');
+      debugPrint('Failed to get VM Service info: $e');
     }
   }
 
@@ -206,10 +215,16 @@ class InspectorConnect {
           sql = args['query'] as String;
         } else if (args.containsKey('table')) {
           final table = args['table'] as String;
+          if (!_isValidIdentifier(table)) {
+            return developer.ServiceExtensionResponse.error(
+              developer.ServiceExtensionResponse.invalidParams,
+              'Invalid table name',
+            );
+          }
           final limit = args['limit'] as int? ?? 50;
           final offset = args['offset'] as int? ?? 0;
 
-          // Build paginated query
+          // Build paginated query — table is already validated as a safe identifier
           sql = 'SELECT * FROM $table LIMIT $limit OFFSET $offset';
         } else {
           return developer.ServiceExtensionResponse.error(
@@ -225,6 +240,7 @@ class InspectorConnect {
         int totalCount = rows.length;
         if (args.containsKey('table')) {
           final table = args['table'] as String;
+          // table was already validated above
           final countResult = await NativeSqlite.query(
             database,
             'SELECT COUNT(*) as count FROM $table',
@@ -241,7 +257,7 @@ class InspectorConnect {
           }),
         );
       } catch (e, stackTrace) {
-        print('executeQuery error: $e\n$stackTrace');
+        debugPrint('executeQuery error: $e\n$stackTrace');
         return developer.ServiceExtensionResponse.error(
           developer.ServiceExtensionResponse.extensionError,
           e.toString(),
@@ -305,6 +321,13 @@ class InspectorConnect {
         final id = args['id'];
         final values = Map<String, Object?>.from(args['values'] as Map);
 
+        if (!_isValidIdentifier(table)) {
+          return developer.ServiceExtensionResponse.error(
+            developer.ServiceExtensionResponse.invalidParams,
+            'Invalid table name',
+          );
+        }
+
         // Use pkColumn from args if provided; otherwise look it up via PRAGMA.
         final pkColumn =
             args['pkColumn'] as String? ??
@@ -346,6 +369,13 @@ class InspectorConnect {
         final table = args['table'] as String;
         final id = args['id'];
 
+        if (!_isValidIdentifier(table)) {
+          return developer.ServiceExtensionResponse.error(
+            developer.ServiceExtensionResponse.invalidParams,
+            'Invalid table name',
+          );
+        }
+
         // Use pkColumn from args if provided; otherwise look it up via PRAGMA.
         final pkColumn =
             args['pkColumn'] as String? ??
@@ -379,6 +409,7 @@ class InspectorConnect {
     String database,
     String table,
   ) async {
+    // table is always validated by callers before reaching here
     try {
       final result = await NativeSqlite.query(
         database,
@@ -448,9 +479,6 @@ class InspectorConnect {
       final indexes = <String>[];
       for (final row in indexesResult.toMapList()) {
         final indexName = row['name'] as String;
-        // Skip auto-generated indexes (like for primary keys) if desired,
-        // but usually we want to see them or at least explicit ones.
-        // sqlite_autoindex_...
 
         final infoResult = await NativeSqlite.query(
           database,
@@ -465,7 +493,7 @@ class InspectorConnect {
       }
       return indexes;
     } catch (e) {
-      print('Error fetching indexes: $e');
+      debugPrint('Error fetching indexes: $e');
       return [];
     }
   }
@@ -485,15 +513,13 @@ class InspectorConnect {
       final pageSizeRows = pageSizeResult.toMapList();
 
       if (pageCountRows.isNotEmpty && pageSizeRows.isNotEmpty) {
-        // PRAGMA results usually have the pragma name as key, or sometimes just 'page_count'
-        // Let's inspect the values safely
         final pageCount = pageCountRows.first.values.first as int;
         final pageSize = pageSizeRows.first.values.first as int;
         return pageCount * pageSize;
       }
       return 0;
     } catch (e) {
-      print('Error fetching database size: $e');
+      debugPrint('Error fetching database size: $e');
       return 0;
     }
   }

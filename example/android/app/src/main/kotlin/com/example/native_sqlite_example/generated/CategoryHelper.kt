@@ -1,6 +1,5 @@
 package com.example.native_sqlite_example.generated
 
-import android.content.ContentValues
 import dev.nesmin.native_sqlite.NativeSqliteManager
 import java.util.concurrent.ConcurrentHashMap
 
@@ -80,16 +79,16 @@ class CategoryHelper(private val databaseName: String) {
     }
 
     fun insert(entity: Category): Long {
-        val values = ContentValues().apply {
-            put(CategorySchema.NAME, entity.name)
-            put(CategorySchema.DESCRIPTION, entity.description)
-            put(CategorySchema.CREATED_AT, entity.createdAt.toEpochMilliseconds())
-        }
-        return NativeSqliteManager.insert(databaseName, CategorySchema.TABLE_NAME, values)
+        val values: Map<String, Any?> = mapOf(
+            CategorySchema.NAME to entity.name,
+            CategorySchema.DESCRIPTION to entity.description,
+            CategorySchema.CREATED_AT to entity.createdAt.toEpochMilliseconds()
+        )
+        return NativeSqliteManager.Instance.insert(databaseName, CategorySchema.TABLE_NAME, values)
     }
 
     fun findById(id: Long): Category? {
-        val result = NativeSqliteManager.query(
+        val result = NativeSqliteManager.Instance.query(
             databaseName,
             "SELECT * FROM ${CategorySchema.TABLE_NAME} WHERE ${CategorySchema.ID} = ? LIMIT 1",
             listOf(id)
@@ -102,7 +101,7 @@ class CategoryHelper(private val databaseName: String) {
     }
 
     fun findAll(): List<Category> {
-        val result = NativeSqliteManager.query(databaseName, "SELECT * FROM ${CategorySchema.TABLE_NAME}")
+        val result = NativeSqliteManager.Instance.query(databaseName, "SELECT * FROM ${CategorySchema.TABLE_NAME}")
         val rows = result["rows"] as? List<List<Any?>> ?: return emptyList()
         val columns = result["columns"] as List<String>
         val columnMap = columns.withIndex().associate { it.value to it.index }
@@ -115,12 +114,12 @@ class CategoryHelper(private val databaseName: String) {
      * @return Number of rows affected
      */
     fun update(entity: Category): Int {
-        val values = ContentValues().apply {
-            put(CategorySchema.NAME, entity.name)
-            put(CategorySchema.DESCRIPTION, entity.description)
-            put(CategorySchema.CREATED_AT, entity.createdAt.toEpochMilliseconds())
-        }
-        return NativeSqliteManager.update(
+        val values: Map<String, Any?> = mapOf(
+            CategorySchema.NAME to entity.name,
+            CategorySchema.DESCRIPTION to entity.description,
+            CategorySchema.CREATED_AT to entity.createdAt.toEpochMilliseconds()
+        )
+        return NativeSqliteManager.Instance.update(
             databaseName,
             CategorySchema.TABLE_NAME,
             values,
@@ -136,7 +135,7 @@ class CategoryHelper(private val databaseName: String) {
      * @return Number of rows affected
      */
     fun updatePartial(id: Long, updates: Map<String, Any?>): Int {
-        return NativeSqliteManager.update(
+        return NativeSqliteManager.Instance.update(
             databaseName,
             CategorySchema.TABLE_NAME,
             updates,
@@ -151,7 +150,7 @@ class CategoryHelper(private val databaseName: String) {
      * @return Number of rows deleted
      */
     fun delete(id: Long): Int {
-        return NativeSqliteManager.delete(
+        return NativeSqliteManager.Instance.delete(
             databaseName,
             CategorySchema.TABLE_NAME,
             "${CategorySchema.ID} = ?",
@@ -166,7 +165,7 @@ class CategoryHelper(private val databaseName: String) {
      * @return Number of rows deleted
      */
     fun deleteWhere(whereClause: String, whereArgs: List<Any?>? = null): Int {
-        return NativeSqliteManager.delete(
+        return NativeSqliteManager.Instance.delete(
             databaseName,
             CategorySchema.TABLE_NAME,
             whereClause,
@@ -180,7 +179,7 @@ class CategoryHelper(private val databaseName: String) {
      * @return List of inserted row IDs
      */
     fun insertBatch(entities: List<Category>): List<Long> {
-        val db = NativeSqliteManager.getDatabase(databaseName)
+        val db = NativeSqliteManager.Instance.getDatabase(databaseName)
         val results = mutableListOf<Long>()
         db.beginTransaction()
         try {
@@ -200,7 +199,7 @@ class CategoryHelper(private val databaseName: String) {
      * @return Total number of rows affected
      */
     fun updateBatch(entities: List<Category>): Int {
-        val db = NativeSqliteManager.getDatabase(databaseName)
+        val db = NativeSqliteManager.Instance.getDatabase(databaseName)
         var totalAffected = 0
         db.beginTransaction()
         try {
@@ -220,7 +219,7 @@ class CategoryHelper(private val databaseName: String) {
      * @return Total number of rows deleted
      */
     fun deleteBatch(ids: List<Long>): Int {
-        val db = NativeSqliteManager.getDatabase(databaseName)
+        val db = NativeSqliteManager.Instance.getDatabase(databaseName)
         var totalDeleted = 0
         db.beginTransaction()
         try {
@@ -257,7 +256,7 @@ class CategoryHelper(private val databaseName: String) {
             limit?.let { append(" LIMIT $it") }
             offset?.let { append(" OFFSET $it") }
         }
-        val result = NativeSqliteManager.query(databaseName, sql, whereArgs)
+        val result = NativeSqliteManager.Instance.query(databaseName, sql, whereArgs)
         val rows = result["rows"] as? List<List<Any?>> ?: return emptyList()
         val columns = result["columns"] as List<String>
         val columnMap = columns.withIndex().associate { it.value to it.index }
@@ -276,7 +275,7 @@ class CategoryHelper(private val databaseName: String) {
         } else {
             "SELECT COUNT(*) FROM ${CategorySchema.TABLE_NAME}"
         }
-        val result = NativeSqliteManager.query(databaseName, sql, whereArgs)
+        val result = NativeSqliteManager.Instance.query(databaseName, sql, whereArgs)
         val rows = result["rows"] as? List<List<Any?>> ?: return 0
         return (rows.firstOrNull()?.firstOrNull() as? Long) ?: 0
     }
@@ -294,7 +293,7 @@ class CategoryHelper(private val databaseName: String) {
         } else {
             "SELECT MAX($column) FROM ${CategorySchema.TABLE_NAME}"
         }
-        val result = NativeSqliteManager.query(databaseName, sql, whereArgs)
+        val result = NativeSqliteManager.Instance.query(databaseName, sql, whereArgs)
         val rows = result["rows"] as? List<List<Any?>> ?: return null
         return rows.firstOrNull()?.firstOrNull()
     }
@@ -312,7 +311,7 @@ class CategoryHelper(private val databaseName: String) {
         } else {
             "SELECT MIN($column) FROM ${CategorySchema.TABLE_NAME}"
         }
-        val result = NativeSqliteManager.query(databaseName, sql, whereArgs)
+        val result = NativeSqliteManager.Instance.query(databaseName, sql, whereArgs)
         val rows = result["rows"] as? List<List<Any?>> ?: return null
         return rows.firstOrNull()?.firstOrNull()
     }
@@ -330,7 +329,7 @@ class CategoryHelper(private val databaseName: String) {
         } else {
             "SELECT AVG($column) FROM ${CategorySchema.TABLE_NAME}"
         }
-        val result = NativeSqliteManager.query(databaseName, sql, whereArgs)
+        val result = NativeSqliteManager.Instance.query(databaseName, sql, whereArgs)
         val rows = result["rows"] as? List<List<Any?>> ?: return null
         return rows.firstOrNull()?.firstOrNull() as? Double
     }
@@ -348,7 +347,7 @@ class CategoryHelper(private val databaseName: String) {
         } else {
             "SELECT SUM($column) FROM ${CategorySchema.TABLE_NAME}"
         }
-        val result = NativeSqliteManager.query(databaseName, sql, whereArgs)
+        val result = NativeSqliteManager.Instance.query(databaseName, sql, whereArgs)
         val rows = result["rows"] as? List<List<Any?>> ?: return null
         return rows.firstOrNull()?.firstOrNull() as? Double
     }

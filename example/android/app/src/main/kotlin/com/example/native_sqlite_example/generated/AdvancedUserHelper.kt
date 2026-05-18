@@ -1,6 +1,5 @@
 package com.example.native_sqlite_example.generated
 
-import android.content.ContentValues
 import dev.nesmin.native_sqlite.NativeSqliteManager
 import java.util.concurrent.ConcurrentHashMap
 
@@ -91,27 +90,27 @@ class AdvancedUserHelper(private val databaseName: String) {
     }
 
     fun insert(entity: AdvancedUser): Long {
-        val values = ContentValues().apply {
-            put(AdvancedUserSchema.NAME, entity.name)
-            put(AdvancedUserSchema.PHONE_NUMBER, entity.phoneNumber)
-            put(AdvancedUserSchema.ADDRESS, entity.address)
-            put(AdvancedUserSchema.COUNTRY, entity.country)
-            put(AdvancedUserSchema.ZIP_CODE, entity.zipCode)
-            put(AdvancedUserSchema.AGE, entity.age)
-            put(AdvancedUserSchema.CITY, entity.city)
-            put(AdvancedUserSchema.LOGIN_DURATION, entity.loginDuration)
-            put(AdvancedUserSchema.PROFILE_URL, entity.profileUrl)
-            put(AdvancedUserSchema.SCORE, entity.score)
-            put(AdvancedUserSchema.STATUS, entity.status)
-            put(AdvancedUserSchema.PRIORITY, entity.priority)
-            put(AdvancedUserSchema.CREATED_AT, entity.createdAt.toEpochMilliseconds())
-            put(AdvancedUserSchema.IS_VERIFIED, if (entity.isVerified) 1 else 0)
-        }
-        return NativeSqliteManager.insert(databaseName, AdvancedUserSchema.TABLE_NAME, values)
+        val values: Map<String, Any?> = mapOf(
+            AdvancedUserSchema.NAME to entity.name,
+            AdvancedUserSchema.PHONE_NUMBER to entity.phoneNumber,
+            AdvancedUserSchema.ADDRESS to entity.address,
+            AdvancedUserSchema.COUNTRY to entity.country,
+            AdvancedUserSchema.ZIP_CODE to entity.zipCode,
+            AdvancedUserSchema.AGE to entity.age,
+            AdvancedUserSchema.CITY to entity.city,
+            AdvancedUserSchema.LOGIN_DURATION to entity.loginDuration,
+            AdvancedUserSchema.PROFILE_URL to entity.profileUrl,
+            AdvancedUserSchema.SCORE to entity.score,
+            AdvancedUserSchema.STATUS to entity.status,
+            AdvancedUserSchema.PRIORITY to entity.priority,
+            AdvancedUserSchema.CREATED_AT to entity.createdAt.toEpochMilliseconds(),
+            AdvancedUserSchema.IS_VERIFIED to if (entity.isVerified) 1 else 0
+        )
+        return NativeSqliteManager.Instance.insert(databaseName, AdvancedUserSchema.TABLE_NAME, values)
     }
 
     fun findById(id: Long): AdvancedUser? {
-        val result = NativeSqliteManager.query(
+        val result = NativeSqliteManager.Instance.query(
             databaseName,
             "SELECT * FROM ${AdvancedUserSchema.TABLE_NAME} WHERE ${AdvancedUserSchema.ID} = ? LIMIT 1",
             listOf(id)
@@ -124,7 +123,7 @@ class AdvancedUserHelper(private val databaseName: String) {
     }
 
     fun findAll(): List<AdvancedUser> {
-        val result = NativeSqliteManager.query(databaseName, "SELECT * FROM ${AdvancedUserSchema.TABLE_NAME}")
+        val result = NativeSqliteManager.Instance.query(databaseName, "SELECT * FROM ${AdvancedUserSchema.TABLE_NAME}")
         val rows = result["rows"] as? List<List<Any?>> ?: return emptyList()
         val columns = result["columns"] as List<String>
         val columnMap = columns.withIndex().associate { it.value to it.index }
@@ -137,23 +136,23 @@ class AdvancedUserHelper(private val databaseName: String) {
      * @return Number of rows affected
      */
     fun update(entity: AdvancedUser): Int {
-        val values = ContentValues().apply {
-            put(AdvancedUserSchema.NAME, entity.name)
-            put(AdvancedUserSchema.PHONE_NUMBER, entity.phoneNumber)
-            put(AdvancedUserSchema.ADDRESS, entity.address)
-            put(AdvancedUserSchema.COUNTRY, entity.country)
-            put(AdvancedUserSchema.ZIP_CODE, entity.zipCode)
-            put(AdvancedUserSchema.AGE, entity.age)
-            put(AdvancedUserSchema.CITY, entity.city)
-            put(AdvancedUserSchema.LOGIN_DURATION, entity.loginDuration)
-            put(AdvancedUserSchema.PROFILE_URL, entity.profileUrl)
-            put(AdvancedUserSchema.SCORE, entity.score)
-            put(AdvancedUserSchema.STATUS, entity.status)
-            put(AdvancedUserSchema.PRIORITY, entity.priority)
-            put(AdvancedUserSchema.CREATED_AT, entity.createdAt.toEpochMilliseconds())
-            put(AdvancedUserSchema.IS_VERIFIED, if (entity.isVerified) 1 else 0)
-        }
-        return NativeSqliteManager.update(
+        val values: Map<String, Any?> = mapOf(
+            AdvancedUserSchema.NAME to entity.name,
+            AdvancedUserSchema.PHONE_NUMBER to entity.phoneNumber,
+            AdvancedUserSchema.ADDRESS to entity.address,
+            AdvancedUserSchema.COUNTRY to entity.country,
+            AdvancedUserSchema.ZIP_CODE to entity.zipCode,
+            AdvancedUserSchema.AGE to entity.age,
+            AdvancedUserSchema.CITY to entity.city,
+            AdvancedUserSchema.LOGIN_DURATION to entity.loginDuration,
+            AdvancedUserSchema.PROFILE_URL to entity.profileUrl,
+            AdvancedUserSchema.SCORE to entity.score,
+            AdvancedUserSchema.STATUS to entity.status,
+            AdvancedUserSchema.PRIORITY to entity.priority,
+            AdvancedUserSchema.CREATED_AT to entity.createdAt.toEpochMilliseconds(),
+            AdvancedUserSchema.IS_VERIFIED to if (entity.isVerified) 1 else 0
+        )
+        return NativeSqliteManager.Instance.update(
             databaseName,
             AdvancedUserSchema.TABLE_NAME,
             values,
@@ -169,7 +168,7 @@ class AdvancedUserHelper(private val databaseName: String) {
      * @return Number of rows affected
      */
     fun updatePartial(id: Long, updates: Map<String, Any?>): Int {
-        return NativeSqliteManager.update(
+        return NativeSqliteManager.Instance.update(
             databaseName,
             AdvancedUserSchema.TABLE_NAME,
             updates,
@@ -184,7 +183,7 @@ class AdvancedUserHelper(private val databaseName: String) {
      * @return Number of rows deleted
      */
     fun delete(id: Long): Int {
-        return NativeSqliteManager.delete(
+        return NativeSqliteManager.Instance.delete(
             databaseName,
             AdvancedUserSchema.TABLE_NAME,
             "${AdvancedUserSchema.ID} = ?",
@@ -199,7 +198,7 @@ class AdvancedUserHelper(private val databaseName: String) {
      * @return Number of rows deleted
      */
     fun deleteWhere(whereClause: String, whereArgs: List<Any?>? = null): Int {
-        return NativeSqliteManager.delete(
+        return NativeSqliteManager.Instance.delete(
             databaseName,
             AdvancedUserSchema.TABLE_NAME,
             whereClause,
@@ -213,7 +212,7 @@ class AdvancedUserHelper(private val databaseName: String) {
      * @return List of inserted row IDs
      */
     fun insertBatch(entities: List<AdvancedUser>): List<Long> {
-        val db = NativeSqliteManager.getDatabase(databaseName)
+        val db = NativeSqliteManager.Instance.getDatabase(databaseName)
         val results = mutableListOf<Long>()
         db.beginTransaction()
         try {
@@ -233,7 +232,7 @@ class AdvancedUserHelper(private val databaseName: String) {
      * @return Total number of rows affected
      */
     fun updateBatch(entities: List<AdvancedUser>): Int {
-        val db = NativeSqliteManager.getDatabase(databaseName)
+        val db = NativeSqliteManager.Instance.getDatabase(databaseName)
         var totalAffected = 0
         db.beginTransaction()
         try {
@@ -253,7 +252,7 @@ class AdvancedUserHelper(private val databaseName: String) {
      * @return Total number of rows deleted
      */
     fun deleteBatch(ids: List<Long>): Int {
-        val db = NativeSqliteManager.getDatabase(databaseName)
+        val db = NativeSqliteManager.Instance.getDatabase(databaseName)
         var totalDeleted = 0
         db.beginTransaction()
         try {
@@ -290,7 +289,7 @@ class AdvancedUserHelper(private val databaseName: String) {
             limit?.let { append(" LIMIT $it") }
             offset?.let { append(" OFFSET $it") }
         }
-        val result = NativeSqliteManager.query(databaseName, sql, whereArgs)
+        val result = NativeSqliteManager.Instance.query(databaseName, sql, whereArgs)
         val rows = result["rows"] as? List<List<Any?>> ?: return emptyList()
         val columns = result["columns"] as List<String>
         val columnMap = columns.withIndex().associate { it.value to it.index }
@@ -309,7 +308,7 @@ class AdvancedUserHelper(private val databaseName: String) {
         } else {
             "SELECT COUNT(*) FROM ${AdvancedUserSchema.TABLE_NAME}"
         }
-        val result = NativeSqliteManager.query(databaseName, sql, whereArgs)
+        val result = NativeSqliteManager.Instance.query(databaseName, sql, whereArgs)
         val rows = result["rows"] as? List<List<Any?>> ?: return 0
         return (rows.firstOrNull()?.firstOrNull() as? Long) ?: 0
     }
@@ -327,7 +326,7 @@ class AdvancedUserHelper(private val databaseName: String) {
         } else {
             "SELECT MAX($column) FROM ${AdvancedUserSchema.TABLE_NAME}"
         }
-        val result = NativeSqliteManager.query(databaseName, sql, whereArgs)
+        val result = NativeSqliteManager.Instance.query(databaseName, sql, whereArgs)
         val rows = result["rows"] as? List<List<Any?>> ?: return null
         return rows.firstOrNull()?.firstOrNull()
     }
@@ -345,7 +344,7 @@ class AdvancedUserHelper(private val databaseName: String) {
         } else {
             "SELECT MIN($column) FROM ${AdvancedUserSchema.TABLE_NAME}"
         }
-        val result = NativeSqliteManager.query(databaseName, sql, whereArgs)
+        val result = NativeSqliteManager.Instance.query(databaseName, sql, whereArgs)
         val rows = result["rows"] as? List<List<Any?>> ?: return null
         return rows.firstOrNull()?.firstOrNull()
     }
@@ -363,7 +362,7 @@ class AdvancedUserHelper(private val databaseName: String) {
         } else {
             "SELECT AVG($column) FROM ${AdvancedUserSchema.TABLE_NAME}"
         }
-        val result = NativeSqliteManager.query(databaseName, sql, whereArgs)
+        val result = NativeSqliteManager.Instance.query(databaseName, sql, whereArgs)
         val rows = result["rows"] as? List<List<Any?>> ?: return null
         return rows.firstOrNull()?.firstOrNull() as? Double
     }
@@ -381,7 +380,7 @@ class AdvancedUserHelper(private val databaseName: String) {
         } else {
             "SELECT SUM($column) FROM ${AdvancedUserSchema.TABLE_NAME}"
         }
-        val result = NativeSqliteManager.query(databaseName, sql, whereArgs)
+        val result = NativeSqliteManager.Instance.query(databaseName, sql, whereArgs)
         val rows = result["rows"] as? List<List<Any?>> ?: return null
         return rows.firstOrNull()?.firstOrNull() as? Double
     }

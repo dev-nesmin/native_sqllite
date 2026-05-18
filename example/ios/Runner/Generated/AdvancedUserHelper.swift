@@ -134,7 +134,7 @@ public class AdvancedUserHelper {
         self.databaseName = databaseName
     }
 
-    public func insert(_ entity: AdvancedUser) throws -> Int {
+    public func insert(_ entity: AdvancedUser) throws -> Int64 {
         var values: [String: Any] = [:]
         values[AdvancedUserSchema.name] = entity.name
         values[AdvancedUserSchema.phoneNumber] = entity.phoneNumber ?? NSNull()
@@ -271,7 +271,6 @@ public class AdvancedUserHelper {
      * - Throws: Database errors
      */
     public func insertBatch(_ entities: [AdvancedUser]) throws -> [Int64] {
-        let db = try manager.getDatabase(name: databaseName)
         var results: [Int64] = []
         
         try manager.execute(name: databaseName, sql: "BEGIN TRANSACTION")
@@ -480,7 +479,6 @@ public class AdvancedUserHelper {
         let result = try manager.query(name: databaseName, sql: sql, arguments: whereArgs)
         guard let rows = result["rows"] as? [[Any?]] else { return nil }
         return rows.first?.first as? Double
-    }
     }
 
     private func fromRow(columnMap: [String: Int], row: [Any?]) -> AdvancedUser {

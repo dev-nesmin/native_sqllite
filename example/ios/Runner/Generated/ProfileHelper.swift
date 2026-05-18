@@ -116,7 +116,7 @@ public class ProfileHelper {
         self.databaseName = databaseName
     }
 
-    public func insert(_ entity: Profile) throws -> Int {
+    public func insert(_ entity: Profile) throws -> Int64 {
         var values: [String: Any] = [:]
         values[ProfileSchema.name] = entity.name
         values[ProfileSchema.email] = entity.email
@@ -241,7 +241,6 @@ public class ProfileHelper {
      * - Throws: Database errors
      */
     public func insertBatch(_ entities: [Profile]) throws -> [Int64] {
-        let db = try manager.getDatabase(name: databaseName)
         var results: [Int64] = []
         
         try manager.execute(name: databaseName, sql: "BEGIN TRANSACTION")
@@ -450,7 +449,6 @@ public class ProfileHelper {
         let result = try manager.query(name: databaseName, sql: sql, arguments: whereArgs)
         guard let rows = result["rows"] as? [[Any?]] else { return nil }
         return rows.first?.first as? Double
-    }
     }
 
     private func fromRow(columnMap: [String: Int], row: [Any?]) -> Profile {

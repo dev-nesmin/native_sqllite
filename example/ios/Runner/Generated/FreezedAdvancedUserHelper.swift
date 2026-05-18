@@ -113,7 +113,7 @@ public class FreezedAdvancedUserHelper {
         self.databaseName = databaseName
     }
 
-    public func insert(_ entity: FreezedAdvancedUser) throws -> Int {
+    public func insert(_ entity: FreezedAdvancedUser) throws -> Int64 {
         var values: [String: Any] = [:]
         values[FreezedAdvancedUserSchema.name] = entity.name
         values[FreezedAdvancedUserSchema.loginDuration] = entity.loginDuration ?? NSNull()
@@ -236,7 +236,6 @@ public class FreezedAdvancedUserHelper {
      * - Throws: Database errors
      */
     public func insertBatch(_ entities: [FreezedAdvancedUser]) throws -> [Int64] {
-        let db = try manager.getDatabase(name: databaseName)
         var results: [Int64] = []
         
         try manager.execute(name: databaseName, sql: "BEGIN TRANSACTION")
@@ -445,7 +444,6 @@ public class FreezedAdvancedUserHelper {
         let result = try manager.query(name: databaseName, sql: sql, arguments: whereArgs)
         guard let rows = result["rows"] as? [[Any?]] else { return nil }
         return rows.first?.first as? Double
-    }
     }
 
     private func fromRow(columnMap: [String: Int], row: [Any?]) -> FreezedAdvancedUser {

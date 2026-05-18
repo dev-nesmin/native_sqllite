@@ -1,6 +1,5 @@
 package com.example.native_sqlite_example.generated
 
-import android.content.ContentValues
 import dev.nesmin.native_sqlite.NativeSqliteManager
 import java.util.concurrent.ConcurrentHashMap
 
@@ -85,21 +84,21 @@ class ProfileHelper(private val databaseName: String) {
     }
 
     fun insert(entity: Profile): Long {
-        val values = ContentValues().apply {
-            put(ProfileSchema.NAME, entity.name)
-            put(ProfileSchema.EMAIL, entity.email)
-            put(ProfileSchema.PHONE_NUMBER, entity.phoneNumber)
-            put(ProfileSchema.SETTINGS, entity.settings?.let { Json.encodeToString(it) })
-            put(ProfileSchema.TAGS, entity.tags?.let { Json.encodeToString(it) })
-            put(ProfileSchema.ADDRESS, entity.address)
-            put(ProfileSchema.ADDRESSES, entity.addresses?.let { Json.encodeToString(it) })
-            put(ProfileSchema.METADATA, entity.metadata)
-        }
-        return NativeSqliteManager.insert(databaseName, ProfileSchema.TABLE_NAME, values)
+        val values: Map<String, Any?> = mapOf(
+            ProfileSchema.NAME to entity.name,
+            ProfileSchema.EMAIL to entity.email,
+            ProfileSchema.PHONE_NUMBER to entity.phoneNumber,
+            ProfileSchema.SETTINGS to entity.settings?.let { Json.encodeToString(it) },
+            ProfileSchema.TAGS to entity.tags?.let { Json.encodeToString(it) },
+            ProfileSchema.ADDRESS to entity.address,
+            ProfileSchema.ADDRESSES to entity.addresses?.let { Json.encodeToString(it) },
+            ProfileSchema.METADATA to entity.metadata
+        )
+        return NativeSqliteManager.Instance.insert(databaseName, ProfileSchema.TABLE_NAME, values)
     }
 
     fun findById(id: Long): Profile? {
-        val result = NativeSqliteManager.query(
+        val result = NativeSqliteManager.Instance.query(
             databaseName,
             "SELECT * FROM ${ProfileSchema.TABLE_NAME} WHERE ${ProfileSchema.ID} = ? LIMIT 1",
             listOf(id)
@@ -112,7 +111,7 @@ class ProfileHelper(private val databaseName: String) {
     }
 
     fun findAll(): List<Profile> {
-        val result = NativeSqliteManager.query(databaseName, "SELECT * FROM ${ProfileSchema.TABLE_NAME}")
+        val result = NativeSqliteManager.Instance.query(databaseName, "SELECT * FROM ${ProfileSchema.TABLE_NAME}")
         val rows = result["rows"] as? List<List<Any?>> ?: return emptyList()
         val columns = result["columns"] as List<String>
         val columnMap = columns.withIndex().associate { it.value to it.index }
@@ -125,17 +124,17 @@ class ProfileHelper(private val databaseName: String) {
      * @return Number of rows affected
      */
     fun update(entity: Profile): Int {
-        val values = ContentValues().apply {
-            put(ProfileSchema.NAME, entity.name)
-            put(ProfileSchema.EMAIL, entity.email)
-            put(ProfileSchema.PHONE_NUMBER, entity.phoneNumber)
-            put(ProfileSchema.SETTINGS, entity.settings?.let { Json.encodeToString(it) })
-            put(ProfileSchema.TAGS, entity.tags?.let { Json.encodeToString(it) })
-            put(ProfileSchema.ADDRESS, entity.address)
-            put(ProfileSchema.ADDRESSES, entity.addresses?.let { Json.encodeToString(it) })
-            put(ProfileSchema.METADATA, entity.metadata)
-        }
-        return NativeSqliteManager.update(
+        val values: Map<String, Any?> = mapOf(
+            ProfileSchema.NAME to entity.name,
+            ProfileSchema.EMAIL to entity.email,
+            ProfileSchema.PHONE_NUMBER to entity.phoneNumber,
+            ProfileSchema.SETTINGS to entity.settings?.let { Json.encodeToString(it) },
+            ProfileSchema.TAGS to entity.tags?.let { Json.encodeToString(it) },
+            ProfileSchema.ADDRESS to entity.address,
+            ProfileSchema.ADDRESSES to entity.addresses?.let { Json.encodeToString(it) },
+            ProfileSchema.METADATA to entity.metadata
+        )
+        return NativeSqliteManager.Instance.update(
             databaseName,
             ProfileSchema.TABLE_NAME,
             values,
@@ -151,7 +150,7 @@ class ProfileHelper(private val databaseName: String) {
      * @return Number of rows affected
      */
     fun updatePartial(id: Long, updates: Map<String, Any?>): Int {
-        return NativeSqliteManager.update(
+        return NativeSqliteManager.Instance.update(
             databaseName,
             ProfileSchema.TABLE_NAME,
             updates,
@@ -166,7 +165,7 @@ class ProfileHelper(private val databaseName: String) {
      * @return Number of rows deleted
      */
     fun delete(id: Long): Int {
-        return NativeSqliteManager.delete(
+        return NativeSqliteManager.Instance.delete(
             databaseName,
             ProfileSchema.TABLE_NAME,
             "${ProfileSchema.ID} = ?",
@@ -181,7 +180,7 @@ class ProfileHelper(private val databaseName: String) {
      * @return Number of rows deleted
      */
     fun deleteWhere(whereClause: String, whereArgs: List<Any?>? = null): Int {
-        return NativeSqliteManager.delete(
+        return NativeSqliteManager.Instance.delete(
             databaseName,
             ProfileSchema.TABLE_NAME,
             whereClause,
@@ -195,7 +194,7 @@ class ProfileHelper(private val databaseName: String) {
      * @return List of inserted row IDs
      */
     fun insertBatch(entities: List<Profile>): List<Long> {
-        val db = NativeSqliteManager.getDatabase(databaseName)
+        val db = NativeSqliteManager.Instance.getDatabase(databaseName)
         val results = mutableListOf<Long>()
         db.beginTransaction()
         try {
@@ -215,7 +214,7 @@ class ProfileHelper(private val databaseName: String) {
      * @return Total number of rows affected
      */
     fun updateBatch(entities: List<Profile>): Int {
-        val db = NativeSqliteManager.getDatabase(databaseName)
+        val db = NativeSqliteManager.Instance.getDatabase(databaseName)
         var totalAffected = 0
         db.beginTransaction()
         try {
@@ -235,7 +234,7 @@ class ProfileHelper(private val databaseName: String) {
      * @return Total number of rows deleted
      */
     fun deleteBatch(ids: List<Long>): Int {
-        val db = NativeSqliteManager.getDatabase(databaseName)
+        val db = NativeSqliteManager.Instance.getDatabase(databaseName)
         var totalDeleted = 0
         db.beginTransaction()
         try {
@@ -272,7 +271,7 @@ class ProfileHelper(private val databaseName: String) {
             limit?.let { append(" LIMIT $it") }
             offset?.let { append(" OFFSET $it") }
         }
-        val result = NativeSqliteManager.query(databaseName, sql, whereArgs)
+        val result = NativeSqliteManager.Instance.query(databaseName, sql, whereArgs)
         val rows = result["rows"] as? List<List<Any?>> ?: return emptyList()
         val columns = result["columns"] as List<String>
         val columnMap = columns.withIndex().associate { it.value to it.index }
@@ -291,7 +290,7 @@ class ProfileHelper(private val databaseName: String) {
         } else {
             "SELECT COUNT(*) FROM ${ProfileSchema.TABLE_NAME}"
         }
-        val result = NativeSqliteManager.query(databaseName, sql, whereArgs)
+        val result = NativeSqliteManager.Instance.query(databaseName, sql, whereArgs)
         val rows = result["rows"] as? List<List<Any?>> ?: return 0
         return (rows.firstOrNull()?.firstOrNull() as? Long) ?: 0
     }
@@ -309,7 +308,7 @@ class ProfileHelper(private val databaseName: String) {
         } else {
             "SELECT MAX($column) FROM ${ProfileSchema.TABLE_NAME}"
         }
-        val result = NativeSqliteManager.query(databaseName, sql, whereArgs)
+        val result = NativeSqliteManager.Instance.query(databaseName, sql, whereArgs)
         val rows = result["rows"] as? List<List<Any?>> ?: return null
         return rows.firstOrNull()?.firstOrNull()
     }
@@ -327,7 +326,7 @@ class ProfileHelper(private val databaseName: String) {
         } else {
             "SELECT MIN($column) FROM ${ProfileSchema.TABLE_NAME}"
         }
-        val result = NativeSqliteManager.query(databaseName, sql, whereArgs)
+        val result = NativeSqliteManager.Instance.query(databaseName, sql, whereArgs)
         val rows = result["rows"] as? List<List<Any?>> ?: return null
         return rows.firstOrNull()?.firstOrNull()
     }
@@ -345,7 +344,7 @@ class ProfileHelper(private val databaseName: String) {
         } else {
             "SELECT AVG($column) FROM ${ProfileSchema.TABLE_NAME}"
         }
-        val result = NativeSqliteManager.query(databaseName, sql, whereArgs)
+        val result = NativeSqliteManager.Instance.query(databaseName, sql, whereArgs)
         val rows = result["rows"] as? List<List<Any?>> ?: return null
         return rows.firstOrNull()?.firstOrNull() as? Double
     }
@@ -363,7 +362,7 @@ class ProfileHelper(private val databaseName: String) {
         } else {
             "SELECT SUM($column) FROM ${ProfileSchema.TABLE_NAME}"
         }
-        val result = NativeSqliteManager.query(databaseName, sql, whereArgs)
+        val result = NativeSqliteManager.Instance.query(databaseName, sql, whereArgs)
         val rows = result["rows"] as? List<List<Any?>> ?: return null
         return rows.firstOrNull()?.firstOrNull() as? Double
     }

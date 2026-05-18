@@ -101,7 +101,7 @@ public class CategoryHelper {
         self.databaseName = databaseName
     }
 
-    public func insert(_ entity: Category) throws -> Int {
+    public func insert(_ entity: Category) throws -> Int64 {
         var values: [String: Any] = [:]
         values[CategorySchema.name] = entity.name
         values[CategorySchema.description] = entity.description ?? NSNull()
@@ -216,7 +216,6 @@ public class CategoryHelper {
      * - Throws: Database errors
      */
     public func insertBatch(_ entities: [Category]) throws -> [Int64] {
-        let db = try manager.getDatabase(name: databaseName)
         var results: [Int64] = []
         
         try manager.execute(name: databaseName, sql: "BEGIN TRANSACTION")
@@ -425,7 +424,6 @@ public class CategoryHelper {
         let result = try manager.query(name: databaseName, sql: sql, arguments: whereArgs)
         guard let rows = result["rows"] as? [[Any?]] else { return nil }
         return rows.first?.first as? Double
-    }
     }
 
     private func fromRow(columnMap: [String: Int], row: [Any?]) -> Category {

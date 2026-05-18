@@ -107,7 +107,7 @@ public class StyledItemHelper {
         self.databaseName = databaseName
     }
 
-    public func insert(_ entity: StyledItem) throws -> Int {
+    public func insert(_ entity: StyledItem) throws -> Int64 {
         var values: [String: Any] = [:]
         values[StyledItemSchema.name] = entity.name
         values[StyledItemSchema.backgroundColor] = entity.backgroundColor
@@ -226,7 +226,6 @@ public class StyledItemHelper {
      * - Throws: Database errors
      */
     public func insertBatch(_ entities: [StyledItem]) throws -> [Int64] {
-        let db = try manager.getDatabase(name: databaseName)
         var results: [Int64] = []
         
         try manager.execute(name: databaseName, sql: "BEGIN TRANSACTION")
@@ -435,7 +434,6 @@ public class StyledItemHelper {
         let result = try manager.query(name: databaseName, sql: sql, arguments: whereArgs)
         guard let rows = result["rows"] as? [[Any?]] else { return nil }
         return rows.first?.first as? Double
-    }
     }
 
     private func fromRow(columnMap: [String: Int], row: [Any?]) -> StyledItem {

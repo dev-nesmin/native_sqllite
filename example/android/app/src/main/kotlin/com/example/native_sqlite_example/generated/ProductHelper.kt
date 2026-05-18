@@ -1,6 +1,5 @@
 package com.example.native_sqlite_example.generated
 
-import android.content.ContentValues
 import dev.nesmin.native_sqlite.NativeSqliteManager
 import java.util.concurrent.ConcurrentHashMap
 
@@ -86,22 +85,22 @@ class ProductHelper(private val databaseName: String) {
     }
 
     fun insert(entity: Product): Long {
-        val values = ContentValues().apply {
-            put(ProductSchema.NAME, entity.name)
-            put(ProductSchema.DESCRIPTION, entity.description)
-            put(ProductSchema.PRICE, entity.price)
-            put(ProductSchema.STOCK, entity.stock)
-            put(ProductSchema.IS_AVAILABLE, if (entity.isAvailable) 1 else 0)
-            put(ProductSchema.CATEGORY_ID, entity.categoryId)
-            put(ProductSchema.IMAGE_URL, entity.imageUrl)
-            put(ProductSchema.CREATED_AT, entity.createdAt.toEpochMilliseconds())
-            put(ProductSchema.UPDATED_AT, entity.updatedAt?.toEpochMilliseconds())
-        }
-        return NativeSqliteManager.insert(databaseName, ProductSchema.TABLE_NAME, values)
+        val values: Map<String, Any?> = mapOf(
+            ProductSchema.NAME to entity.name,
+            ProductSchema.DESCRIPTION to entity.description,
+            ProductSchema.PRICE to entity.price,
+            ProductSchema.STOCK to entity.stock,
+            ProductSchema.IS_AVAILABLE to if (entity.isAvailable) 1 else 0,
+            ProductSchema.CATEGORY_ID to entity.categoryId,
+            ProductSchema.IMAGE_URL to entity.imageUrl,
+            ProductSchema.CREATED_AT to entity.createdAt.toEpochMilliseconds(),
+            ProductSchema.UPDATED_AT to entity.updatedAt?.toEpochMilliseconds()
+        )
+        return NativeSqliteManager.Instance.insert(databaseName, ProductSchema.TABLE_NAME, values)
     }
 
     fun findById(id: Long): Product? {
-        val result = NativeSqliteManager.query(
+        val result = NativeSqliteManager.Instance.query(
             databaseName,
             "SELECT * FROM ${ProductSchema.TABLE_NAME} WHERE ${ProductSchema.ID} = ? LIMIT 1",
             listOf(id)
@@ -114,7 +113,7 @@ class ProductHelper(private val databaseName: String) {
     }
 
     fun findAll(): List<Product> {
-        val result = NativeSqliteManager.query(databaseName, "SELECT * FROM ${ProductSchema.TABLE_NAME}")
+        val result = NativeSqliteManager.Instance.query(databaseName, "SELECT * FROM ${ProductSchema.TABLE_NAME}")
         val rows = result["rows"] as? List<List<Any?>> ?: return emptyList()
         val columns = result["columns"] as List<String>
         val columnMap = columns.withIndex().associate { it.value to it.index }
@@ -127,18 +126,18 @@ class ProductHelper(private val databaseName: String) {
      * @return Number of rows affected
      */
     fun update(entity: Product): Int {
-        val values = ContentValues().apply {
-            put(ProductSchema.NAME, entity.name)
-            put(ProductSchema.DESCRIPTION, entity.description)
-            put(ProductSchema.PRICE, entity.price)
-            put(ProductSchema.STOCK, entity.stock)
-            put(ProductSchema.IS_AVAILABLE, if (entity.isAvailable) 1 else 0)
-            put(ProductSchema.CATEGORY_ID, entity.categoryId)
-            put(ProductSchema.IMAGE_URL, entity.imageUrl)
-            put(ProductSchema.CREATED_AT, entity.createdAt.toEpochMilliseconds())
-            put(ProductSchema.UPDATED_AT, entity.updatedAt?.toEpochMilliseconds())
-        }
-        return NativeSqliteManager.update(
+        val values: Map<String, Any?> = mapOf(
+            ProductSchema.NAME to entity.name,
+            ProductSchema.DESCRIPTION to entity.description,
+            ProductSchema.PRICE to entity.price,
+            ProductSchema.STOCK to entity.stock,
+            ProductSchema.IS_AVAILABLE to if (entity.isAvailable) 1 else 0,
+            ProductSchema.CATEGORY_ID to entity.categoryId,
+            ProductSchema.IMAGE_URL to entity.imageUrl,
+            ProductSchema.CREATED_AT to entity.createdAt.toEpochMilliseconds(),
+            ProductSchema.UPDATED_AT to entity.updatedAt?.toEpochMilliseconds()
+        )
+        return NativeSqliteManager.Instance.update(
             databaseName,
             ProductSchema.TABLE_NAME,
             values,
@@ -154,7 +153,7 @@ class ProductHelper(private val databaseName: String) {
      * @return Number of rows affected
      */
     fun updatePartial(id: Long, updates: Map<String, Any?>): Int {
-        return NativeSqliteManager.update(
+        return NativeSqliteManager.Instance.update(
             databaseName,
             ProductSchema.TABLE_NAME,
             updates,
@@ -169,7 +168,7 @@ class ProductHelper(private val databaseName: String) {
      * @return Number of rows deleted
      */
     fun delete(id: Long): Int {
-        return NativeSqliteManager.delete(
+        return NativeSqliteManager.Instance.delete(
             databaseName,
             ProductSchema.TABLE_NAME,
             "${ProductSchema.ID} = ?",
@@ -184,7 +183,7 @@ class ProductHelper(private val databaseName: String) {
      * @return Number of rows deleted
      */
     fun deleteWhere(whereClause: String, whereArgs: List<Any?>? = null): Int {
-        return NativeSqliteManager.delete(
+        return NativeSqliteManager.Instance.delete(
             databaseName,
             ProductSchema.TABLE_NAME,
             whereClause,
@@ -198,7 +197,7 @@ class ProductHelper(private val databaseName: String) {
      * @return List of inserted row IDs
      */
     fun insertBatch(entities: List<Product>): List<Long> {
-        val db = NativeSqliteManager.getDatabase(databaseName)
+        val db = NativeSqliteManager.Instance.getDatabase(databaseName)
         val results = mutableListOf<Long>()
         db.beginTransaction()
         try {
@@ -218,7 +217,7 @@ class ProductHelper(private val databaseName: String) {
      * @return Total number of rows affected
      */
     fun updateBatch(entities: List<Product>): Int {
-        val db = NativeSqliteManager.getDatabase(databaseName)
+        val db = NativeSqliteManager.Instance.getDatabase(databaseName)
         var totalAffected = 0
         db.beginTransaction()
         try {
@@ -238,7 +237,7 @@ class ProductHelper(private val databaseName: String) {
      * @return Total number of rows deleted
      */
     fun deleteBatch(ids: List<Long>): Int {
-        val db = NativeSqliteManager.getDatabase(databaseName)
+        val db = NativeSqliteManager.Instance.getDatabase(databaseName)
         var totalDeleted = 0
         db.beginTransaction()
         try {
@@ -275,7 +274,7 @@ class ProductHelper(private val databaseName: String) {
             limit?.let { append(" LIMIT $it") }
             offset?.let { append(" OFFSET $it") }
         }
-        val result = NativeSqliteManager.query(databaseName, sql, whereArgs)
+        val result = NativeSqliteManager.Instance.query(databaseName, sql, whereArgs)
         val rows = result["rows"] as? List<List<Any?>> ?: return emptyList()
         val columns = result["columns"] as List<String>
         val columnMap = columns.withIndex().associate { it.value to it.index }
@@ -294,7 +293,7 @@ class ProductHelper(private val databaseName: String) {
         } else {
             "SELECT COUNT(*) FROM ${ProductSchema.TABLE_NAME}"
         }
-        val result = NativeSqliteManager.query(databaseName, sql, whereArgs)
+        val result = NativeSqliteManager.Instance.query(databaseName, sql, whereArgs)
         val rows = result["rows"] as? List<List<Any?>> ?: return 0
         return (rows.firstOrNull()?.firstOrNull() as? Long) ?: 0
     }
@@ -312,7 +311,7 @@ class ProductHelper(private val databaseName: String) {
         } else {
             "SELECT MAX($column) FROM ${ProductSchema.TABLE_NAME}"
         }
-        val result = NativeSqliteManager.query(databaseName, sql, whereArgs)
+        val result = NativeSqliteManager.Instance.query(databaseName, sql, whereArgs)
         val rows = result["rows"] as? List<List<Any?>> ?: return null
         return rows.firstOrNull()?.firstOrNull()
     }
@@ -330,7 +329,7 @@ class ProductHelper(private val databaseName: String) {
         } else {
             "SELECT MIN($column) FROM ${ProductSchema.TABLE_NAME}"
         }
-        val result = NativeSqliteManager.query(databaseName, sql, whereArgs)
+        val result = NativeSqliteManager.Instance.query(databaseName, sql, whereArgs)
         val rows = result["rows"] as? List<List<Any?>> ?: return null
         return rows.firstOrNull()?.firstOrNull()
     }
@@ -348,7 +347,7 @@ class ProductHelper(private val databaseName: String) {
         } else {
             "SELECT AVG($column) FROM ${ProductSchema.TABLE_NAME}"
         }
-        val result = NativeSqliteManager.query(databaseName, sql, whereArgs)
+        val result = NativeSqliteManager.Instance.query(databaseName, sql, whereArgs)
         val rows = result["rows"] as? List<List<Any?>> ?: return null
         return rows.firstOrNull()?.firstOrNull() as? Double
     }
@@ -366,7 +365,7 @@ class ProductHelper(private val databaseName: String) {
         } else {
             "SELECT SUM($column) FROM ${ProductSchema.TABLE_NAME}"
         }
-        val result = NativeSqliteManager.query(databaseName, sql, whereArgs)
+        val result = NativeSqliteManager.Instance.query(databaseName, sql, whereArgs)
         val rows = result["rows"] as? List<List<Any?>> ?: return null
         return rows.firstOrNull()?.firstOrNull() as? Double
     }

@@ -119,7 +119,7 @@ public class OrderHelper {
         self.databaseName = databaseName
     }
 
-    public func insert(_ entity: Order) throws -> Int {
+    public func insert(_ entity: Order) throws -> Int64 {
         var values: [String: Any] = [:]
         values[OrderSchema.userId] = entity.userId
         values[OrderSchema.productId] = entity.productId
@@ -246,7 +246,6 @@ public class OrderHelper {
      * - Throws: Database errors
      */
     public func insertBatch(_ entities: [Order]) throws -> [Int64] {
-        let db = try manager.getDatabase(name: databaseName)
         var results: [Int64] = []
         
         try manager.execute(name: databaseName, sql: "BEGIN TRANSACTION")
@@ -455,7 +454,6 @@ public class OrderHelper {
         let result = try manager.query(name: databaseName, sql: sql, arguments: whereArgs)
         guard let rows = result["rows"] as? [[Any?]] else { return nil }
         return rows.first?.first as? Double
-    }
     }
 
     private func fromRow(columnMap: [String: Int], row: [Any?]) -> Order {

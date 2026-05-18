@@ -224,8 +224,9 @@ class NativeSwiftGenerator {
     buffer.writeln();
 
     // Insert method
+    final pkSwiftType = _getSwiftType(primaryKey).replaceAll('?', '');
     buffer.writeln(
-      '    public func insert(_ entity: ${model.className}) throws -> Int {',
+      '    public func insert(_ entity: ${model.className}) throws -> Int64 {',
     );
     buffer.writeln('        var values: [String: Any] = [:]');
     for (final field in model.columns) {
@@ -244,7 +245,7 @@ class NativeSwiftGenerator {
 
     // FindById method
     buffer.writeln(
-      '    public func findById(_ id: Int) throws -> ${model.className}? {',
+      '    public func findById(_ id: $pkSwiftType) throws -> ${model.className}? {',
     );
     buffer.writeln('        let result = try manager.query(');
     buffer.writeln('            name: databaseName,');
@@ -338,7 +339,7 @@ class NativeSwiftGenerator {
     buffer.writeln('     * - Throws: Database errors');
     buffer.writeln('     */');
     buffer.writeln(
-      '    public func updatePartial(id: Int, updates: [String: Any]) throws -> Int {',
+      '    public func updatePartial(id: $pkSwiftType, updates: [String: Any]) throws -> Int {',
     );
     buffer.writeln('        return try manager.update(');
     buffer.writeln('            name: databaseName,');
@@ -359,7 +360,7 @@ class NativeSwiftGenerator {
     buffer.writeln('     * - Returns: Number of rows deleted');
     buffer.writeln('     * - Throws: Database errors');
     buffer.writeln('     */');
-    buffer.writeln('    public func delete(id: Int) throws -> Int {');
+    buffer.writeln('    public func delete(id: $pkSwiftType) throws -> Int {');
     buffer.writeln('        return try manager.delete(');
     buffer.writeln('            name: databaseName,');
     buffer.writeln('            table: ${model.className}Schema.tableName,');
@@ -403,9 +404,6 @@ class NativeSwiftGenerator {
     buffer.writeln('     */');
     buffer.writeln(
       '    public func insertBatch(_ entities: [${model.className}]) throws -> [Int64] {',
-    );
-    buffer.writeln(
-      '        let db = try manager.getDatabase(name: databaseName)',
     );
     buffer.writeln('        var results: [Int64] = []');
     buffer.writeln('        ');
@@ -471,7 +469,7 @@ class NativeSwiftGenerator {
     buffer.writeln('     * - Returns: Total number of rows deleted');
     buffer.writeln('     * - Throws: Database errors');
     buffer.writeln('     */');
-    buffer.writeln('    public func deleteBatch(ids: [Int]) throws -> Int {');
+    buffer.writeln('    public func deleteBatch(ids: [$pkSwiftType]) throws -> Int {');
     buffer.writeln('        var totalDeleted = 0');
     buffer.writeln('        ');
     buffer.writeln(
@@ -716,7 +714,6 @@ class NativeSwiftGenerator {
       '        guard let rows = result["rows"] as? [[Any?]] else { return nil }',
     );
     buffer.writeln('        return rows.first?.first as? Double');
-    buffer.writeln('    }');
     buffer.writeln('    }');
     buffer.writeln();
 

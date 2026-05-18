@@ -79,7 +79,6 @@ class NativeKotlinGenerator {
 
     buffer.writeln('package $packageName');
     buffer.writeln();
-    buffer.writeln('import android.content.ContentValues');
     buffer.writeln('import dev.nesmin.native_sqlite.NativeSqliteManager');
     buffer.writeln('import java.util.concurrent.ConcurrentHashMap');
     buffer.writeln();
@@ -192,25 +191,27 @@ class NativeKotlinGenerator {
 
     // Insert method
     buffer.writeln('    fun insert(entity: ${model.className}): Long {');
-    buffer.writeln('        val values = ContentValues().apply {');
-    for (final field in model.columns) {
-      if (field.primaryKey && field.autoIncrement) continue;
-
+    buffer.writeln('        val values: Map<String, Any?> = mapOf(');
+    final insertFields = model.columns.where((f) => !(f.primaryKey && f.autoIncrement)).toList();
+    for (var i = 0; i < insertFields.length; i++) {
+      final field = insertFields[i];
       final value = _serializeKotlin(field, 'entity.${field.dartName}');
+      final comma = i < insertFields.length - 1 ? ',' : '';
       buffer.writeln(
-        '            put(${model.className}Schema.${_toScreamingSnakeCase(field.dartName)}, $value)',
+        '            ${model.className}Schema.${_toScreamingSnakeCase(field.dartName)} to $value$comma',
       );
     }
-    buffer.writeln('        }');
+    buffer.writeln('        )');
     buffer.writeln(
-      '        return NativeSqliteManager.insert(databaseName, ${model.className}Schema.TABLE_NAME, values)',
+      '        return NativeSqliteManager.Instance.insert(databaseName, ${model.className}Schema.TABLE_NAME, values)',
     );
     buffer.writeln('    }');
     buffer.writeln();
 
     // FindById method
-    buffer.writeln('    fun findById(id: Long): ${model.className}? {');
-    buffer.writeln('        val result = NativeSqliteManager.query(');
+    final pkKotlinType = _getKotlinType(primaryKey).replaceAll('?', '');
+    buffer.writeln('    fun findById(id: $pkKotlinType): ${model.className}? {');
+    buffer.writeln('        val result = NativeSqliteManager.Instance.query(');
     buffer.writeln('            databaseName,');
     buffer.writeln(
       '            "SELECT * FROM \${${model.className}Schema.TABLE_NAME} WHERE \${${model.className}Schema.${_toScreamingSnakeCase(primaryKey.dartName)}} = ? LIMIT 1",',
@@ -232,7 +233,7 @@ class NativeKotlinGenerator {
     // FindAll method
     buffer.writeln('    fun findAll(): List<${model.className}> {');
     buffer.writeln(
-      '        val result = NativeSqliteManager.query(databaseName, "SELECT * FROM \${${model.className}Schema.TABLE_NAME}")',
+      '        val result = NativeSqliteManager.Instance.query(databaseName, "SELECT * FROM \${${model.className}Schema.TABLE_NAME}")',
     );
     buffer.writeln(
       '        val rows = result["rows"] as? List<List<Any?>> ?: return emptyList()',
@@ -254,16 +255,18 @@ class NativeKotlinGenerator {
     buffer.writeln('     * @return Number of rows affected');
     buffer.writeln('     */');
     buffer.writeln('    fun update(entity: ${model.className}): Int {');
-    buffer.writeln('        val values = ContentValues().apply {');
-    for (final field in model.columns) {
-      if (field.primaryKey) continue; // Skip PK in updates
+    buffer.writeln('        val values: Map<String, Any?> = mapOf(');
+    final updateFields = model.columns.where((f) => !f.primaryKey).toList();
+    for (var i = 0; i < updateFields.length; i++) {
+      final field = updateFields[i];
       final value = _serializeKotlin(field, 'entity.${field.dartName}');
+      final comma = i < updateFields.length - 1 ? ',' : '';
       buffer.writeln(
-        '            put(${model.className}Schema.${_toScreamingSnakeCase(field.dartName)}, $value)',
+        '            ${model.className}Schema.${_toScreamingSnakeCase(field.dartName)} to $value$comma',
       );
     }
-    buffer.writeln('        }');
-    buffer.writeln('        return NativeSqliteManager.update(');
+    buffer.writeln('        )');
+    buffer.writeln('        return NativeSqliteManager.Instance.update(');
     buffer.writeln('            databaseName,');
     buffer.writeln('            ${model.className}Schema.TABLE_NAME,');
     buffer.writeln('            values,');
@@ -283,9 +286,9 @@ class NativeKotlinGenerator {
     buffer.writeln('     * @return Number of rows affected');
     buffer.writeln('     */');
     buffer.writeln(
-      '    fun updatePartial(id: Long, updates: Map<String, Any?>): Int {',
+      '    fun updatePartial(id: $pkKotlinType, updates: Map<String, Any?>): Int {',
     );
-    buffer.writeln('        return NativeSqliteManager.update(');
+    buffer.writeln('        return NativeSqliteManager.Instance.update(');
     buffer.writeln('            databaseName,');
     buffer.writeln('            ${model.className}Schema.TABLE_NAME,');
     buffer.writeln('            updates,');
@@ -303,8 +306,8 @@ class NativeKotlinGenerator {
     buffer.writeln('     * @param id The primary key value');
     buffer.writeln('     * @return Number of rows deleted');
     buffer.writeln('     */');
-    buffer.writeln('    fun delete(id: Long): Int {');
-    buffer.writeln('        return NativeSqliteManager.delete(');
+    buffer.writeln('    fun delete(id: $pkKotlinType): Int {');
+    buffer.writeln('        return NativeSqliteManager.Instance.delete(');
     buffer.writeln('            databaseName,');
     buffer.writeln('            ${model.className}Schema.TABLE_NAME,');
     buffer.writeln(
@@ -327,7 +330,7 @@ class NativeKotlinGenerator {
     buffer.writeln(
       '    fun deleteWhere(whereClause: String, whereArgs: List<Any?>? = null): Int {',
     );
-    buffer.writeln('        return NativeSqliteManager.delete(');
+    buffer.writeln('        return NativeSqliteManager.Instance.delete(');
     buffer.writeln('            databaseName,');
     buffer.writeln('            ${model.className}Schema.TABLE_NAME,');
     buffer.writeln('            whereClause,');
@@ -346,7 +349,7 @@ class NativeKotlinGenerator {
       '    fun insertBatch(entities: List<${model.className}>): List<Long> {',
     );
     buffer.writeln(
-      '        val db = NativeSqliteManager.getDatabase(databaseName)',
+      '        val db = NativeSqliteManager.Instance.getDatabase(databaseName)',
     );
     buffer.writeln('        val results = mutableListOf<Long>()');
     buffer.writeln('        db.beginTransaction()');
@@ -372,7 +375,7 @@ class NativeKotlinGenerator {
       '    fun updateBatch(entities: List<${model.className}>): Int {',
     );
     buffer.writeln(
-      '        val db = NativeSqliteManager.getDatabase(databaseName)',
+      '        val db = NativeSqliteManager.Instance.getDatabase(databaseName)',
     );
     buffer.writeln('        var totalAffected = 0');
     buffer.writeln('        db.beginTransaction()');
@@ -396,9 +399,9 @@ class NativeKotlinGenerator {
     buffer.writeln('     * @param ids List of primary key values');
     buffer.writeln('     * @return Total number of rows deleted');
     buffer.writeln('     */');
-    buffer.writeln('    fun deleteBatch(ids: List<Long>): Int {');
+    buffer.writeln('    fun deleteBatch(ids: List<$pkKotlinType>): Int {');
     buffer.writeln(
-      '        val db = NativeSqliteManager.getDatabase(databaseName)',
+      '        val db = NativeSqliteManager.Instance.getDatabase(databaseName)',
     );
     buffer.writeln('        var totalDeleted = 0');
     buffer.writeln('        db.beginTransaction()');
@@ -447,7 +450,7 @@ class NativeKotlinGenerator {
     buffer.writeln('            offset?.let { append(" OFFSET \$it") }');
     buffer.writeln('        }');
     buffer.writeln(
-      '        val result = NativeSqliteManager.query(databaseName, sql, whereArgs)',
+      '        val result = NativeSqliteManager.Instance.query(databaseName, sql, whereArgs)',
     );
     buffer.writeln(
       '        val rows = result["rows"] as? List<List<Any?>> ?: return emptyList()',
@@ -482,7 +485,7 @@ class NativeKotlinGenerator {
     );
     buffer.writeln('        }');
     buffer.writeln(
-      '        val result = NativeSqliteManager.query(databaseName, sql, whereArgs)',
+      '        val result = NativeSqliteManager.Instance.query(databaseName, sql, whereArgs)',
     );
     buffer.writeln(
       '        val rows = result["rows"] as? List<List<Any?>> ?: return 0',
@@ -514,7 +517,7 @@ class NativeKotlinGenerator {
     );
     buffer.writeln('        }');
     buffer.writeln(
-      '        val result = NativeSqliteManager.query(databaseName, sql, whereArgs)',
+      '        val result = NativeSqliteManager.Instance.query(databaseName, sql, whereArgs)',
     );
     buffer.writeln(
       '        val rows = result["rows"] as? List<List<Any?>> ?: return null',
@@ -543,7 +546,7 @@ class NativeKotlinGenerator {
     );
     buffer.writeln('        }');
     buffer.writeln(
-      '        val result = NativeSqliteManager.query(databaseName, sql, whereArgs)',
+      '        val result = NativeSqliteManager.Instance.query(databaseName, sql, whereArgs)',
     );
     buffer.writeln(
       '        val rows = result["rows"] as? List<List<Any?>> ?: return null',
@@ -572,7 +575,7 @@ class NativeKotlinGenerator {
     );
     buffer.writeln('        }');
     buffer.writeln(
-      '        val result = NativeSqliteManager.query(databaseName, sql, whereArgs)',
+      '        val result = NativeSqliteManager.Instance.query(databaseName, sql, whereArgs)',
     );
     buffer.writeln(
       '        val rows = result["rows"] as? List<List<Any?>> ?: return null',
@@ -603,7 +606,7 @@ class NativeKotlinGenerator {
     );
     buffer.writeln('        }');
     buffer.writeln(
-      '        val result = NativeSqliteManager.query(databaseName, sql, whereArgs)',
+      '        val result = NativeSqliteManager.Instance.query(databaseName, sql, whereArgs)',
     );
     buffer.writeln(
       '        val rows = result["rows"] as? List<List<Any?>> ?: return null',

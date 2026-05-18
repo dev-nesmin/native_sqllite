@@ -78,9 +78,12 @@ class SchemaRegistryBuilder implements Builder {
             final tableInfo = analyzer.analyze(element, annotation);
             tables.add(tableInfo);
 
-            final pathParts = assetId.path.split('/');
-            final fileName = pathParts.last.replaceAll('.dart', '');
-            tableFiles[tableInfo.dartName] = fileName;
+            // Store path relative to lib/ (without extension) so the import
+            // is reconstructed as package:<pkg>/<rel_path>.dart
+            final relPath = assetId.path
+                .replaceFirst('lib/', '')
+                .replaceAll('.dart', '');
+            tableFiles[tableInfo.dartName] = relPath;
           } catch (e) {
             log.warning('⚠️  Failed to analyze ${element.name}: $e');
           }
@@ -168,9 +171,9 @@ class SchemaRegistryBuilder implements Builder {
     buffer.writeln();
 
     for (final table in tables) {
-      final fileName =
-          tableFiles[table.dartName] ?? _toSnakeCase(table.dartName);
-      buffer.writeln("import 'package:$packageName/models/$fileName.dart';");
+      final relPath =
+          tableFiles[table.dartName] ?? 'models/${_toSnakeCase(table.dartName)}';
+      buffer.writeln("import 'package:$packageName/$relPath.dart';");
     }
 
     buffer.writeln();

@@ -28,6 +28,9 @@ class SchemaRegistryGenerator extends Generator {
     final tables = <TableInfo>[];
     final tableFiles = <String, String>{}; // dartName -> filename
 
+    // Capture the package name from the trigger file
+    final packageName = buildStep.inputId.package;
+
     // Scan all Dart files in lib/ for @DbTable annotations
     final dartFiles = Glob('lib/**.dart');
 
@@ -59,13 +62,15 @@ class SchemaRegistryGenerator extends Generator {
               final tableInfo = analyzer.analyze(element, annotation);
               tables.add(tableInfo);
 
-              // Extract filename from assetId path
-              final pathParts = assetId.path.split('/');
-              final fileName = pathParts.last.replaceAll('.dart', '');
-              tableFiles[tableInfo.dartName] = fileName;
+              // Store the path relative to lib/ (without extension) so the
+              // import can be reconstructed as package:<pkg>/<rel_path>.dart
+              final relPath = assetId.path
+                  .replaceFirst('lib/', '')
+                  .replaceAll('.dart', '');
+              tableFiles[tableInfo.dartName] = relPath;
 
               print(
-                'Found auto-managed table: ${tableInfo.sqlName} in $fileName.dart',
+                'Found auto-managed table: ${tableInfo.sqlName} in $relPath.dart',
               );
             } catch (e) {
               print('Failed to analyze table ${element.name}: $e');
@@ -85,7 +90,7 @@ class SchemaRegistryGenerator extends Generator {
     // Sort tables by dependencies (foreign keys)
     final sortedTables = _topologicalSort(tables);
 
-    return _generateRegistry(sortedTables, tableFiles);
+    return _generateRegistry(sortedTables, tableFiles, packageName);
   }
 
   /// Performs topological sort on tables based on foreign key dependencies.
@@ -136,6 +141,7 @@ class SchemaRegistryGenerator extends Generator {
   String _generateRegistry(
     List<TableInfo> tables,
     Map<String, String> tableFiles,
+    String packageName,
   ) {
     final buffer = StringBuffer();
 
@@ -151,13 +157,12 @@ class SchemaRegistryGenerator extends Generator {
     buffer.writeln("import 'package:native_sqlite/native_sqlite.dart';");
     buffer.writeln();
 
-    // Import all schema classes using absolute paths from lib/
+    // Import all schema classes using absolute package paths
     for (final table in tables) {
-      final fileName =
-          tableFiles[table.dartName] ?? _toSnakeCase(table.dartName);
-      buffer.writeln(
-        "import 'package:native_sqlite_example/models/$fileName.dart';",
-      );
+      final relPath =
+          tableFiles[table.dartName] ??
+          'models/${_toSnakeCase(table.dartName)}';
+      buffer.writeln("import 'package:$packageName/$relPath.dart';");
     }
     buffer.writeln();
 

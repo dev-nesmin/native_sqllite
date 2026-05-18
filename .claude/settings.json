@@ -23,7 +23,8 @@
       "Bash(cat /Users/nesmin/.puro/shared/pub_cache/hosted/pub.dev/melos-7.7.0/README.md | head -80 2>&1)",
       "Read(//Users/nesmin/.puro/shared/pub_cache/hosted/pub.dev/melos-7.7.0/**)",
       "Bash(grep -rn \"lockFileRoot\\\\|pubspec.lock\\\\|workspace\" /Users/nesmin/.puro/shared/pub_cache/hosted/pub.dev/cli_launcher-0.3.3+1/lib/ 2>/dev/null | head -20)",
-      "Read(//Users/nesmin/.puro/shared/pub_cache/hosted/pub.dev/cli_launcher-0.3.3+1/lib/**)"
+      "Read(//Users/nesmin/.puro/shared/pub_cache/hosted/pub.dev/cli_launcher-0.3.3+1/lib/**)",
+      "Bash(awk '/^  vm_service:/{found=1} found && /version:/{print; exit}' /Users/nesmin/Development/personel/native_sqllite/pubspec.lock)"
     ],
     "additionalDirectories": [
       "/tmp"

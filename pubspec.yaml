@@ -12,6 +12,7 @@ workspace:
   - native_sqlite/native_sqlite_web
   - native_sqlite/native_sqlite_platform_interface
   - native_sqlite_annotations
+  - native_sqlite_inspector
   - example
 
 dev_dependencies:

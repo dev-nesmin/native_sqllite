@@ -156,4 +156,94 @@ void main() {
     ]);
     expect(success, true);
   });
+
+  test('execute returns affected row count', () async {
+    MockNativeSqlitePlatform fakePlatform = MockNativeSqlitePlatform();
+    NativeSqlitePlatform.instance = fakePlatform;
+
+    final affected = await NativeSqlite.execute(
+      'test_db',
+      'UPDATE users SET name = ? WHERE id = ?',
+      ['Updated', 1],
+    );
+    expect(affected, 1);
+  });
+
+  test('execute without arguments', () async {
+    MockNativeSqlitePlatform fakePlatform = MockNativeSqlitePlatform();
+    NativeSqlitePlatform.instance = fakePlatform;
+
+    final affected = await NativeSqlite.execute(
+      'test_db',
+      'DELETE FROM users',
+    );
+    expect(affected, 1);
+  });
+
+  test('close completes without error', () async {
+    MockNativeSqlitePlatform fakePlatform = MockNativeSqlitePlatform();
+    NativeSqlitePlatform.instance = fakePlatform;
+
+    await expectLater(NativeSqlite.close('test_db'), completes);
+  });
+
+  test('deleteDatabase completes without error', () async {
+    MockNativeSqlitePlatform fakePlatform = MockNativeSqlitePlatform();
+    NativeSqlitePlatform.instance = fakePlatform;
+
+    await expectLater(NativeSqlite.deleteDatabase('test_db'), completes);
+  });
+
+  test('query with arguments passes them to platform', () async {
+    MockNativeSqlitePlatform fakePlatform = MockNativeSqlitePlatform();
+    NativeSqlitePlatform.instance = fakePlatform;
+
+    final result = await NativeSqlite.query(
+      'test_db',
+      'SELECT * FROM users WHERE id = ?',
+      [1],
+    );
+    expect(result.columns, ['id', 'name']);
+    expect(result.rows, isNotEmpty);
+  });
+
+  test('update without where clause', () async {
+    MockNativeSqlitePlatform fakePlatform = MockNativeSqlitePlatform();
+    NativeSqlitePlatform.instance = fakePlatform;
+
+    final rows = await NativeSqlite.update(
+      'test_db',
+      'users',
+      {'active': 0},
+    );
+    expect(rows, 1);
+  });
+
+  test('delete without where clause', () async {
+    MockNativeSqlitePlatform fakePlatform = MockNativeSqlitePlatform();
+    NativeSqlitePlatform.instance = fakePlatform;
+
+    final rows = await NativeSqlite.delete('test_db', 'users');
+    expect(rows, 1);
+  });
+
+  test('insert with null field values', () async {
+    MockNativeSqlitePlatform fakePlatform = MockNativeSqlitePlatform();
+    NativeSqlitePlatform.instance = fakePlatform;
+
+    final id = await NativeSqlite.insert(
+      'test_db',
+      'users',
+      {'name': 'Test', 'email': null},
+    );
+    expect(id, 123);
+  });
+
+  test('transaction with empty list', () async {
+    MockNativeSqlitePlatform fakePlatform = MockNativeSqlitePlatform();
+    NativeSqlitePlatform.instance = fakePlatform;
+
+    final success = await NativeSqlite.transaction('test_db', []);
+    expect(success, true);
+  });
 }

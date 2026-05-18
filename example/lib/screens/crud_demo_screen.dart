@@ -72,7 +72,6 @@ class UserCrudTab extends StatefulWidget {
 }
 
 class _UserCrudTabState extends State<UserCrudTab> {
-  // No need to specify database name! Using default from @Table annotation
   final _userRepository = UserRepository();
   List<User> _users = [];
   bool _isLoading = false;
@@ -411,7 +410,6 @@ class CategoryCrudTab extends StatefulWidget {
 }
 
 class _CategoryCrudTabState extends State<CategoryCrudTab> {
-  // No need to specify database name! Using default from @Table annotation
   final _categoryRepository = CategoryRepository();
   List<Category> _categories = [];
   bool _isLoading = false;
@@ -458,13 +456,56 @@ class _CategoryCrudTabState extends State<CategoryCrudTab> {
     }
   }
 
+  Future<void> _updateCategory(Category category) async {
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) => CategoryFormDialog(category: category),
+    );
+
+    if (result != null) {
+      try {
+        final updated = category.copyWith(
+          name: result['name'] as String,
+          description: result['description'] as String?,
+        );
+        await _categoryRepository.update(updated);
+        _showSuccess('Category updated successfully');
+        _loadCategories();
+      } catch (e) {
+        _showError('Error updating category: $e');
+      }
+    }
+  }
+
   Future<void> _deleteCategory(int id) async {
-    try {
-      await _categoryRepository.delete(id);
-      _showSuccess('Category deleted successfully');
-      _loadCategories();
-    } catch (e) {
-      _showError('Error deleting category: $e');
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Confirm Delete'),
+        content: const Text(
+          'Deleting this category will also delete all associated products.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        await _categoryRepository.delete(id);
+        _showSuccess('Category deleted successfully');
+        _loadCategories();
+      } catch (e) {
+        _showError('Error deleting category: $e');
+      }
     }
   }
 
@@ -523,15 +564,52 @@ class _CategoryCrudTabState extends State<CategoryCrudTab> {
                     return Card(
                       margin: const EdgeInsets.only(bottom: 12),
                       child: ListTile(
-                        leading: const Icon(Icons.category),
+                        leading: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.purple.withValues(alpha: 0.1),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.category,
+                              color: Colors.purple),
+                        ),
                         title: Text(category.name),
                         subtitle: category.description != null
                             ? Text(category.description!)
-                            : null,
-                        trailing: IconButton(
-                          icon: const Icon(Icons.delete, color: Colors.red),
-                          onPressed: () {
-                            if (category.id != null) {
+                            : const Text('No description',
+                                style: TextStyle(
+                                    fontStyle: FontStyle.italic,
+                                    color: Colors.grey)),
+                        trailing: PopupMenuButton(
+                          itemBuilder: (context) => [
+                            const PopupMenuItem(
+                              value: 'edit',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.edit, size: 20),
+                                  SizedBox(width: 8),
+                                  Text('Edit'),
+                                ],
+                              ),
+                            ),
+                            const PopupMenuItem(
+                              value: 'delete',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.delete,
+                                      size: 20, color: Colors.red),
+                                  SizedBox(width: 8),
+                                  Text('Delete',
+                                      style: TextStyle(color: Colors.red)),
+                                ],
+                              ),
+                            ),
+                          ],
+                          onSelected: (value) {
+                            if (value == 'edit') {
+                              _updateCategory(category);
+                            } else if (value == 'delete' &&
+                                category.id != null) {
                               _deleteCategory(category.id!);
                             }
                           },
@@ -548,7 +626,9 @@ class _CategoryCrudTabState extends State<CategoryCrudTab> {
 
 // ==================== CATEGORY FORM DIALOG ====================
 class CategoryFormDialog extends StatefulWidget {
-  const CategoryFormDialog({super.key});
+  final Category? category;
+
+  const CategoryFormDialog({super.key, this.category});
 
   @override
   State<CategoryFormDialog> createState() => _CategoryFormDialogState();
@@ -562,8 +642,9 @@ class _CategoryFormDialogState extends State<CategoryFormDialog> {
   @override
   void initState() {
     super.initState();
-    _nameController = TextEditingController();
-    _descriptionController = TextEditingController();
+    _nameController = TextEditingController(text: widget.category?.name);
+    _descriptionController =
+        TextEditingController(text: widget.category?.description);
   }
 
   @override
@@ -575,8 +656,9 @@ class _CategoryFormDialogState extends State<CategoryFormDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final isEdit = widget.category != null;
     return AlertDialog(
-      title: const Text('Add Category'),
+      title: Text(isEdit ? 'Edit Category' : 'Add Category'),
       content: Form(
         key: _formKey,
         child: Column(
@@ -614,7 +696,7 @@ class _CategoryFormDialogState extends State<CategoryFormDialog> {
               });
             }
           },
-          child: const Text('Add'),
+          child: Text(isEdit ? 'Update' : 'Add'),
         ),
       ],
     );
@@ -630,7 +712,6 @@ class ProductCrudTab extends StatefulWidget {
 }
 
 class _ProductCrudTabState extends State<ProductCrudTab> {
-  // No need to specify database name! Using defaults from @Table annotations
   final _productRepository = ProductRepository();
   final _categoryRepository = CategoryRepository();
   List<Product> _products = [];
@@ -677,6 +758,7 @@ class _ProductCrudTabState extends State<ProductCrudTab> {
           description: result['description'] as String?,
           price: result['price'] as double,
           stock: result['stock'] as int,
+          isAvailable: result['isAvailable'] as bool,
           categoryId: result['categoryId'] as int,
         );
 
@@ -689,14 +771,65 @@ class _ProductCrudTabState extends State<ProductCrudTab> {
     }
   }
 
+  Future<void> _updateProduct(Product product) async {
+    if (_categories.isEmpty) {
+      _showError('No categories available');
+      return;
+    }
+
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) =>
+          ProductFormDialog(categories: _categories, product: product),
+    );
+
+    if (result != null) {
+      try {
+        final updated = product.copyWith(
+          name: result['name'] as String,
+          description: result['description'] as String?,
+          price: result['price'] as double,
+          stock: result['stock'] as int,
+          isAvailable: result['isAvailable'] as bool,
+          categoryId: result['categoryId'] as int,
+          updatedAt: DateTime.now(),
+        );
+        await _productRepository.update(updated);
+        _showSuccess('Product updated successfully');
+        _loadData();
+      } catch (e) {
+        _showError('Error updating product: $e');
+      }
+    }
+  }
+
   Future<void> _deleteProduct(int id) async {
-    try {
-      // Use custom SQL query since ProductRepository doesn't have delete(id) method
-      await _productRepository.query('DELETE FROM products WHERE id = ?', [id]);
-      _showSuccess('Product deleted successfully');
-      _loadData();
-    } catch (e) {
-      _showError('Error deleting product: $e');
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Confirm Delete'),
+        content: const Text('Are you sure you want to delete this product?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        await _productRepository.delete(id);
+        _showSuccess('Product deleted successfully');
+        _loadData();
+      } catch (e) {
+        _showError('Error deleting product: $e');
+      }
     }
   }
 
@@ -760,7 +893,21 @@ class _ProductCrudTabState extends State<ProductCrudTab> {
                     return Card(
                       margin: const EdgeInsets.only(bottom: 12),
                       child: ListTile(
-                        leading: const Icon(Icons.shopping_bag),
+                        leading: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: product.isAvailable
+                                ? Colors.green.withValues(alpha: 0.1)
+                                : Colors.grey.withValues(alpha: 0.1),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.shopping_bag,
+                            color: product.isAvailable
+                                ? Colors.green
+                                : Colors.grey,
+                          ),
+                        ),
                         title: Text(product.name),
                         subtitle: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -772,12 +919,50 @@ class _ProductCrudTabState extends State<ProductCrudTab> {
                               'Stock: ${product.stock} • '
                               'Category: ${_getCategoryName(product.categoryId)}',
                             ),
+                            Text(
+                              product.isAvailable
+                                  ? 'Available'
+                                  : 'Unavailable',
+                              style: TextStyle(
+                                color: product.isAvailable
+                                    ? Colors.green
+                                    : Colors.red,
+                                fontSize: 12,
+                              ),
+                            ),
                           ],
                         ),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.delete, color: Colors.red),
-                          onPressed: () {
-                            if (product.id != null) {
+                        isThreeLine: true,
+                        trailing: PopupMenuButton(
+                          itemBuilder: (context) => [
+                            const PopupMenuItem(
+                              value: 'edit',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.edit, size: 20),
+                                  SizedBox(width: 8),
+                                  Text('Edit'),
+                                ],
+                              ),
+                            ),
+                            const PopupMenuItem(
+                              value: 'delete',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.delete,
+                                      size: 20, color: Colors.red),
+                                  SizedBox(width: 8),
+                                  Text('Delete',
+                                      style: TextStyle(color: Colors.red)),
+                                ],
+                              ),
+                            ),
+                          ],
+                          onSelected: (value) {
+                            if (value == 'edit') {
+                              _updateProduct(product);
+                            } else if (value == 'delete' &&
+                                product.id != null) {
                               _deleteProduct(product.id!);
                             }
                           },
@@ -795,8 +980,13 @@ class _ProductCrudTabState extends State<ProductCrudTab> {
 // ==================== PRODUCT FORM DIALOG ====================
 class ProductFormDialog extends StatefulWidget {
   final List<Category> categories;
+  final Product? product;
 
-  const ProductFormDialog({super.key, required this.categories});
+  const ProductFormDialog({
+    super.key,
+    required this.categories,
+    this.product,
+  });
 
   @override
   State<ProductFormDialog> createState() => _ProductFormDialogState();
@@ -808,16 +998,21 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
   late TextEditingController _priceController;
   late TextEditingController _stockController;
   int? _selectedCategoryId;
+  bool _isAvailable = true;
   final _formKey = GlobalKey<FormState>();
 
   @override
   void initState() {
     super.initState();
-    _nameController = TextEditingController();
-    _descriptionController = TextEditingController();
-    _priceController = TextEditingController();
-    _stockController = TextEditingController(text: '0');
-    _selectedCategoryId = widget.categories.first.id;
+    final p = widget.product;
+    _nameController = TextEditingController(text: p?.name);
+    _descriptionController = TextEditingController(text: p?.description);
+    _priceController =
+        TextEditingController(text: p?.price.toString() ?? '');
+    _stockController =
+        TextEditingController(text: p?.stock.toString() ?? '0');
+    _selectedCategoryId = p?.categoryId ?? widget.categories.first.id;
+    _isAvailable = p?.isAvailable ?? true;
   }
 
   @override
@@ -831,8 +1026,9 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final isEdit = widget.product != null;
     return AlertDialog(
-      title: const Text('Add Product'),
+      title: Text(isEdit ? 'Edit Product' : 'Add Product'),
       content: Form(
         key: _formKey,
         child: SingleChildScrollView(
@@ -878,7 +1074,13 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
                   return null;
                 },
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 8),
+              SwitchListTile(
+                title: const Text('Available'),
+                value: _isAvailable,
+                onChanged: (v) => setState(() => _isAvailable = v),
+                contentPadding: EdgeInsets.zero,
+              ),
               DropdownButtonFormField<int>(
                 initialValue: _selectedCategoryId,
                 decoration: const InputDecoration(labelText: 'Category'),
@@ -913,11 +1115,12 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
                     : _descriptionController.text,
                 'price': double.parse(_priceController.text),
                 'stock': int.parse(_stockController.text),
+                'isAvailable': _isAvailable,
                 'categoryId': _selectedCategoryId!,
               });
             }
           },
-          child: const Text('Add'),
+          child: Text(isEdit ? 'Update' : 'Add'),
         ),
       ],
     );

@@ -3,6 +3,7 @@ description: "Code generator for native_sqlite - Generates table schemas and rep
 version: 0.0.1
 homepage: https://nesmin.dev
 publish_to: none
+resolution: workspace
 environment:
   sdk: '>=3.9.0 <4.0.0'
 
@@ -16,7 +17,11 @@ dependencies:
   args: ^2.5.0
   dart_style: ^3.1.2
   crypto: ^3.0.5
-  native_sqlite_annotations: any
+  native_sqlite_annotations:
+    git:
+      url: https://github.com/dev-nesmin/native_sqllite.git
+      ref: main
+      path: native_sqlite_annotations
   logging: ^1.3.0
 
 dev_dependencies:

@@ -26,11 +26,10 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2  # v2
         with:
-          flutter-version: '3.24.0'
+          flutter-version: '3.35.7'
           channel: 'stable'
 
       - name: Get dependencies
-        working-directory: ./native_sqlite_inspector
         run: flutter pub get
 
       - name: Build web

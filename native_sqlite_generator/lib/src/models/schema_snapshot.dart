@@ -1,3 +1,7 @@
+import 'dart:convert';
+
+import 'package:crypto/crypto.dart';
+
 /// Represents a snapshot of a table schema for migration tracking.
 class TableSchemaSnapshot {
   /// The Dart class name
@@ -35,7 +39,7 @@ class TableSchemaSnapshot {
     List<IndexSchemaSnapshot> indexes,
     int version,
   ) {
-    final hash = _generateHash(tableName, columns, indexes);
+    final hash = computeHash(tableName, columns, indexes);
     return TableSchemaSnapshot(
       className: className,
       tableName: tableName,
@@ -74,8 +78,10 @@ class TableSchemaSnapshot {
     );
   }
 
-  /// Generates a hash for change detection
-  static String _generateHash(
+  /// Hash used for change detection. Only properties that affect the SQL
+  /// schema are included; descriptive metadata (enum values, index names)
+  /// is deliberately excluded so adding it never bumps a schema version.
+  static String computeHash(
     String tableName,
     List<ColumnSchemaSnapshot> columns,
     List<IndexSchemaSnapshot> indexes,
@@ -86,13 +92,19 @@ class TableSchemaSnapshot {
       buffer.write(
         '|${column.name}:${column.type}:${column.nullable}:'
         '${column.primaryKey}:${column.autoIncrement}:${column.unique}:'
-        '${column.defaultValue}',
+        '${column.defaultValue}:${column.foreignKey}:'
+        '${column.foreignKeyOnDelete}:${column.foreignKeyOnUpdate}',
       );
     }
     for (final index in indexes) {
       buffer.write('|idx:${index.columns.join(',')}:${index.unique}');
     }
-    return buffer.toString().hashCode.toRadixString(16);
+    // A content hash rather than String.hashCode, which is not guaranteed
+    // to be stable across Dart SDK versions.
+    return sha256
+        .convert(utf8.encode(buffer.toString()))
+        .toString()
+        .substring(0, 16);
   }
 
   @override
@@ -149,6 +161,12 @@ class ColumnSchemaSnapshot {
   /// Dart type name
   final String dartType;
 
+  /// Enum storage strategy (`ordinal` or `name`) when [dartType] is an enum.
+  final String? enumType;
+
+  /// Enum constant names in declaration order when [dartType] is an enum.
+  final List<String>? enumValues;
+
   const ColumnSchemaSnapshot({
     required this.dartName,
     required this.name,
@@ -164,7 +182,12 @@ class ColumnSchemaSnapshot {
     required this.isJsonField,
     required this.hasConverter,
     required this.dartType,
+    this.enumType,
+    this.enumValues,
   });
+
+  /// Whether this column stores a Dart enum.
+  bool get isEnum => enumValues != null;
 
   /// Converts to JSON
   Map<String, dynamic> toJson() {
@@ -183,6 +206,8 @@ class ColumnSchemaSnapshot {
       'isJsonField': isJsonField,
       'hasConverter': hasConverter,
       'dartType': dartType,
+      if (enumType != null) 'enumType': enumType,
+      if (enumValues != null) 'enumValues': enumValues,
     };
   }
 
@@ -203,6 +228,8 @@ class ColumnSchemaSnapshot {
       isJsonField: json['isJsonField'] as bool,
       hasConverter: json['hasConverter'] as bool,
       dartType: json['dartType'] as String,
+      enumType: json['enumType'] as String?,
+      enumValues: (json['enumValues'] as List?)?.cast<String>(),
     );
   }
 }
@@ -215,11 +242,18 @@ class IndexSchemaSnapshot {
   /// Whether this is a unique index
   final bool unique;
 
-  const IndexSchemaSnapshot({required this.columns, required this.unique});
+  /// Index name as used in `CREATE INDEX`.
+  final String? name;
+
+  const IndexSchemaSnapshot({
+    required this.columns,
+    required this.unique,
+    this.name,
+  });
 
   /// Converts to JSON
   Map<String, dynamic> toJson() {
-    return {'columns': columns, 'unique': unique};
+    return {'columns': columns, 'unique': unique, if (name != null) 'name': name};
   }
 
   /// Creates from JSON
@@ -227,6 +261,7 @@ class IndexSchemaSnapshot {
     return IndexSchemaSnapshot(
       columns: (json['columns'] as List).cast<String>(),
       unique: json['unique'] as bool,
+      name: json['name'] as String?,
     );
   }
 }

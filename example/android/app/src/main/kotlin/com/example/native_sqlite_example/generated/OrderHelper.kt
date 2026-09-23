@@ -1,6 +1,9 @@
+@file:Suppress("UNCHECKED_CAST")
+
 package com.example.native_sqlite_example.generated
 
 import dev.nesmin.native_sqlite.NativeSqliteManager
+import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -14,10 +17,10 @@ data class Order(
     val quantity: Long,
     val totalPrice: Double,
     val status: String,
-    val notes: String?,
-    val createdAt: Long,
-    val updatedAt: Long?,
-    val deliveredAt: Long?
+    val notes: String? = null,
+    val createdAt: Instant,
+    val updatedAt: Instant? = null,
+    val deliveredAt: Instant? = null
 )
 
 /**
@@ -92,9 +95,9 @@ class OrderHelper(private val databaseName: String) {
             OrderSchema.TOTAL_PRICE to entity.totalPrice,
             OrderSchema.STATUS to entity.status,
             OrderSchema.NOTES to entity.notes,
-            OrderSchema.CREATED_AT to entity.createdAt.toEpochMilliseconds(),
-            OrderSchema.UPDATED_AT to entity.updatedAt?.toEpochMilliseconds(),
-            OrderSchema.DELIVERED_AT to entity.deliveredAt?.toEpochMilliseconds()
+            OrderSchema.CREATED_AT to entity.createdAt.toEpochMilli(),
+            OrderSchema.UPDATED_AT to entity.updatedAt?.let { it.toEpochMilli() },
+            OrderSchema.DELIVERED_AT to entity.deliveredAt?.let { it.toEpochMilli() }
         )
         return NativeSqliteManager.Instance.insert(databaseName, OrderSchema.TABLE_NAME, values)
     }
@@ -133,9 +136,9 @@ class OrderHelper(private val databaseName: String) {
             OrderSchema.TOTAL_PRICE to entity.totalPrice,
             OrderSchema.STATUS to entity.status,
             OrderSchema.NOTES to entity.notes,
-            OrderSchema.CREATED_AT to entity.createdAt.toEpochMilliseconds(),
-            OrderSchema.UPDATED_AT to entity.updatedAt?.toEpochMilliseconds(),
-            OrderSchema.DELIVERED_AT to entity.deliveredAt?.toEpochMilliseconds()
+            OrderSchema.CREATED_AT to entity.createdAt.toEpochMilli(),
+            OrderSchema.UPDATED_AT to entity.updatedAt?.let { it.toEpochMilli() },
+            OrderSchema.DELIVERED_AT to entity.deliveredAt?.let { it.toEpochMilli() }
         )
         return NativeSqliteManager.Instance.update(
             databaseName,
@@ -372,16 +375,16 @@ class OrderHelper(private val databaseName: String) {
 
     private fun fromRow(columnMap: Map<String, Int>, row: List<Any?>): Order {
         return Order(
-            id = row[columnMap[OrderSchema.ID]!!] as Long?,
-            userId = row[columnMap[OrderSchema.USER_ID]!!] as Long,
-            productId = row[columnMap[OrderSchema.PRODUCT_ID]!!] as Long,
-            quantity = row[columnMap[OrderSchema.QUANTITY]!!] as Long,
-            totalPrice = row[columnMap[OrderSchema.TOTAL_PRICE]!!] as Double,
-            status = row[columnMap[OrderSchema.STATUS]!!] as String,
-            notes = row[columnMap[OrderSchema.NOTES]!!] as String?,
-            createdAt = DateTime.fromEpochMilliseconds(row[columnMap[OrderSchema.CREATED_AT]!!] as Long),
-            updatedAt = (row[columnMap[OrderSchema.UPDATED_AT]!!] as? Long)?.let { DateTime.fromEpochMilliseconds(it) },
-            deliveredAt = (row[columnMap[OrderSchema.DELIVERED_AT]!!] as? Long)?.let { DateTime.fromEpochMilliseconds(it) }
+            id = row[columnMap.getValue(OrderSchema.ID)]?.let { (it as Number).toLong() },
+            userId = (row[columnMap.getValue(OrderSchema.USER_ID)] as Number).toLong(),
+            productId = (row[columnMap.getValue(OrderSchema.PRODUCT_ID)] as Number).toLong(),
+            quantity = (row[columnMap.getValue(OrderSchema.QUANTITY)] as Number).toLong(),
+            totalPrice = (row[columnMap.getValue(OrderSchema.TOTAL_PRICE)] as Number).toDouble(),
+            status = row[columnMap.getValue(OrderSchema.STATUS)] as String,
+            notes = row[columnMap.getValue(OrderSchema.NOTES)]?.let { it as String },
+            createdAt = Instant.ofEpochMilli((row[columnMap.getValue(OrderSchema.CREATED_AT)] as Number).toLong()),
+            updatedAt = row[columnMap.getValue(OrderSchema.UPDATED_AT)]?.let { Instant.ofEpochMilli((it as Number).toLong()) },
+            deliveredAt = row[columnMap.getValue(OrderSchema.DELIVERED_AT)]?.let { Instant.ofEpochMilli((it as Number).toLong()) }
         )
     }
 }

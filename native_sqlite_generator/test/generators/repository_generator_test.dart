@@ -31,7 +31,7 @@ class TestUser {
           'a|lib/test_user.table.dart': decodedMatches(
             allOf(
               contains('class TestUserRepository'),
-              contains('Future<int> insert(TestUser entity)'),
+              contains('Future<int?> insert(TestUser entity)'),
               contains('Future<TestUser?> findById(int? id)'),
               contains('Future<List<TestUser>> findAll()'),
               contains('Future<int> update(TestUser entity)'),
@@ -95,7 +95,7 @@ class TestCategory {
         },
         outputs: {
           'a|lib/test_category.table.dart': decodedMatches(
-            contains('Future<QueryResult> query('),
+            matches(RegExp(r'Future<List<TestCategory>> query\(\s*String sql')),
           ),
         },
       );

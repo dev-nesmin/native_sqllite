@@ -12,15 +12,11 @@ public enum CategorySchema {
     public static let id = "id"
     public static let name = "name"
     public static let description = "description"
-    public static let createdAt = "createdAt"
+    public static let createdAt = "created_at"
 
-    // CREATE TABLE SQL
-    public static let createTableSql = """
-        CREATE TABLE categories (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL UNIQUE,
-            description TEXT,
-            createdAt INTEGER NOT NULL
-        )
-        """
+    // Same statements as the Dart CategorySchema
+    public static let createTableSql = "CREATE TABLE categories (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, description TEXT, created_at INTEGER NOT NULL)"
+
+    public static let indexSql: [String] = [
+    ]
 }

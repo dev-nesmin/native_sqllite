@@ -19,18 +19,9 @@ public enum ProfileSchema {
     public static let addresses = "addresses"
     public static let metadata = "metadata"
 
-    // CREATE TABLE SQL
-    public static let createTableSql = """
-        CREATE TABLE profiles (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            email TEXT NOT NULL,
-            phone_number TEXT,
-            settings TEXT,
-            tags TEXT,
-            address TEXT,
-            addresses TEXT,
-            metadata TEXT NOT NULL
-        )
-        """
+    // Same statements as the Dart ProfileSchema
+    public static let createTableSql = "CREATE TABLE profiles (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, email TEXT NOT NULL, phone_number TEXT, settings TEXT, tags TEXT, address TEXT, addresses TEXT, metadata TEXT NOT NULL)"
+
+    public static let indexSql: [String] = [
+    ]
 }

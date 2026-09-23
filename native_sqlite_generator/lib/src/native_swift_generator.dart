@@ -1,4 +1,7 @@
 import 'package:native_sqlite_generator/src/models/schema_snapshot.dart';
+import 'package:native_sqlite_generator/src/native/native_column.dart';
+import 'package:native_sqlite_generator/src/native/native_database_spec.dart';
+import 'package:native_sqlite_generator/src/sql/schema_sql.dart';
 
 /// Generates Swift code for iOS
 class NativeSwiftGenerator {
@@ -23,49 +26,163 @@ class NativeSwiftGenerator {
     );
     buffer.writeln(' */');
     buffer.writeln('public enum ${model.className}Schema {');
-    buffer.writeln('    public static let tableName = "${model.tableName}"');
+    buffer.writeln(
+      '    public static let tableName = ${_swiftString(model.tableName)}',
+    );
     buffer.writeln();
     buffer.writeln('    // Column names');
 
     for (final field in model.columns) {
-      final constantName = _toCamelCase(field.dartName);
-      buffer.writeln('    public static let $constantName = "${field.name}"');
+      final constantName = _swiftIdentifier(_toCamelCase(field.dartName));
+      buffer.writeln(
+        '    public static let $constantName = ${_swiftString(field.name)}',
+      );
     }
 
     buffer.writeln();
-    buffer.writeln('    // CREATE TABLE SQL');
-    buffer.writeln('    public static let createTableSql = """');
-    buffer.write('        CREATE TABLE ${model.tableName} (');
-
-    final columnDefs = <String>[];
-    for (final field in model.columns) {
-      final parts = <String>[field.name, field.type];
-
-      if (field.primaryKey) {
-        parts.add('PRIMARY KEY');
-        if (field.autoIncrement) {
-          parts.add('AUTOINCREMENT');
-        }
-      }
-
-      if (!field.nullable && !field.primaryKey) {
-        parts.add('NOT NULL');
-      }
-
-      if (field.unique && !field.primaryKey) {
-        parts.add('UNIQUE');
-      }
-
-      columnDefs.add(parts.join(' '));
+    buffer.writeln('    // Same statements as the Dart ${model.className}Schema');
+    buffer.writeln(
+      '    public static let createTableSql = ${_swiftString(SchemaSql.createTable(model))}',
+    );
+    buffer.writeln();
+    buffer.writeln('    public static let indexSql: [String] = [');
+    for (final sql in SchemaSql.createIndexes(model)) {
+      buffer.writeln('        ${_swiftString(sql)},');
     }
-
-    buffer.write('\n');
-    buffer.write(columnDefs.map((def) => '            $def').join(',\n'));
-    buffer.writeln('\n        )');
-    buffer.writeln('        """');
+    buffer.writeln('    ]');
     buffer.writeln('}');
 
     return buffer.toString();
+  }
+
+  /// Generates a Swift enum mirroring a Dart enum. Case names (and so raw
+  /// values) match Dart names; declaration order matches Dart indexes.
+  String generateEnum(NativeEnum nativeEnum) {
+    final buffer = StringBuffer();
+    buffer.writeln('import Foundation');
+    buffer.writeln();
+    buffer.writeln('/**');
+    buffer.writeln(' * Mirrors the Dart enum ${nativeEnum.name}.');
+    buffer.writeln(' * AUTO-GENERATED from Dart - DO NOT EDIT MANUALLY');
+    buffer.writeln(' */');
+    buffer.writeln(
+      'public enum ${nativeEnum.name}: String, CaseIterable {',
+    );
+    for (final value in nativeEnum.values) {
+      buffer.writeln('    case ${_swiftIdentifier(value)}');
+    }
+    buffer.writeln();
+    buffer.writeln('    /// Index of this case, equal to the Dart enum\'s `index`.');
+    buffer.writeln('    public var ordinal: Int64 {');
+    buffer.writeln('        Int64(Self.allCases.firstIndex(of: self)!)');
+    buffer.writeln('    }');
+    buffer.writeln();
+    buffer.writeln('    public init?(ordinal: Int64) {');
+    buffer.writeln('        let cases = Array(Self.allCases)');
+    buffer.writeln(
+      '        guard ordinal >= 0, ordinal < Int64(cases.count) else { return nil }',
+    );
+    buffer.writeln('        self = cases[Int(ordinal)]');
+    buffer.writeln('    }');
+    buffer.writeln('}');
+    return buffer.toString();
+  }
+
+  /// Row decoding support shared by all generated helpers.
+  String generateSupport() {
+    return '''import Foundation
+
+/**
+ * Row decoding support for generated helpers.
+ * AUTO-GENERATED - DO NOT EDIT MANUALLY
+ */
+public enum GeneratedRowError: Error, CustomStringConvertible {
+    case missingColumn(String)
+    case unexpectedValue(column: String, expected: String, value: Any?)
+
+    public var description: String {
+        switch self {
+        case .missingColumn(let column):
+            return "Column '\\(column)' is missing from the query result"
+        case .unexpectedValue(let column, let expected, let value):
+            return "Column '\\(column)': expected \\(expected), got \\(String(describing: value))"
+        }
+    }
+}
+
+/// A result row addressed by column name.
+struct GeneratedRow {
+    let columnMap: [String: Int]
+    let values: [Any?]
+
+    func optional<T>(_ column: String, _ convert: (Any) -> T?, expected: String) throws -> T? {
+        guard let index = columnMap[column] else {
+            throw GeneratedRowError.missingColumn(column)
+        }
+        guard let value = GeneratedRow.unwrap(values[index]) else { return nil }
+        guard let converted = convert(value) else {
+            throw GeneratedRowError.unexpectedValue(column: column, expected: expected, value: value)
+        }
+        return converted
+    }
+
+    /// Flattens nested optionals and maps NSNull to nil.
+    static func unwrap(_ value: Any?) -> Any? {
+        guard let value = value, !(value is NSNull) else { return nil }
+        let mirror = Mirror(reflecting: value)
+        if mirror.displayStyle == .optional {
+            return unwrap(mirror.children.first?.value)
+        }
+        return value
+    }
+
+    func required<T>(_ column: String, _ convert: (Any) -> T?, expected: String) throws -> T {
+        guard let value = try optional(column, convert, expected: expected) else {
+            throw GeneratedRowError.unexpectedValue(column: column, expected: expected, value: nil)
+        }
+        return value
+    }
+}
+
+/// Conversions from SQLite values (Int64, Double, String, Data) to Swift
+/// types, using the same storage formats as the Dart side.
+enum GeneratedValue {
+    static func int64(_ value: Any) -> Int64? {
+        (value as? Int64) ?? (value as? Int).map(Int64.init)
+    }
+
+    static func double(_ value: Any) -> Double? {
+        (value as? Double) ?? int64(value).map(Double.init)
+    }
+
+    static func string(_ value: Any) -> String? { value as? String }
+
+    static func data(_ value: Any) -> Data? { value as? Data }
+
+    /// Dart decodes booleans with `== 1`.
+    static func bool(_ value: Any) -> Bool? { int64(value).map { \$0 == 1 } }
+
+    /// Milliseconds since epoch.
+    static func date(_ value: Any) -> Date? {
+        int64(value).map { Date(timeIntervalSince1970: Double(\$0) / 1000) }
+    }
+
+    /// Milliseconds.
+    static func timeInterval(_ value: Any) -> TimeInterval? {
+        int64(value).map { Double(\$0) / 1000 }
+    }
+
+    static func url(_ value: Any) -> URL? { string(value).flatMap(URL.init(string:)) }
+
+    static func milliseconds(_ date: Date) -> Int64 {
+        Int64((date.timeIntervalSince1970 * 1000).rounded())
+    }
+
+    static func milliseconds(_ interval: TimeInterval) -> Int64 {
+        Int64((interval * 1000).rounded())
+    }
+}
+''';
   }
 
   String generateHelper(TableSchemaSnapshot model) {
@@ -75,7 +192,10 @@ class NativeSwiftGenerator {
       orElse: () => model.columns.first,
     );
 
+    final columns = model.columns.map(NativeColumn.of).toList();
+
     buffer.writeln('import Foundation');
+    buffer.writeln('import native_sqlite_ios');
     buffer.writeln();
     buffer.writeln('/**');
     buffer.writeln(' * Struct for ${model.className}.');
@@ -83,26 +203,30 @@ class NativeSwiftGenerator {
     buffer.writeln(' */');
     buffer.writeln('public struct ${model.className} {');
 
-    for (final field in model.columns) {
-      final swiftType = _getSwiftType(field);
-      buffer.writeln('    public let ${field.dartName}: $swiftType');
+    for (final column in columns) {
+      final note = column.rawStorageNote;
+      if (note != null) buffer.writeln('    /// Raw $note.');
+      buffer.writeln(
+        '    public let ${_swiftIdentifier(column.column.dartName)}: ${_getSwiftType(column)}',
+      );
     }
 
     buffer.writeln();
     buffer.writeln('    public init(');
     final initParams = <String>[];
-    for (final field in model.columns) {
-      final swiftType = _getSwiftType(field);
-      final defaultValue = field.primaryKey && field.autoIncrement
-          ? ' = nil'
-          : '';
-      initParams.add('        ${field.dartName}: $swiftType$defaultValue');
+    for (final column in columns) {
+      final field = column.column;
+      final defaultValue = field.nullable ? ' = nil' : '';
+      initParams.add(
+        '        ${_swiftIdentifier(field.dartName)}: ${_getSwiftType(column)}$defaultValue',
+      );
     }
     buffer.writeln(initParams.join(',\n'));
     buffer.writeln('    ) {');
 
-    for (final field in model.columns) {
-      buffer.writeln('        self.${field.dartName} = ${field.dartName}');
+    for (final column in columns) {
+      final name = column.column.dartName;
+      buffer.writeln('        self.$name = ${_swiftIdentifier(name)}');
     }
 
     buffer.writeln('    }');
@@ -196,7 +320,7 @@ class NativeSwiftGenerator {
     buffer.writeln('    public static func cleanupIsolate(isolateId: Int64) {');
     buffer.writeln('        isolateQueue.sync {');
     buffer.writeln(
-      '            isolateInstances.removeValue(forKey: isolateId)',
+      '            _ = isolateInstances.removeValue(forKey: isolateId)',
     );
     buffer.writeln('        }');
     buffer.writeln('    }');
@@ -224,19 +348,16 @@ class NativeSwiftGenerator {
     buffer.writeln();
 
     // Insert method
-    final pkSwiftType = _getSwiftType(primaryKey).replaceAll('?', '');
+    final pkColumn = NativeColumn.of(primaryKey);
+    final pkSwiftType = _getSwiftType(pkColumn).replaceAll('?', '');
     buffer.writeln(
       '    public func insert(_ entity: ${model.className}) throws -> Int64 {',
     );
-    buffer.writeln('        var values: [String: Any] = [:]');
-    for (final field in model.columns) {
-      if (field.primaryKey && field.autoIncrement) continue;
-
-      final value = _serializeSwift(field, 'entity.${field.dartName}');
-      buffer.writeln(
-        '        values[${model.className}Schema.${_toCamelCase(field.dartName)}] = $value',
-      );
-    }
+    _writeValues(
+      buffer,
+      model,
+      columns.where((c) => !(c.column.primaryKey && c.column.autoIncrement)),
+    );
     buffer.writeln(
       '        return try manager.insert(name: databaseName, table: ${model.className}Schema.tableName, values: values)',
     );
@@ -267,7 +388,7 @@ class NativeSwiftGenerator {
     buffer.writeln('            columnMap[column] = index');
     buffer.writeln('        }');
     buffer.writeln(
-      '        return fromRow(columnMap: columnMap, row: rows[0])',
+      '        return try fromRow(columnMap: columnMap, row: rows[0])',
     );
     buffer.writeln('    }');
     buffer.writeln();
@@ -290,7 +411,7 @@ class NativeSwiftGenerator {
     buffer.writeln('            columnMap[column] = index');
     buffer.writeln('        }');
     buffer.writeln(
-      '        return rows.map { fromRow(columnMap: columnMap, row: \$0) }',
+      '        return try rows.map { try fromRow(columnMap: columnMap, row: \$0) }',
     );
     buffer.writeln('    }');
     buffer.writeln();
@@ -307,14 +428,7 @@ class NativeSwiftGenerator {
     buffer.writeln(
       '    public func update(_ entity: ${model.className}) throws -> Int {',
     );
-    buffer.writeln('        var values: [String: Any] = [:]');
-    for (final field in model.columns) {
-      if (field.primaryKey) continue; // Skip PK in updates
-      final value = _serializeSwift(field, 'entity.${field.dartName}');
-      buffer.writeln(
-        '        values[${model.className}Schema.${_toCamelCase(field.dartName)}] = $value',
-      );
-    }
+    _writeValues(buffer, model, columns.where((c) => !c.column.primaryKey));
     buffer.writeln('        return try manager.update(');
     buffer.writeln('            name: databaseName,');
     buffer.writeln('            table: ${model.className}Schema.tableName,');
@@ -322,7 +436,9 @@ class NativeSwiftGenerator {
     buffer.writeln(
       '            whereClause: "\\(${model.className}Schema.${_toCamelCase(primaryKey.dartName)}) = ?",',
     );
-    buffer.writeln('            whereArgs: [entity.${primaryKey.dartName}]');
+    buffer.writeln(
+      '            whereArgs: [${_serializeSwift(pkColumn, 'entity.${primaryKey.dartName}')}]',
+    );
     buffer.writeln('        )');
     buffer.writeln('    }');
     buffer.writeln();
@@ -339,7 +455,7 @@ class NativeSwiftGenerator {
     buffer.writeln('     * - Throws: Database errors');
     buffer.writeln('     */');
     buffer.writeln(
-      '    public func updatePartial(id: $pkSwiftType, updates: [String: Any]) throws -> Int {',
+      '    public func updatePartial(id: $pkSwiftType, updates: [String: Any?]) throws -> Int {',
     );
     buffer.writeln('        return try manager.update(');
     buffer.writeln('            name: databaseName,');
@@ -408,7 +524,7 @@ class NativeSwiftGenerator {
     buffer.writeln('        var results: [Int64] = []');
     buffer.writeln('        ');
     buffer.writeln(
-      '        try manager.execute(name: databaseName, sql: "BEGIN TRANSACTION")',
+      '        _ = try manager.execute(name: databaseName, sql: "BEGIN TRANSACTION")',
     );
     buffer.writeln('        do {');
     buffer.writeln('            for entity in entities {');
@@ -416,11 +532,11 @@ class NativeSwiftGenerator {
     buffer.writeln('                results.append(id)');
     buffer.writeln('            }');
     buffer.writeln(
-      '            try manager.execute(name: databaseName, sql: "COMMIT")',
+      '            _ = try manager.execute(name: databaseName, sql: "COMMIT")',
     );
     buffer.writeln('        } catch {');
     buffer.writeln(
-      '            try? manager.execute(name: databaseName, sql: "ROLLBACK")',
+      '            _ = try? manager.execute(name: databaseName, sql: "ROLLBACK")',
     );
     buffer.writeln('            throw error');
     buffer.writeln('        }');
@@ -441,18 +557,18 @@ class NativeSwiftGenerator {
     buffer.writeln('        var totalAffected = 0');
     buffer.writeln('        ');
     buffer.writeln(
-      '        try manager.execute(name: databaseName, sql: "BEGIN TRANSACTION")',
+      '        _ = try manager.execute(name: databaseName, sql: "BEGIN TRANSACTION")',
     );
     buffer.writeln('        do {');
     buffer.writeln('            for entity in entities {');
     buffer.writeln('                totalAffected += try update(entity)');
     buffer.writeln('            }');
     buffer.writeln(
-      '            try manager.execute(name: databaseName, sql: "COMMIT")',
+      '            _ = try manager.execute(name: databaseName, sql: "COMMIT")',
     );
     buffer.writeln('        } catch {');
     buffer.writeln(
-      '            try? manager.execute(name: databaseName, sql: "ROLLBACK")',
+      '            _ = try? manager.execute(name: databaseName, sql: "ROLLBACK")',
     );
     buffer.writeln('            throw error');
     buffer.writeln('        }');
@@ -473,18 +589,18 @@ class NativeSwiftGenerator {
     buffer.writeln('        var totalDeleted = 0');
     buffer.writeln('        ');
     buffer.writeln(
-      '        try manager.execute(name: databaseName, sql: "BEGIN TRANSACTION")',
+      '        _ = try manager.execute(name: databaseName, sql: "BEGIN TRANSACTION")',
     );
     buffer.writeln('        do {');
     buffer.writeln('            for id in ids {');
     buffer.writeln('                totalDeleted += try delete(id: id)');
     buffer.writeln('            }');
     buffer.writeln(
-      '            try manager.execute(name: databaseName, sql: "COMMIT")',
+      '            _ = try manager.execute(name: databaseName, sql: "COMMIT")',
     );
     buffer.writeln('        } catch {');
     buffer.writeln(
-      '            try? manager.execute(name: databaseName, sql: "ROLLBACK")',
+      '            _ = try? manager.execute(name: databaseName, sql: "ROLLBACK")',
     );
     buffer.writeln('            throw error');
     buffer.writeln('        }');
@@ -546,7 +662,7 @@ class NativeSwiftGenerator {
     buffer.writeln('            columnMap[column] = index');
     buffer.writeln('        }');
     buffer.writeln(
-      '        return rows.map { fromRow(columnMap: columnMap, row: \$0) }',
+      '        return try rows.map { try fromRow(columnMap: columnMap, row: \$0) }',
     );
     buffer.writeln('    }');
     buffer.writeln();
@@ -617,7 +733,7 @@ class NativeSwiftGenerator {
     buffer.writeln(
       '        guard let rows = result["rows"] as? [[Any?]] else { return nil }',
     );
-    buffer.writeln('        return rows.first?.first');
+    buffer.writeln('        return rows.first?.first ?? nil');
     buffer.writeln('    }');
     buffer.writeln();
 
@@ -649,7 +765,7 @@ class NativeSwiftGenerator {
     buffer.writeln(
       '        guard let rows = result["rows"] as? [[Any?]] else { return nil }',
     );
-    buffer.writeln('        return rows.first?.first');
+    buffer.writeln('        return rows.first?.first ?? nil');
     buffer.writeln('    }');
     buffer.writeln();
 
@@ -719,17 +835,21 @@ class NativeSwiftGenerator {
 
     // FromRow helper
     buffer.writeln(
-      '    private func fromRow(columnMap: [String: Int], row: [Any?]) -> ${model.className} {',
+      '    private func fromRow(columnMap: [String: Int], row values: [Any?]) throws -> ${model.className} {',
+    );
+    buffer.writeln(
+      '        let row = GeneratedRow(columnMap: columnMap, values: values)',
     );
     buffer.writeln('        return ${model.className}(');
 
     final fieldInits = <String>[];
-    for (final field in model.columns) {
+    for (final column in columns) {
+      final field = column.column;
       final value = _deserializeSwift(
-        field,
-        'row[columnMap[${model.className}Schema.${_toCamelCase(field.dartName)}]!]',
+        column,
+        '${model.className}Schema.${_swiftIdentifier(_toCamelCase(field.dartName))}',
       );
-      fieldInits.add('            ${field.dartName}: $value');
+      fieldInits.add('            ${_swiftIdentifier(field.dartName)}: $value');
     }
     buffer.writeln(fieldInits.join(',\n'));
     buffer.writeln('        )');
@@ -739,254 +859,238 @@ class NativeSwiftGenerator {
     return buffer.toString();
   }
 
-  String _getSwiftType(ColumnSchemaSnapshot field) {
-    final baseType = field.dartType.replaceAll('?', '');
-    String swiftType;
-
-    // Handle basic types
-    if (baseType == 'int' || baseType == 'Int') {
-      swiftType = 'Int';
-    } else if (baseType == 'DateTime') {
-      swiftType = 'Int'; // Stored as epoch milliseconds
-    } else if (baseType == 'double' || baseType == 'Double') {
-      swiftType = 'Double';
-    } else if (baseType == 'String') {
-      swiftType = 'String';
-    } else if (baseType == 'bool' || baseType == 'Boolean') {
-      swiftType = 'Bool';
-    }
-    // Handle binary data
-    else if (baseType == 'Uint8List') {
-      swiftType = 'Data';
-    }
-    // Handle collections (stored as JSON)
-    else if (baseType.startsWith('List<')) {
-      swiftType = 'String'; // Serialized as JSON string
-    } else if (baseType.startsWith('Map<')) {
-      swiftType = 'String'; // Serialized as JSON string
-    }
-    // Handle enums (assume integer storage by default)
-    else if (baseType.contains('Enum')) {
-      swiftType = 'Int';
-    } else {
-      // Default to Any for unknown types
-      swiftType = 'Any';
-    }
-
-    return field.nullable ? '$swiftType?' : swiftType;
+  String _getSwiftType(NativeColumn column) {
+    final swiftType = switch (column.kind) {
+      NativeKind.integer => 'Int64',
+      NativeKind.real => 'Double',
+      NativeKind.text => 'String',
+      NativeKind.blob => 'Data',
+      NativeKind.boolean => 'Bool',
+      NativeKind.dateTime => 'Date',
+      NativeKind.duration => 'TimeInterval',
+      NativeKind.uri => 'URL',
+      NativeKind.enumeration => column.enumName,
+    };
+    return column.nullable ? '$swiftType?' : swiftType;
   }
 
-  String _serializeSwift(ColumnSchemaSnapshot field, String accessor) {
-    final baseType = field.dartType.replaceAll('?', '');
-
-    // Handle boolean conversion to integer
-    if (baseType == 'bool' || baseType == 'Boolean') {
-      return field.nullable
-          ? '$accessor.map { \$0 ? 1 : 0 } ?? NSNull()'
-          : '$accessor ? 1 : 0';
-    }
-
-    // Handle DateTime conversion to epoch milliseconds
-    if (baseType == 'DateTime') {
-      return field.nullable
-          ? '$accessor?.timeIntervalSince1970 ?? NSNull()'
-          : 'Int($accessor.timeIntervalSince1970 * 1000)';
-    }
-
-    // Handle binary data (Uint8List -> Data)
-    if (baseType == 'Uint8List') {
-      return field.nullable ? '$accessor ?? NSNull()' : accessor;
-    }
-
-    // Handle List serialization to JSON
-    if (baseType.startsWith('List<')) {
-      if (field.nullable) {
-        return '$accessor.flatMap { try? JSONEncoder().encode(\$0) }.flatMap { String(data: \$0, encoding: .utf8) } ?? NSNull()';
-      } else {
-        return 'try! String(data: JSONEncoder().encode($accessor), encoding: .utf8)!';
-      }
-    }
-
-    // Handle Map serialization to JSON
-    if (baseType.startsWith('Map<')) {
-      if (field.nullable) {
-        return '$accessor.flatMap { try? JSONSerialization.data(withJSONObject: \$0) }.flatMap { String(data: \$0, encoding: .utf8) } ?? NSNull()';
-      } else {
-        return 'String(data: try! JSONSerialization.data(withJSONObject: $accessor), encoding: .utf8)!';
-      }
-    }
-
-    return field.nullable ? '$accessor ?? NSNull()' : accessor;
-  }
-
-  String _deserializeSwift(ColumnSchemaSnapshot field, String accessor) {
-    final baseType = field.dartType.replaceAll('?', '');
-
-    // Handle integer types
-    if (baseType == 'int' || baseType == 'Int') {
-      return field.nullable ? '$accessor as? Int' : '$accessor as! Int';
-    }
-    // Handle DateTime (stored as epoch milliseconds)
-    else if (baseType == 'DateTime') {
-      if (field.nullable) {
-        return '($accessor as? Int).map { Date(timeIntervalSince1970: TimeInterval(\$0) / 1000) }';
-      } else {
-        return 'Date(timeIntervalSince1970: TimeInterval($accessor as! Int) / 1000)';
-      }
-    }
-    // Handle double types
-    else if (baseType == 'double' || baseType == 'Double') {
-      return field.nullable ? '$accessor as? Double' : '$accessor as! Double';
-    }
-    // Handle String types
-    else if (baseType == 'String') {
-      return field.nullable ? '$accessor as? String' : '$accessor as! String';
-    }
-    // Handle boolean (stored as integer)
-    else if (baseType == 'bool' || baseType == 'Boolean') {
-      return field.nullable
-          ? '($accessor as? Int).map { \$0 == 1 }'
-          : '($accessor as! Int) == 1';
-    }
-    // Handle binary data
-    else if (baseType == 'Uint8List') {
-      return field.nullable ? '$accessor as? Data' : '$accessor as! Data';
-    }
-    // Handle List deserialization from JSON
-    else if (baseType.startsWith('List<')) {
-      if (field.nullable) {
-        return '($accessor as? String).flatMap { try? JSONDecoder().decode([Any].self, from: \$0.data(using: .utf8)!) }';
-      } else {
-        return 'try! JSONDecoder().decode([Any].self, from: ($accessor as! String).data(using: .utf8)!)';
-      }
-    }
-    // Handle Map deserialization from JSON
-    else if (baseType.startsWith('Map<')) {
-      if (field.nullable) {
-        return '($accessor as? String).flatMap { try? JSONSerialization.jsonObject(with: \$0.data(using: .utf8)!) as? [String: Any] }';
-      } else {
-        return 'try! JSONSerialization.jsonObject(with: ($accessor as! String).data(using: .utf8)!) as! [String: Any]';
-      }
-    }
-
-    return accessor;
-  }
-
-  String generateDatabaseManager(
-    List<TableSchemaSnapshot> schemas,
-    int schemaVersion,
+  /// Writes `let values: [String: Any?] = [...]` for [columns].
+  void _writeValues(
+    StringBuffer buffer,
+    TableSchemaSnapshot model,
+    Iterable<NativeColumn> columns,
   ) {
+    if (columns.isEmpty) {
+      buffer.writeln('        let values: [String: Any?] = [:]');
+      return;
+    }
+    buffer.writeln('        let values: [String: Any?] = [');
+    for (final column in columns) {
+      final field = column.column;
+      final value = _serializeSwift(
+        column,
+        'entity.${_swiftIdentifier(field.dartName)}',
+      );
+      buffer.writeln(
+        '            ${model.className}Schema.${_swiftIdentifier(_toCamelCase(field.dartName))}: $value,',
+      );
+    }
+    buffer.writeln('        ]');
+  }
+
+  /// Swift expression converting [accessor] to its SQLite storage value.
+  String _serializeSwift(NativeColumn column, String accessor) {
+    final String Function(String) convert = switch (column.kind) {
+      NativeKind.integer ||
+      NativeKind.real ||
+      NativeKind.text ||
+      NativeKind.blob => (v) => v,
+      NativeKind.boolean => (v) => '($v ? Int64(1) : Int64(0))',
+      NativeKind.dateTime ||
+      NativeKind.duration => (v) => 'GeneratedValue.milliseconds($v)',
+      NativeKind.uri => (v) => '$v.absoluteString',
+      NativeKind.enumeration =>
+        column.storesEnumByName ? (v) => '$v.rawValue' : (v) => '$v.ordinal',
+    };
+    final direct = convert(accessor);
+    if (direct == accessor) return accessor;
+    return column.nullable ? '$accessor.map { ${convert('\$0')} }' : direct;
+  }
+
+  /// Swift expression decoding [column] from `row` (a `GeneratedRow`).
+  String _deserializeSwift(NativeColumn column, String columnName) {
+    final (converter, expected) = switch (column.kind) {
+      NativeKind.integer => ('GeneratedValue.int64', 'Int64'),
+      NativeKind.real => ('GeneratedValue.double', 'Double'),
+      NativeKind.text => ('GeneratedValue.string', 'String'),
+      NativeKind.blob => ('GeneratedValue.data', 'Data'),
+      NativeKind.boolean => ('GeneratedValue.bool', 'Bool'),
+      NativeKind.dateTime => ('GeneratedValue.date', 'Date'),
+      NativeKind.duration => ('GeneratedValue.timeInterval', 'TimeInterval'),
+      NativeKind.uri => ('GeneratedValue.url', 'URL'),
+      NativeKind.enumeration => (
+        column.storesEnumByName
+            ? '{ GeneratedValue.string(\$0).flatMap(${column.enumName}.init(rawValue:)) }'
+            : '{ GeneratedValue.int64(\$0).flatMap(${column.enumName}.init(ordinal:)) }',
+        column.enumName,
+      ),
+    };
+    final method = column.nullable ? 'optional' : 'required';
+    return 'try row.$method($columnName, $converter, expected: "$expected")';
+  }
+
+  /// Swift string literal for [value].
+  String _swiftString(String value) {
+    final escaped = value
+        .replaceAll(r'\', r'\\')
+        .replaceAll('"', r'\"')
+        .replaceAll('\n', r'\n');
+    return '"$escaped"';
+  }
+
+  /// Escapes Swift keywords used as identifiers.
+  String _swiftIdentifier(String name) =>
+      _swiftKeywords.contains(name) ? '`$name`' : name;
+
+  static const _swiftKeywords = {
+    'associatedtype', 'class', 'deinit', 'enum', 'extension', 'fileprivate',
+    'func', 'import', 'init', 'inout', 'internal', 'let', 'open', 'operator',
+    'private', 'protocol', 'public', 'rethrows', 'static', 'struct',
+    'subscript', 'typealias', 'var', 'break', 'case', 'continue', 'default',
+    'defer', 'do', 'else', 'fallthrough', 'for', 'guard', 'if', 'in',
+    'repeat', 'return', 'switch', 'where', 'while', 'as', 'catch', 'false',
+    'is', 'nil', 'self', 'Self', 'super', 'throw', 'throws', 'true', 'try',
+  };
+
+  /// Swift counterpart of the generated Dart DatabaseManager: it opens the
+  /// database with the same version, statements and migration steps, so it
+  /// makes no difference whether Dart or native code opens it first.
+  String generateDatabaseManager(NativeDatabaseSpec spec) {
     final buffer = StringBuffer();
+    final schemas = spec.tables;
 
     buffer.writeln('import Foundation');
+    buffer.writeln('import native_sqlite_ios');
     buffer.writeln();
     buffer.writeln('/**');
-    buffer.writeln(' * Auto-generated native database manager.');
+    buffer.writeln(' * Native database manager, mirroring the generated DatabaseManager.dart.');
     buffer.writeln(
-      ' * Mirrors DatabaseManager.dart — call DatabaseManager.shared.initialize() from',
+      ' * Call DatabaseManager.shared.initialize() from native iOS code',
     );
     buffer.writeln(
-      ' * native iOS code (BGTaskScheduler, App Extensions, Share Extensions).',
+      ' * (BGTaskScheduler, App Extensions) before using the generated helpers.',
     );
     buffer.writeln(' * AUTO-GENERATED - DO NOT EDIT MANUALLY');
     buffer.writeln(' */');
-    buffer.writeln('public class DatabaseManager {');
+    buffer.writeln('public final class DatabaseManager {');
     buffer.writeln('    public static let shared = DatabaseManager()');
     buffer.writeln();
-    buffer.writeln('    private var initialized = false');
-    buffer.writeln('    private var currentDatabaseName: String?');
-    buffer.writeln();
-    buffer.writeln('    private init() {}');
+    buffer.writeln('    public static let schemaVersion = ${spec.schemaVersion}');
+    buffer.writeln(
+      '    public static let defaultDatabaseName = ${_swiftString(spec.databaseName)}',
+    );
     buffer.writeln();
     buffer.writeln('    public static let onCreateStatements: [String] = [');
     for (final schema in schemas) {
       buffer.writeln('        ${schema.className}Schema.createTableSql,');
     }
+    buffer.writeln('    ] + [');
+    for (final schema in schemas) {
+      buffer.writeln('        ${schema.className}Schema.indexSql,');
+    }
+    buffer.writeln(r'    ].flatMap { $0 }');
+    buffer.writeln();
+    buffer.writeln(
+      '    /// Versioned steps: `migrations[v]` upgrades version `v - 1` to `v`.',
+    );
+    if (spec.migrations.isEmpty) {
+      buffer.writeln('    public static let migrations: [Int: [String]] = [:]');
+    } else {
+      buffer.writeln('    public static let migrations: [Int: [String]] = [');
+      for (final MapEntry(key: version, value: sql) in spec.migrations.entries) {
+        buffer.writeln('        $version: [');
+        for (final statement in sql) {
+          buffer.writeln('            ${_swiftString(statement)},');
+        }
+        buffer.writeln('        ],');
+      }
+      buffer.writeln('    ]');
+    }
+    buffer.writeln();
+    buffer.writeln(
+      '    /// Run after every upgrade: creates any missing table or index.',
+    );
+    buffer.writeln('    public static let ensureSchemaStatements: [String] = [');
+    for (final statement in spec.ensureSchema) {
+      buffer.writeln('        ${_swiftString(statement)},');
+    }
     buffer.writeln('    ]');
     buffer.writeln();
     buffer.writeln('    public static let tableNames: [String] = [');
     for (final schema in schemas) {
-      buffer.writeln('        "${schema.tableName}",');
+      buffer.writeln('        ${schema.className}Schema.tableName,');
     }
     buffer.writeln('    ]');
     buffer.writeln();
+    buffer.writeln('    private let lock = NSLock()');
+    buffer.writeln('    private var currentDatabaseName: String?');
+    buffer.writeln();
+    buffer.writeln('    private init() {}');
+    buffer.writeln();
     buffer.writeln('    /**');
-    buffer.writeln('     * Initialize the database.');
-    buffer.writeln(
-      '     * Creates tables on first run and runs pending migrations.',
-    );
-    buffer.writeln('     *');
-    buffer.writeln(
-      '     * - Parameters:',
-    );
-    buffer.writeln(
-      '     *   - name: Database name (default: "$databaseName")',
-    );
-    buffer.writeln(
-      '     *   - enableWAL: Enable Write-Ahead Logging for better concurrency',
-    );
-    buffer.writeln(
-      '     *   - enableForeignKeys: Enable foreign key constraints',
-    );
+    buffer.writeln('     * Opens the database, creating it or applying pending migrations.');
     buffer.writeln('     */');
     buffer.writeln('    public func initialize(');
-    buffer.writeln('        name: String = "$databaseName",');
+    buffer.writeln('        name: String = DatabaseManager.defaultDatabaseName,');
     buffer.writeln('        enableWAL: Bool = true,');
     buffer.writeln('        enableForeignKeys: Bool = true');
     buffer.writeln('    ) throws {');
-    buffer.writeln('        guard !initialized else {');
+    buffer.writeln('        lock.lock()');
+    buffer.writeln('        defer { lock.unlock() }');
+    buffer.writeln('        let manager = NativeSqliteManager.shared');
     buffer.writeln(
-      '            print("DatabaseManager: Already initialized")',
+      '        // Already opened (e.g. by Dart through the plugin, which shares this',
     );
+    buffer.writeln(
+      '        // manager) with the same generated schema and migrations.',
+    );
+    buffer.writeln('        if manager.isDatabaseOpen(name: name) {');
+    buffer.writeln('            currentDatabaseName = name');
     buffer.writeln('            return');
     buffer.writeln('        }');
-    buffer.writeln();
-    buffer.writeln(
-      '        _ = try NativeSqliteManager.shared.openDatabase(config: DatabaseConfig(',
-    );
+    buffer.writeln('        _ = try manager.openDatabase(config: DatabaseConfig(');
     buffer.writeln('            name: name,');
-    buffer.writeln(
-      '            version: SchemaVersionManager.currentVersion,',
-    );
-    buffer.writeln(
-      '            onCreate: DatabaseManager.onCreateStatements,',
-    );
-    buffer.writeln('            onUpgrade: nil,');
+    buffer.writeln('            version: Self.schemaVersion,');
+    buffer.writeln('            onCreate: Self.onCreateStatements,');
+    buffer.writeln('            onUpgrade: Self.ensureSchemaStatements,');
     buffer.writeln('            enableWAL: enableWAL,');
-    buffer.writeln('            enableForeignKeys: enableForeignKeys');
+    buffer.writeln('            enableForeignKeys: enableForeignKeys,');
+    buffer.writeln('            migrations: Self.migrations');
     buffer.writeln('        ))');
-    buffer.writeln();
-    buffer.writeln(
-      '        try SchemaVersionManager.migrate(databaseName: name)',
-    );
-    buffer.writeln();
     buffer.writeln('        currentDatabaseName = name');
-    buffer.writeln('        initialized = true');
-    buffer.writeln(
-      '        print("✅ DatabaseManager initialized (v\\(SchemaVersionManager.currentVersion))")',
-    );
     buffer.writeln('    }');
     buffer.writeln();
     buffer.writeln('    public func close() throws {');
+    buffer.writeln('        lock.lock()');
+    buffer.writeln('        defer { lock.unlock() }');
     buffer.writeln('        if let name = currentDatabaseName {');
-    buffer.writeln(
-      '            try NativeSqliteManager.shared.closeDatabase(name: name)',
-    );
+    buffer.writeln('            try NativeSqliteManager.shared.closeDatabase(name: name)');
     buffer.writeln('        }');
-    buffer.writeln('        initialized = false');
     buffer.writeln('        currentDatabaseName = nil');
     buffer.writeln('    }');
     buffer.writeln();
-    buffer.writeln('    public var isInitialized: Bool { initialized }');
+    buffer.writeln('    public var isInitialized: Bool {');
+    buffer.writeln('        lock.lock()');
+    buffer.writeln('        defer { lock.unlock() }');
+    buffer.writeln('        return currentDatabaseName != nil');
+    buffer.writeln('    }');
     buffer.writeln();
     buffer.writeln('    public var currentDatabase: String {');
     buffer.writeln('        get throws {');
-    buffer.writeln(
-      '            guard initialized, let name = currentDatabaseName else {',
-    );
-    buffer.writeln(
-      '                throw NSError(domain: "DatabaseManager", code: -1,',
-    );
+    buffer.writeln('            lock.lock()');
+    buffer.writeln('            defer { lock.unlock() }');
+    buffer.writeln('            guard let name = currentDatabaseName else {');
+    buffer.writeln('                throw NSError(domain: "DatabaseManager", code: -1,');
     buffer.writeln(
       '                    userInfo: [NSLocalizedDescriptionKey: "Call DatabaseManager.shared.initialize() first"])',
     );

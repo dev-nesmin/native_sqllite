@@ -74,6 +74,10 @@ targets:
           verbose: false
 ```
 
+> `table_name_case` / `column_name_case` must be identical for the `:table`,
+> `:migration` and `:schema_registry` builders (the defaults already are). The
+> build fails if the schema snapshot and the generated tables disagree.
+
 ---
 
 ## Generated Files
@@ -165,80 +169,79 @@ class UserQueryBuilder {
 
 ### `lib/generated/database_manager.dart`
 
-Auto-generated (no trigger file needed). Aggregates all `@DbTable(auto: true)` tables in the project.
+Auto-generated (no trigger file needed). Aggregates all `@DbTable(auto: true)` tables in the project. Everything is embedded at build time — nothing is read from disk at runtime, so it works on devices and the web.
 
 ```dart
 class DatabaseManager {
-  // Name of the default database
-  static const String databaseName = 'my_app';
+  static const int schemaVersion = 3;
+  static const String defaultDatabaseName = 'my_app'; // database_name in native_sqlite_config.yaml
 
-  // Current schema version (read from native_sqlite_schema.json)
-  static int get schemaVersion => 3;
-
-  // table name → CREATE TABLE SQL
-  static const Map<String, String> tables = {
-    'users': 'CREATE TABLE users (...)',
-    'orders': 'CREATE TABLE orders (...)',
-  };
-
-  // Ordered by foreign key dependencies (parents before children)
-  static List<String> get onCreateStatements => [...];
-
+  static const tables = <String, String>{ 'users': UserSchema.createTableSql, ... };
+  static List<String> get onCreateStatements => [...]; // tables (FK order) + indexes
   static List<String> get tableNames => ['users', 'orders'];
 
-  // Generated migration entries
-  static const List<Map<String, dynamic>> migrations = [
-    {
-      'tableName': 'users',
-      'className': 'User',
-      'fromVersion': 2,
-      'toVersion': 3,
-      'sql': ['ALTER TABLE users ADD COLUMN phone TEXT'],
-      'summary': 'Added columns: phone',
-    },
-  ];
+  // migrations[v] upgrades version v - 1 to v
+  static const Map<int, List<String>> migrations = {
+    2: ['ALTER TABLE users ADD COLUMN phone TEXT'],
+    3: ['CREATE TABLE orders (...)', 'CREATE INDEX ...'],
+  };
+
+  // Run after every upgrade: creates any missing table or index
+  static const List<String> ensureSchemaStatements = [...];
+
+  static Future<void> init({String name = defaultDatabaseName, bool enableWAL = true, bool enableForeignKeys = true});
+  static Future<void> close();
 }
 ```
 
-Pass `DatabaseManager` fields directly to `AutoMigration.createConfig(...)`:
-
-```dart
-await NativeSqlite.open(
-  config: AutoMigration.createConfig(
-    name: DatabaseManager.databaseName,
-    schemaVersion: DatabaseManager.schemaVersion,
-    onCreateStatements: DatabaseManager.onCreateStatements,
-    tables: DatabaseManager.tables,
-    tableNames: DatabaseManager.tableNames,
-    migrations: DatabaseManager.migrations,
-  ),
-);
-```
+Call `await DatabaseManager.init()` at startup. The generated Kotlin and Swift
+`DatabaseManager`s embed the same data, so the database is migrated identically
+whichever side opens it first.
 
 ---
 
 ### `lib/generated/native_sqlite_schema.json`
 
-A JSON snapshot of the current schema used to detect changes between builds. Commit this file so that migrations can be computed correctly on CI.
+The current schema, and — when the schema changed — the migration step to its
+`schemaVersion`. Each version is also saved as
+`lib/generated/schemas/native_sqlite_schema_vN.json`; these files are the
+migration history, so **commit them** (CI and every developer must build from
+the same history).
 
 ```json
 {
-  "version": "3",
-  "generatedAt": "2025-05-12T10:00:00.000Z",
-  "tables": [
+  "schemaVersion": 3,
+  "migrationFormat": 2,
+  "schemas": [
     {
+      "className": "User",
       "tableName": "users",
-      "dartName": "User",
       "columns": [
-        { "name": "id", "dartName": "id", "type": "INTEGER", "primaryKey": true, "autoIncrement": true, "nullable": false },
-        { "name": "name", "dartName": "name", "type": "TEXT", "nullable": false },
-        { "name": "email", "dartName": "email", "type": "TEXT", "nullable": false, "unique": true }
+        { "dartName": "phoneNumber", "name": "phone_number", "type": "TEXT", "nullable": true, "dartType": "String?" }
       ],
-      "indexes": [{ "columns": ["email"], "unique": false }]
+      "indexes": [{ "name": "idx_users_email", "columns": ["email"], "unique": false }]
     }
+  ],
+  "migrations": [
+    { "tableName": "users", "sql": ["ALTER TABLE users ADD COLUMN phone_number TEXT"], "summary": "Added columns: phone_number" }
   ]
 }
 ```
+
+How changes are migrated:
+
+| Change | Migration |
+|--------|-----------|
+| New table | `CREATE TABLE` + its indexes |
+| New nullable column, or with a default | `ALTER TABLE ADD COLUMN` |
+| New `NOT NULL` column without default | **Build error** (existing rows have no value) |
+| Removed column, type/constraint/FK change, new `UNIQUE`/FK column | Table rebuild (copy shared columns, recreate indexes); removed data is logged as a warning |
+| Index added/removed/changed | `CREATE INDEX` / `DROP INDEX` |
+| Model removed | Table kept (warning) |
+
+Snapshots written by older generator versions (Dart names instead of column
+names, migrations that never ran) are corrected automatically without creating
+a migration.
 
 ---
 
@@ -427,61 +430,32 @@ native_sqlite:
     generate_helpers: true
 ```
 
-Run the native generator after `build_runner`:
-
-```bash
-dart run native_sqlite_generator
-```
+The `native_code` builder regenerates the files on every `build_runner` build;
+`dart run native_sqlite_generator` does the same from the command line.
 
 ### Generated Kotlin files
 
 | File | Description |
 |------|-------------|
-| `UserSchema.kt` | Column constants and `CREATE TABLE` SQL |
-| `UserHelper.kt` | Cursor-to-model mapping helpers |
-| `SchemaVersionManager.kt` | Read/write `PRAGMA user_version` |
-| `Migration_1_2.kt` | Stub migration class with helper methods |
+| `UserSchema.kt` | Column constants, `CREATE_TABLE_SQL`, `INDEX_SQL` |
+| `UserHelper.kt` | Typed `User` data class (`Instant`, `Duration`, `Uri`, enums) and CRUD/query helper |
+| `UserStatus.kt` | One enum class per Dart enum used by a model |
+| `DatabaseManager.kt` | `init(context)` — opens and migrates like `DatabaseManager.dart` |
 
 ### Generated Swift files
 
 | File | Description |
 |------|-------------|
-| `UserSchema.swift` | Column constants and `CREATE TABLE` SQL |
-| `UserHelper.swift` | Row-to-model mapping helpers |
-| `SchemaVersionManager.swift` | Read/write `PRAGMA user_version` |
-| `Migration_1_2.swift` | Stub migration class with helper methods |
+| `UserSchema.swift` | Column constants, `createTableSql`, `indexSql` |
+| `UserHelper.swift` | Typed `User` struct (`Date`, `TimeInterval`, `URL`, enums) and CRUD/query helper; row decoding throws on bad data |
+| `UserStatus.swift` | One enum per Dart enum used by a model |
+| `NativeSqliteGeneratedSupport.swift` | Row decoding shared by the helpers |
+| `DatabaseManager.swift` | `initialize()` — opens and migrates like `DatabaseManager.dart` |
 
-### Migration stubs
-
-The generator creates `Migration_X_Y` stub classes with three ready-to-use helper methods. You must implement the `migrate()` body:
-
-```kotlin
-// Migration_1_2.kt — fill in the migration steps
-class Migration_1_2 : Migration(1, 2) {
-    override fun migrate(db: SQLiteDatabase) {
-        // TODO: implement migration steps
-        addColumn(db, "users", "phone", "TEXT")
-    }
-}
-```
-
-```swift
-// Migration_1_2.swift — fill in the migration steps
-class Migration_1_2: Migration {
-    static func migrate(_ db: OpaquePointer) {
-        // TODO: implement migration steps
-        addColumn(db, table: "users", column: "phone", type: "TEXT")
-    }
-}
-```
-
-**Available helper methods:**
-
-| Method | Description |
-|--------|-------------|
-| `addColumn(db, table, column, type)` | `ALTER TABLE ADD COLUMN` |
-| `renameTable(db, from, to)` | `ALTER TABLE RENAME TO` |
-| `migrateTableData(db, from, to, columns)` | Copy rows between tables |
+Fields with a `@UseConverter` or `@JsonField` are exposed as their stored
+SQLite value (documented on the property). The files `import native_sqlite_ios`;
+add `ios/Runner/Generated` to the Runner target once as a synchronized folder
+(Xcode 16+), so new files are picked up automatically.
 
 ---
 
@@ -516,6 +490,5 @@ Your model files (@DbTable classes)
 
 ## Known Limitations
 
-- The schema version in generated native stubs is always `1` (versioning not yet implemented). See [MISSING_IMPLEMENTATIONS.md](../MISSING_IMPLEMENTATIONS.md) issue #7.
-- The schema file path is hard-coded to `lib/generated/native_sqlite_schema.json`. See issue #8.
-- Table-recreation migrations do not preserve foreign-key constraints. See issue #5.
+- Column renames are migrated as remove + add (the build warns that the column's data is dropped).
+- The schema file path is fixed to `lib/generated/native_sqlite_schema.json`.

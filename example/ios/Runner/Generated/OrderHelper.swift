@@ -1,32 +1,33 @@
 import Foundation
+import native_sqlite_ios
 
 /**
  * Struct for Order.
  * AUTO-GENERATED from Dart - DO NOT EDIT MANUALLY
  */
 public struct Order {
-    public let id: Int?
-    public let userId: Int
-    public let productId: Int
-    public let quantity: Int
+    public let id: Int64?
+    public let userId: Int64
+    public let productId: Int64
+    public let quantity: Int64
     public let totalPrice: Double
     public let status: String
     public let notes: String?
-    public let createdAt: Int
-    public let updatedAt: Int?
-    public let deliveredAt: Int?
+    public let createdAt: Date
+    public let updatedAt: Date?
+    public let deliveredAt: Date?
 
     public init(
-        id: Int? = nil,
-        userId: Int,
-        productId: Int,
-        quantity: Int,
+        id: Int64? = nil,
+        userId: Int64,
+        productId: Int64,
+        quantity: Int64,
         totalPrice: Double,
         status: String,
-        notes: String?,
-        createdAt: Int,
-        updatedAt: Int?,
-        deliveredAt: Int?
+        notes: String? = nil,
+        createdAt: Date,
+        updatedAt: Date? = nil,
+        deliveredAt: Date? = nil
     ) {
         self.id = id
         self.userId = userId
@@ -99,7 +100,7 @@ public class OrderHelper {
      */
     public static func cleanupIsolate(isolateId: Int64) {
         isolateQueue.sync {
-            isolateInstances.removeValue(forKey: isolateId)
+            _ = isolateInstances.removeValue(forKey: isolateId)
         }
     }
 
@@ -120,20 +121,21 @@ public class OrderHelper {
     }
 
     public func insert(_ entity: Order) throws -> Int64 {
-        var values: [String: Any] = [:]
-        values[OrderSchema.userId] = entity.userId
-        values[OrderSchema.productId] = entity.productId
-        values[OrderSchema.quantity] = entity.quantity
-        values[OrderSchema.totalPrice] = entity.totalPrice
-        values[OrderSchema.status] = entity.status
-        values[OrderSchema.notes] = entity.notes ?? NSNull()
-        values[OrderSchema.createdAt] = Int(entity.createdAt.timeIntervalSince1970 * 1000)
-        values[OrderSchema.updatedAt] = entity.updatedAt?.timeIntervalSince1970 ?? NSNull()
-        values[OrderSchema.deliveredAt] = entity.deliveredAt?.timeIntervalSince1970 ?? NSNull()
+        let values: [String: Any?] = [
+            OrderSchema.userId: entity.userId,
+            OrderSchema.productId: entity.productId,
+            OrderSchema.quantity: entity.quantity,
+            OrderSchema.totalPrice: entity.totalPrice,
+            OrderSchema.status: entity.status,
+            OrderSchema.notes: entity.notes,
+            OrderSchema.createdAt: GeneratedValue.milliseconds(entity.createdAt),
+            OrderSchema.updatedAt: entity.updatedAt.map { GeneratedValue.milliseconds($0) },
+            OrderSchema.deliveredAt: entity.deliveredAt.map { GeneratedValue.milliseconds($0) },
+        ]
         return try manager.insert(name: databaseName, table: OrderSchema.tableName, values: values)
     }
 
-    public func findById(_ id: Int) throws -> Order? {
+    public func findById(_ id: Int64) throws -> Order? {
         let result = try manager.query(
             name: databaseName,
             sql: "SELECT * FROM \(OrderSchema.tableName) WHERE \(OrderSchema.id) = ? LIMIT 1",
@@ -147,7 +149,7 @@ public class OrderHelper {
         for (index, column) in columns.enumerated() {
             columnMap[column] = index
         }
-        return fromRow(columnMap: columnMap, row: rows[0])
+        return try fromRow(columnMap: columnMap, row: rows[0])
     }
 
     public func findAll() throws -> [Order] {
@@ -160,7 +162,7 @@ public class OrderHelper {
         for (index, column) in columns.enumerated() {
             columnMap[column] = index
         }
-        return rows.map { fromRow(columnMap: columnMap, row: $0) }
+        return try rows.map { try fromRow(columnMap: columnMap, row: $0) }
     }
 
     /**
@@ -170,16 +172,17 @@ public class OrderHelper {
      * - Throws: Database errors
      */
     public func update(_ entity: Order) throws -> Int {
-        var values: [String: Any] = [:]
-        values[OrderSchema.userId] = entity.userId
-        values[OrderSchema.productId] = entity.productId
-        values[OrderSchema.quantity] = entity.quantity
-        values[OrderSchema.totalPrice] = entity.totalPrice
-        values[OrderSchema.status] = entity.status
-        values[OrderSchema.notes] = entity.notes ?? NSNull()
-        values[OrderSchema.createdAt] = Int(entity.createdAt.timeIntervalSince1970 * 1000)
-        values[OrderSchema.updatedAt] = entity.updatedAt?.timeIntervalSince1970 ?? NSNull()
-        values[OrderSchema.deliveredAt] = entity.deliveredAt?.timeIntervalSince1970 ?? NSNull()
+        let values: [String: Any?] = [
+            OrderSchema.userId: entity.userId,
+            OrderSchema.productId: entity.productId,
+            OrderSchema.quantity: entity.quantity,
+            OrderSchema.totalPrice: entity.totalPrice,
+            OrderSchema.status: entity.status,
+            OrderSchema.notes: entity.notes,
+            OrderSchema.createdAt: GeneratedValue.milliseconds(entity.createdAt),
+            OrderSchema.updatedAt: entity.updatedAt.map { GeneratedValue.milliseconds($0) },
+            OrderSchema.deliveredAt: entity.deliveredAt.map { GeneratedValue.milliseconds($0) },
+        ]
         return try manager.update(
             name: databaseName,
             table: OrderSchema.tableName,
@@ -197,7 +200,7 @@ public class OrderHelper {
      * - Returns: Number of rows affected
      * - Throws: Database errors
      */
-    public func updatePartial(id: Int, updates: [String: Any]) throws -> Int {
+    public func updatePartial(id: Int64, updates: [String: Any?]) throws -> Int {
         return try manager.update(
             name: databaseName,
             table: OrderSchema.tableName,
@@ -213,7 +216,7 @@ public class OrderHelper {
      * - Returns: Number of rows deleted
      * - Throws: Database errors
      */
-    public func delete(id: Int) throws -> Int {
+    public func delete(id: Int64) throws -> Int {
         return try manager.delete(
             name: databaseName,
             table: OrderSchema.tableName,
@@ -248,15 +251,15 @@ public class OrderHelper {
     public func insertBatch(_ entities: [Order]) throws -> [Int64] {
         var results: [Int64] = []
         
-        try manager.execute(name: databaseName, sql: "BEGIN TRANSACTION")
+        _ = try manager.execute(name: databaseName, sql: "BEGIN TRANSACTION")
         do {
             for entity in entities {
                 let id = try insert(entity)
                 results.append(id)
             }
-            try manager.execute(name: databaseName, sql: "COMMIT")
+            _ = try manager.execute(name: databaseName, sql: "COMMIT")
         } catch {
-            try? manager.execute(name: databaseName, sql: "ROLLBACK")
+            _ = try? manager.execute(name: databaseName, sql: "ROLLBACK")
             throw error
         }
         return results
@@ -271,14 +274,14 @@ public class OrderHelper {
     public func updateBatch(_ entities: [Order]) throws -> Int {
         var totalAffected = 0
         
-        try manager.execute(name: databaseName, sql: "BEGIN TRANSACTION")
+        _ = try manager.execute(name: databaseName, sql: "BEGIN TRANSACTION")
         do {
             for entity in entities {
                 totalAffected += try update(entity)
             }
-            try manager.execute(name: databaseName, sql: "COMMIT")
+            _ = try manager.execute(name: databaseName, sql: "COMMIT")
         } catch {
-            try? manager.execute(name: databaseName, sql: "ROLLBACK")
+            _ = try? manager.execute(name: databaseName, sql: "ROLLBACK")
             throw error
         }
         return totalAffected
@@ -290,17 +293,17 @@ public class OrderHelper {
      * - Returns: Total number of rows deleted
      * - Throws: Database errors
      */
-    public func deleteBatch(ids: [Int]) throws -> Int {
+    public func deleteBatch(ids: [Int64]) throws -> Int {
         var totalDeleted = 0
         
-        try manager.execute(name: databaseName, sql: "BEGIN TRANSACTION")
+        _ = try manager.execute(name: databaseName, sql: "BEGIN TRANSACTION")
         do {
             for id in ids {
                 totalDeleted += try delete(id: id)
             }
-            try manager.execute(name: databaseName, sql: "COMMIT")
+            _ = try manager.execute(name: databaseName, sql: "COMMIT")
         } catch {
-            try? manager.execute(name: databaseName, sql: "ROLLBACK")
+            _ = try? manager.execute(name: databaseName, sql: "ROLLBACK")
             throw error
         }
         return totalDeleted
@@ -346,7 +349,7 @@ public class OrderHelper {
         for (index, column) in columns.enumerated() {
             columnMap[column] = index
         }
-        return rows.map { fromRow(columnMap: columnMap, row: $0) }
+        return try rows.map { try fromRow(columnMap: columnMap, row: $0) }
     }
 
     /**
@@ -390,7 +393,7 @@ public class OrderHelper {
         }
         let result = try manager.query(name: databaseName, sql: sql, arguments: whereArgs)
         guard let rows = result["rows"] as? [[Any?]] else { return nil }
-        return rows.first?.first
+        return rows.first?.first ?? nil
     }
 
     /**
@@ -411,7 +414,7 @@ public class OrderHelper {
         }
         let result = try manager.query(name: databaseName, sql: sql, arguments: whereArgs)
         guard let rows = result["rows"] as? [[Any?]] else { return nil }
-        return rows.first?.first
+        return rows.first?.first ?? nil
     }
 
     /**
@@ -456,18 +459,19 @@ public class OrderHelper {
         return rows.first?.first as? Double
     }
 
-    private func fromRow(columnMap: [String: Int], row: [Any?]) -> Order {
+    private func fromRow(columnMap: [String: Int], row values: [Any?]) throws -> Order {
+        let row = GeneratedRow(columnMap: columnMap, values: values)
         return Order(
-            id: row[columnMap[OrderSchema.id]!] as? Int,
-            userId: row[columnMap[OrderSchema.userId]!] as! Int,
-            productId: row[columnMap[OrderSchema.productId]!] as! Int,
-            quantity: row[columnMap[OrderSchema.quantity]!] as! Int,
-            totalPrice: row[columnMap[OrderSchema.totalPrice]!] as! Double,
-            status: row[columnMap[OrderSchema.status]!] as! String,
-            notes: row[columnMap[OrderSchema.notes]!] as? String,
-            createdAt: Date(timeIntervalSince1970: TimeInterval(row[columnMap[OrderSchema.createdAt]!] as! Int) / 1000),
-            updatedAt: (row[columnMap[OrderSchema.updatedAt]!] as? Int).map { Date(timeIntervalSince1970: TimeInterval($0) / 1000) },
-            deliveredAt: (row[columnMap[OrderSchema.deliveredAt]!] as? Int).map { Date(timeIntervalSince1970: TimeInterval($0) / 1000) }
+            id: try row.optional(OrderSchema.id, GeneratedValue.int64, expected: "Int64"),
+            userId: try row.required(OrderSchema.userId, GeneratedValue.int64, expected: "Int64"),
+            productId: try row.required(OrderSchema.productId, GeneratedValue.int64, expected: "Int64"),
+            quantity: try row.required(OrderSchema.quantity, GeneratedValue.int64, expected: "Int64"),
+            totalPrice: try row.required(OrderSchema.totalPrice, GeneratedValue.double, expected: "Double"),
+            status: try row.required(OrderSchema.status, GeneratedValue.string, expected: "String"),
+            notes: try row.optional(OrderSchema.notes, GeneratedValue.string, expected: "String"),
+            createdAt: try row.required(OrderSchema.createdAt, GeneratedValue.date, expected: "Date"),
+            updatedAt: try row.optional(OrderSchema.updatedAt, GeneratedValue.date, expected: "Date"),
+            deliveredAt: try row.optional(OrderSchema.deliveredAt, GeneratedValue.date, expected: "Date")
         )
     }
 }

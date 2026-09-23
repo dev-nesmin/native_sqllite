@@ -1,24 +1,28 @@
 import Foundation
+import native_sqlite_ios
 
 /**
  * Struct for StyledItem.
  * AUTO-GENERATED from Dart - DO NOT EDIT MANUALLY
  */
 public struct StyledItem {
-    public let id: Int?
+    public let id: Int64?
     public let name: String
-    public let backgroundColor: Any
-    public let textColor: Any?
+    /// Raw value stored by the Dart TypeConverter for `Color`.
+    public let backgroundColor: Int64
+    /// Raw value stored by the Dart TypeConverter for `Color?`.
+    public let textColor: Int64?
+    /// Raw value stored by the Dart TypeConverter for `List<String>`.
     public let tags: String
-    public let createdAt: Int
+    public let createdAt: Date
 
     public init(
-        id: Int? = nil,
+        id: Int64? = nil,
         name: String,
-        backgroundColor: Any,
-        textColor: Any?,
+        backgroundColor: Int64,
+        textColor: Int64? = nil,
         tags: String,
-        createdAt: Int
+        createdAt: Date
     ) {
         self.id = id
         self.name = name
@@ -87,7 +91,7 @@ public class StyledItemHelper {
      */
     public static func cleanupIsolate(isolateId: Int64) {
         isolateQueue.sync {
-            isolateInstances.removeValue(forKey: isolateId)
+            _ = isolateInstances.removeValue(forKey: isolateId)
         }
     }
 
@@ -108,16 +112,17 @@ public class StyledItemHelper {
     }
 
     public func insert(_ entity: StyledItem) throws -> Int64 {
-        var values: [String: Any] = [:]
-        values[StyledItemSchema.name] = entity.name
-        values[StyledItemSchema.backgroundColor] = entity.backgroundColor
-        values[StyledItemSchema.textColor] = entity.textColor ?? NSNull()
-        values[StyledItemSchema.tags] = try! String(data: JSONEncoder().encode(entity.tags), encoding: .utf8)!
-        values[StyledItemSchema.createdAt] = Int(entity.createdAt.timeIntervalSince1970 * 1000)
+        let values: [String: Any?] = [
+            StyledItemSchema.name: entity.name,
+            StyledItemSchema.backgroundColor: entity.backgroundColor,
+            StyledItemSchema.textColor: entity.textColor,
+            StyledItemSchema.tags: entity.tags,
+            StyledItemSchema.createdAt: GeneratedValue.milliseconds(entity.createdAt),
+        ]
         return try manager.insert(name: databaseName, table: StyledItemSchema.tableName, values: values)
     }
 
-    public func findById(_ id: Int) throws -> StyledItem? {
+    public func findById(_ id: Int64) throws -> StyledItem? {
         let result = try manager.query(
             name: databaseName,
             sql: "SELECT * FROM \(StyledItemSchema.tableName) WHERE \(StyledItemSchema.id) = ? LIMIT 1",
@@ -131,7 +136,7 @@ public class StyledItemHelper {
         for (index, column) in columns.enumerated() {
             columnMap[column] = index
         }
-        return fromRow(columnMap: columnMap, row: rows[0])
+        return try fromRow(columnMap: columnMap, row: rows[0])
     }
 
     public func findAll() throws -> [StyledItem] {
@@ -144,7 +149,7 @@ public class StyledItemHelper {
         for (index, column) in columns.enumerated() {
             columnMap[column] = index
         }
-        return rows.map { fromRow(columnMap: columnMap, row: $0) }
+        return try rows.map { try fromRow(columnMap: columnMap, row: $0) }
     }
 
     /**
@@ -154,12 +159,13 @@ public class StyledItemHelper {
      * - Throws: Database errors
      */
     public func update(_ entity: StyledItem) throws -> Int {
-        var values: [String: Any] = [:]
-        values[StyledItemSchema.name] = entity.name
-        values[StyledItemSchema.backgroundColor] = entity.backgroundColor
-        values[StyledItemSchema.textColor] = entity.textColor ?? NSNull()
-        values[StyledItemSchema.tags] = try! String(data: JSONEncoder().encode(entity.tags), encoding: .utf8)!
-        values[StyledItemSchema.createdAt] = Int(entity.createdAt.timeIntervalSince1970 * 1000)
+        let values: [String: Any?] = [
+            StyledItemSchema.name: entity.name,
+            StyledItemSchema.backgroundColor: entity.backgroundColor,
+            StyledItemSchema.textColor: entity.textColor,
+            StyledItemSchema.tags: entity.tags,
+            StyledItemSchema.createdAt: GeneratedValue.milliseconds(entity.createdAt),
+        ]
         return try manager.update(
             name: databaseName,
             table: StyledItemSchema.tableName,
@@ -177,7 +183,7 @@ public class StyledItemHelper {
      * - Returns: Number of rows affected
      * - Throws: Database errors
      */
-    public func updatePartial(id: Int, updates: [String: Any]) throws -> Int {
+    public func updatePartial(id: Int64, updates: [String: Any?]) throws -> Int {
         return try manager.update(
             name: databaseName,
             table: StyledItemSchema.tableName,
@@ -193,7 +199,7 @@ public class StyledItemHelper {
      * - Returns: Number of rows deleted
      * - Throws: Database errors
      */
-    public func delete(id: Int) throws -> Int {
+    public func delete(id: Int64) throws -> Int {
         return try manager.delete(
             name: databaseName,
             table: StyledItemSchema.tableName,
@@ -228,15 +234,15 @@ public class StyledItemHelper {
     public func insertBatch(_ entities: [StyledItem]) throws -> [Int64] {
         var results: [Int64] = []
         
-        try manager.execute(name: databaseName, sql: "BEGIN TRANSACTION")
+        _ = try manager.execute(name: databaseName, sql: "BEGIN TRANSACTION")
         do {
             for entity in entities {
                 let id = try insert(entity)
                 results.append(id)
             }
-            try manager.execute(name: databaseName, sql: "COMMIT")
+            _ = try manager.execute(name: databaseName, sql: "COMMIT")
         } catch {
-            try? manager.execute(name: databaseName, sql: "ROLLBACK")
+            _ = try? manager.execute(name: databaseName, sql: "ROLLBACK")
             throw error
         }
         return results
@@ -251,14 +257,14 @@ public class StyledItemHelper {
     public func updateBatch(_ entities: [StyledItem]) throws -> Int {
         var totalAffected = 0
         
-        try manager.execute(name: databaseName, sql: "BEGIN TRANSACTION")
+        _ = try manager.execute(name: databaseName, sql: "BEGIN TRANSACTION")
         do {
             for entity in entities {
                 totalAffected += try update(entity)
             }
-            try manager.execute(name: databaseName, sql: "COMMIT")
+            _ = try manager.execute(name: databaseName, sql: "COMMIT")
         } catch {
-            try? manager.execute(name: databaseName, sql: "ROLLBACK")
+            _ = try? manager.execute(name: databaseName, sql: "ROLLBACK")
             throw error
         }
         return totalAffected
@@ -270,17 +276,17 @@ public class StyledItemHelper {
      * - Returns: Total number of rows deleted
      * - Throws: Database errors
      */
-    public func deleteBatch(ids: [Int]) throws -> Int {
+    public func deleteBatch(ids: [Int64]) throws -> Int {
         var totalDeleted = 0
         
-        try manager.execute(name: databaseName, sql: "BEGIN TRANSACTION")
+        _ = try manager.execute(name: databaseName, sql: "BEGIN TRANSACTION")
         do {
             for id in ids {
                 totalDeleted += try delete(id: id)
             }
-            try manager.execute(name: databaseName, sql: "COMMIT")
+            _ = try manager.execute(name: databaseName, sql: "COMMIT")
         } catch {
-            try? manager.execute(name: databaseName, sql: "ROLLBACK")
+            _ = try? manager.execute(name: databaseName, sql: "ROLLBACK")
             throw error
         }
         return totalDeleted
@@ -326,7 +332,7 @@ public class StyledItemHelper {
         for (index, column) in columns.enumerated() {
             columnMap[column] = index
         }
-        return rows.map { fromRow(columnMap: columnMap, row: $0) }
+        return try rows.map { try fromRow(columnMap: columnMap, row: $0) }
     }
 
     /**
@@ -370,7 +376,7 @@ public class StyledItemHelper {
         }
         let result = try manager.query(name: databaseName, sql: sql, arguments: whereArgs)
         guard let rows = result["rows"] as? [[Any?]] else { return nil }
-        return rows.first?.first
+        return rows.first?.first ?? nil
     }
 
     /**
@@ -391,7 +397,7 @@ public class StyledItemHelper {
         }
         let result = try manager.query(name: databaseName, sql: sql, arguments: whereArgs)
         guard let rows = result["rows"] as? [[Any?]] else { return nil }
-        return rows.first?.first
+        return rows.first?.first ?? nil
     }
 
     /**
@@ -436,14 +442,15 @@ public class StyledItemHelper {
         return rows.first?.first as? Double
     }
 
-    private func fromRow(columnMap: [String: Int], row: [Any?]) -> StyledItem {
+    private func fromRow(columnMap: [String: Int], row values: [Any?]) throws -> StyledItem {
+        let row = GeneratedRow(columnMap: columnMap, values: values)
         return StyledItem(
-            id: row[columnMap[StyledItemSchema.id]!] as? Int,
-            name: row[columnMap[StyledItemSchema.name]!] as! String,
-            backgroundColor: row[columnMap[StyledItemSchema.backgroundColor]!],
-            textColor: row[columnMap[StyledItemSchema.textColor]!],
-            tags: try! JSONDecoder().decode([Any].self, from: (row[columnMap[StyledItemSchema.tags]!] as! String).data(using: .utf8)!),
-            createdAt: Date(timeIntervalSince1970: TimeInterval(row[columnMap[StyledItemSchema.createdAt]!] as! Int) / 1000)
+            id: try row.optional(StyledItemSchema.id, GeneratedValue.int64, expected: "Int64"),
+            name: try row.required(StyledItemSchema.name, GeneratedValue.string, expected: "String"),
+            backgroundColor: try row.required(StyledItemSchema.backgroundColor, GeneratedValue.int64, expected: "Int64"),
+            textColor: try row.optional(StyledItemSchema.textColor, GeneratedValue.int64, expected: "Int64"),
+            tags: try row.required(StyledItemSchema.tags, GeneratedValue.string, expected: "String"),
+            createdAt: try row.required(StyledItemSchema.createdAt, GeneratedValue.date, expected: "Date")
         )
     }
 }

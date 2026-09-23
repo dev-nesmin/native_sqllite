@@ -1,20 +1,21 @@
 import Foundation
+import native_sqlite_ios
 
 /**
  * Struct for Category.
  * AUTO-GENERATED from Dart - DO NOT EDIT MANUALLY
  */
 public struct Category {
-    public let id: Int?
+    public let id: Int64?
     public let name: String
     public let description: String?
-    public let createdAt: Int
+    public let createdAt: Date
 
     public init(
-        id: Int? = nil,
+        id: Int64? = nil,
         name: String,
-        description: String?,
-        createdAt: Int
+        description: String? = nil,
+        createdAt: Date
     ) {
         self.id = id
         self.name = name
@@ -81,7 +82,7 @@ public class CategoryHelper {
      */
     public static func cleanupIsolate(isolateId: Int64) {
         isolateQueue.sync {
-            isolateInstances.removeValue(forKey: isolateId)
+            _ = isolateInstances.removeValue(forKey: isolateId)
         }
     }
 
@@ -102,14 +103,15 @@ public class CategoryHelper {
     }
 
     public func insert(_ entity: Category) throws -> Int64 {
-        var values: [String: Any] = [:]
-        values[CategorySchema.name] = entity.name
-        values[CategorySchema.description] = entity.description ?? NSNull()
-        values[CategorySchema.createdAt] = Int(entity.createdAt.timeIntervalSince1970 * 1000)
+        let values: [String: Any?] = [
+            CategorySchema.name: entity.name,
+            CategorySchema.description: entity.description,
+            CategorySchema.createdAt: GeneratedValue.milliseconds(entity.createdAt),
+        ]
         return try manager.insert(name: databaseName, table: CategorySchema.tableName, values: values)
     }
 
-    public func findById(_ id: Int) throws -> Category? {
+    public func findById(_ id: Int64) throws -> Category? {
         let result = try manager.query(
             name: databaseName,
             sql: "SELECT * FROM \(CategorySchema.tableName) WHERE \(CategorySchema.id) = ? LIMIT 1",
@@ -123,7 +125,7 @@ public class CategoryHelper {
         for (index, column) in columns.enumerated() {
             columnMap[column] = index
         }
-        return fromRow(columnMap: columnMap, row: rows[0])
+        return try fromRow(columnMap: columnMap, row: rows[0])
     }
 
     public func findAll() throws -> [Category] {
@@ -136,7 +138,7 @@ public class CategoryHelper {
         for (index, column) in columns.enumerated() {
             columnMap[column] = index
         }
-        return rows.map { fromRow(columnMap: columnMap, row: $0) }
+        return try rows.map { try fromRow(columnMap: columnMap, row: $0) }
     }
 
     /**
@@ -146,10 +148,11 @@ public class CategoryHelper {
      * - Throws: Database errors
      */
     public func update(_ entity: Category) throws -> Int {
-        var values: [String: Any] = [:]
-        values[CategorySchema.name] = entity.name
-        values[CategorySchema.description] = entity.description ?? NSNull()
-        values[CategorySchema.createdAt] = Int(entity.createdAt.timeIntervalSince1970 * 1000)
+        let values: [String: Any?] = [
+            CategorySchema.name: entity.name,
+            CategorySchema.description: entity.description,
+            CategorySchema.createdAt: GeneratedValue.milliseconds(entity.createdAt),
+        ]
         return try manager.update(
             name: databaseName,
             table: CategorySchema.tableName,
@@ -167,7 +170,7 @@ public class CategoryHelper {
      * - Returns: Number of rows affected
      * - Throws: Database errors
      */
-    public func updatePartial(id: Int, updates: [String: Any]) throws -> Int {
+    public func updatePartial(id: Int64, updates: [String: Any?]) throws -> Int {
         return try manager.update(
             name: databaseName,
             table: CategorySchema.tableName,
@@ -183,7 +186,7 @@ public class CategoryHelper {
      * - Returns: Number of rows deleted
      * - Throws: Database errors
      */
-    public func delete(id: Int) throws -> Int {
+    public func delete(id: Int64) throws -> Int {
         return try manager.delete(
             name: databaseName,
             table: CategorySchema.tableName,
@@ -218,15 +221,15 @@ public class CategoryHelper {
     public func insertBatch(_ entities: [Category]) throws -> [Int64] {
         var results: [Int64] = []
         
-        try manager.execute(name: databaseName, sql: "BEGIN TRANSACTION")
+        _ = try manager.execute(name: databaseName, sql: "BEGIN TRANSACTION")
         do {
             for entity in entities {
                 let id = try insert(entity)
                 results.append(id)
             }
-            try manager.execute(name: databaseName, sql: "COMMIT")
+            _ = try manager.execute(name: databaseName, sql: "COMMIT")
         } catch {
-            try? manager.execute(name: databaseName, sql: "ROLLBACK")
+            _ = try? manager.execute(name: databaseName, sql: "ROLLBACK")
             throw error
         }
         return results
@@ -241,14 +244,14 @@ public class CategoryHelper {
     public func updateBatch(_ entities: [Category]) throws -> Int {
         var totalAffected = 0
         
-        try manager.execute(name: databaseName, sql: "BEGIN TRANSACTION")
+        _ = try manager.execute(name: databaseName, sql: "BEGIN TRANSACTION")
         do {
             for entity in entities {
                 totalAffected += try update(entity)
             }
-            try manager.execute(name: databaseName, sql: "COMMIT")
+            _ = try manager.execute(name: databaseName, sql: "COMMIT")
         } catch {
-            try? manager.execute(name: databaseName, sql: "ROLLBACK")
+            _ = try? manager.execute(name: databaseName, sql: "ROLLBACK")
             throw error
         }
         return totalAffected
@@ -260,17 +263,17 @@ public class CategoryHelper {
      * - Returns: Total number of rows deleted
      * - Throws: Database errors
      */
-    public func deleteBatch(ids: [Int]) throws -> Int {
+    public func deleteBatch(ids: [Int64]) throws -> Int {
         var totalDeleted = 0
         
-        try manager.execute(name: databaseName, sql: "BEGIN TRANSACTION")
+        _ = try manager.execute(name: databaseName, sql: "BEGIN TRANSACTION")
         do {
             for id in ids {
                 totalDeleted += try delete(id: id)
             }
-            try manager.execute(name: databaseName, sql: "COMMIT")
+            _ = try manager.execute(name: databaseName, sql: "COMMIT")
         } catch {
-            try? manager.execute(name: databaseName, sql: "ROLLBACK")
+            _ = try? manager.execute(name: databaseName, sql: "ROLLBACK")
             throw error
         }
         return totalDeleted
@@ -316,7 +319,7 @@ public class CategoryHelper {
         for (index, column) in columns.enumerated() {
             columnMap[column] = index
         }
-        return rows.map { fromRow(columnMap: columnMap, row: $0) }
+        return try rows.map { try fromRow(columnMap: columnMap, row: $0) }
     }
 
     /**
@@ -360,7 +363,7 @@ public class CategoryHelper {
         }
         let result = try manager.query(name: databaseName, sql: sql, arguments: whereArgs)
         guard let rows = result["rows"] as? [[Any?]] else { return nil }
-        return rows.first?.first
+        return rows.first?.first ?? nil
     }
 
     /**
@@ -381,7 +384,7 @@ public class CategoryHelper {
         }
         let result = try manager.query(name: databaseName, sql: sql, arguments: whereArgs)
         guard let rows = result["rows"] as? [[Any?]] else { return nil }
-        return rows.first?.first
+        return rows.first?.first ?? nil
     }
 
     /**
@@ -426,12 +429,13 @@ public class CategoryHelper {
         return rows.first?.first as? Double
     }
 
-    private func fromRow(columnMap: [String: Int], row: [Any?]) -> Category {
+    private func fromRow(columnMap: [String: Int], row values: [Any?]) throws -> Category {
+        let row = GeneratedRow(columnMap: columnMap, values: values)
         return Category(
-            id: row[columnMap[CategorySchema.id]!] as? Int,
-            name: row[columnMap[CategorySchema.name]!] as! String,
-            description: row[columnMap[CategorySchema.description]!] as? String,
-            createdAt: Date(timeIntervalSince1970: TimeInterval(row[columnMap[CategorySchema.createdAt]!] as! Int) / 1000)
+            id: try row.optional(CategorySchema.id, GeneratedValue.int64, expected: "Int64"),
+            name: try row.required(CategorySchema.name, GeneratedValue.string, expected: "String"),
+            description: try row.optional(CategorySchema.description, GeneratedValue.string, expected: "String"),
+            createdAt: try row.required(CategorySchema.createdAt, GeneratedValue.date, expected: "Date")
         )
     }
 }

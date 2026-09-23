@@ -1,4 +1,7 @@
 import 'package:native_sqlite_generator/src/models/schema_snapshot.dart';
+import 'package:native_sqlite_generator/src/native/native_column.dart';
+import 'package:native_sqlite_generator/src/native/native_database_spec.dart';
+import 'package:native_sqlite_generator/src/sql/schema_sql.dart';
 
 /// Generates Kotlin code for Android
 class NativeKotlinGenerator {
@@ -25,48 +28,48 @@ class NativeKotlinGenerator {
     );
     buffer.writeln(' */');
     buffer.writeln('object ${model.className}Schema {');
-    buffer.writeln('    const val TABLE_NAME = "${model.tableName}"');
+    buffer.writeln('    const val TABLE_NAME = ${_kotlinString(model.tableName)}');
     buffer.writeln();
     buffer.writeln('    // Column names');
 
     for (final field in model.columns) {
       final constantName = _toScreamingSnakeCase(field.dartName);
-      buffer.writeln('    const val $constantName = "${field.name}"');
+      buffer.writeln('    const val $constantName = ${_kotlinString(field.name)}');
     }
 
     buffer.writeln();
-    buffer.writeln('    // CREATE TABLE SQL');
-    buffer.writeln('    const val CREATE_TABLE_SQL = """');
-    buffer.write('        CREATE TABLE ${model.tableName} (');
-
-    final columnDefs = <String>[];
-    for (final field in model.columns) {
-      final parts = <String>[field.name, field.type];
-
-      if (field.primaryKey) {
-        parts.add('PRIMARY KEY');
-        if (field.autoIncrement) {
-          parts.add('AUTOINCREMENT');
-        }
-      }
-
-      if (!field.nullable && !field.primaryKey) {
-        parts.add('NOT NULL');
-      }
-
-      if (field.unique && !field.primaryKey) {
-        parts.add('UNIQUE');
-      }
-
-      columnDefs.add(parts.join(' '));
+    buffer.writeln('    // Same statements as the Dart ${model.className}Schema');
+    buffer.writeln(
+      '    const val CREATE_TABLE_SQL = ${_kotlinString(SchemaSql.createTable(model))}',
+    );
+    final indexSql = SchemaSql.createIndexes(model);
+    buffer.writeln();
+    buffer.writeln('    val INDEX_SQL: List<String> = listOf(');
+    for (final sql in indexSql) {
+      buffer.writeln('        ${_kotlinString(sql)},');
     }
-
-    buffer.write('\n');
-    buffer.write(columnDefs.map((def) => '            $def').join(',\n'));
-    buffer.writeln('\n        )');
-    buffer.writeln('    """.trimIndent()');
+    buffer.writeln('    )');
     buffer.writeln('}');
 
+    return buffer.toString();
+  }
+
+  /// Generates a Kotlin enum mirroring a Dart enum. Constant names are kept
+  /// identical to Dart so `name`-stored values round-trip unchanged.
+  String generateEnum(NativeEnum nativeEnum) {
+    final buffer = StringBuffer();
+    buffer.writeln('package $packageName');
+    buffer.writeln();
+    buffer.writeln('/**');
+    buffer.writeln(' * Mirrors the Dart enum ${nativeEnum.name}.');
+    buffer.writeln(' * Declaration order matches Dart, so ordinals are compatible.');
+    buffer.writeln(' * AUTO-GENERATED from Dart - DO NOT EDIT MANUALLY');
+    buffer.writeln(' */');
+    buffer.writeln('enum class ${nativeEnum.name} {');
+    buffer.writeln(
+      nativeEnum.values.map((v) => '    ${_kotlinIdentifier(v)}').join(',\n'),
+    );
+    buffer.writeln('}');
     return buffer.toString();
   }
 
@@ -77,9 +80,22 @@ class NativeKotlinGenerator {
       orElse: () => model.columns.first,
     );
 
+    final columns = model.columns.map(NativeColumn.of).toList();
+    final kinds = columns.map((c) => c.kind).toSet();
+
+    // The query results are untyped maps from the plugin.
+    buffer.writeln('@file:Suppress("UNCHECKED_CAST")');
+    buffer.writeln();
     buffer.writeln('package $packageName');
     buffer.writeln();
+    if (kinds.contains(NativeKind.uri)) buffer.writeln('import android.net.Uri');
     buffer.writeln('import dev.nesmin.native_sqlite.NativeSqliteManager');
+    if (kinds.contains(NativeKind.duration)) {
+      buffer.writeln('import java.time.Duration');
+    }
+    if (kinds.contains(NativeKind.dateTime)) {
+      buffer.writeln('import java.time.Instant');
+    }
     buffer.writeln('import java.util.concurrent.ConcurrentHashMap');
     buffer.writeln();
     buffer.writeln('/**');
@@ -89,12 +105,15 @@ class NativeKotlinGenerator {
     buffer.writeln('data class ${model.className}(');
 
     final params = <String>[];
-    for (final field in model.columns) {
-      final kotlinType = _getKotlinType(field);
-      final defaultValue = field.primaryKey && field.autoIncrement
-          ? ' = null'
-          : '';
-      params.add('    val ${field.dartName}: $kotlinType$defaultValue');
+    for (final column in columns) {
+      final field = column.column;
+      final kotlinType = _getKotlinType(column);
+      final defaultValue = field.nullable ? ' = null' : '';
+      final note = column.rawStorageNote;
+      final doc = note == null ? '' : '    /** Raw $note. */\n';
+      params.add(
+        '$doc    val ${_kotlinIdentifier(field.dartName)}: $kotlinType$defaultValue',
+      );
     }
     buffer.writeln(params.join(',\n'));
     buffer.writeln(')');
@@ -195,7 +214,10 @@ class NativeKotlinGenerator {
     final insertFields = model.columns.where((f) => !(f.primaryKey && f.autoIncrement)).toList();
     for (var i = 0; i < insertFields.length; i++) {
       final field = insertFields[i];
-      final value = _serializeKotlin(field, 'entity.${field.dartName}');
+      final value = _serializeKotlin(
+        NativeColumn.of(field),
+        'entity.${_kotlinIdentifier(field.dartName)}',
+      );
       final comma = i < insertFields.length - 1 ? ',' : '';
       buffer.writeln(
         '            ${model.className}Schema.${_toScreamingSnakeCase(field.dartName)} to $value$comma',
@@ -209,7 +231,9 @@ class NativeKotlinGenerator {
     buffer.writeln();
 
     // FindById method
-    final pkKotlinType = _getKotlinType(primaryKey).replaceAll('?', '');
+    final pkKotlinType = _getKotlinType(
+      NativeColumn.of(primaryKey),
+    ).replaceAll('?', '');
     buffer.writeln('    fun findById(id: $pkKotlinType): ${model.className}? {');
     buffer.writeln('        val result = NativeSqliteManager.Instance.query(');
     buffer.writeln('            databaseName,');
@@ -259,7 +283,10 @@ class NativeKotlinGenerator {
     final updateFields = model.columns.where((f) => !f.primaryKey).toList();
     for (var i = 0; i < updateFields.length; i++) {
       final field = updateFields[i];
-      final value = _serializeKotlin(field, 'entity.${field.dartName}');
+      final value = _serializeKotlin(
+        NativeColumn.of(field),
+        'entity.${_kotlinIdentifier(field.dartName)}',
+      );
       final comma = i < updateFields.length - 1 ? ',' : '';
       buffer.writeln(
         '            ${model.className}Schema.${_toScreamingSnakeCase(field.dartName)} to $value$comma',
@@ -273,7 +300,9 @@ class NativeKotlinGenerator {
     buffer.writeln(
       '            "\${${model.className}Schema.${_toScreamingSnakeCase(primaryKey.dartName)}} = ?",',
     );
-    buffer.writeln('            listOf(entity.${primaryKey.dartName})');
+    buffer.writeln(
+      '            listOf(${_serializeKotlin(NativeColumn.of(primaryKey), 'entity.${_kotlinIdentifier(primaryKey.dartName)}')})',
+    );
     buffer.writeln('        )');
     buffer.writeln('    }');
     buffer.writeln();
@@ -624,12 +653,13 @@ class NativeKotlinGenerator {
     buffer.writeln('        return ${model.className}(');
 
     final fieldInits = <String>[];
-    for (final field in model.columns) {
+    for (final column in columns) {
+      final field = column.column;
       final value = _deserializeKotlin(
-        field,
-        'row[columnMap[${model.className}Schema.${_toScreamingSnakeCase(field.dartName)}]!!]',
+        column,
+        'row[columnMap.getValue(${model.className}Schema.${_toScreamingSnakeCase(field.dartName)})]',
       );
-      fieldInits.add('            ${field.dartName} = $value');
+      fieldInits.add('            ${_kotlinIdentifier(field.dartName)} = $value');
     }
     buffer.writeln(fieldInits.join(',\n'));
     buffer.writeln('        )');
@@ -639,264 +669,205 @@ class NativeKotlinGenerator {
     return buffer.toString();
   }
 
-  String _getKotlinType(ColumnSchemaSnapshot field) {
-    final baseType = field.dartType.replaceAll('?', '');
-    String kotlinType;
-
-    // Handle basic types
-    if (baseType == 'int' || baseType == 'Int') {
-      kotlinType = 'Long';
-    } else if (baseType == 'DateTime') {
-      kotlinType = 'Long'; // Stored as epoch milliseconds
-    } else if (baseType == 'double' || baseType == 'Double') {
-      kotlinType = 'Double';
-    } else if (baseType == 'String') {
-      kotlinType = 'String';
-    } else if (baseType == 'bool' || baseType == 'Boolean') {
-      kotlinType = 'Boolean';
-    }
-    // Handle binary data
-    else if (baseType == 'Uint8List') {
-      kotlinType = 'ByteArray';
-    }
-    // Handle collections (stored as JSON)
-    else if (baseType.startsWith('List<')) {
-      kotlinType = 'String'; // Serialized as JSON string
-    } else if (baseType.startsWith('Map<')) {
-      kotlinType = 'String'; // Serialized as JSON string
-    }
-    // Handle enums (assume integer storage by default)
-    else if (baseType.contains('Enum')) {
-      kotlinType = 'Int';
-    } else {
-      // Default to Any for unknown types
-      kotlinType = 'Any';
-    }
-
-    return field.nullable ? '$kotlinType?' : kotlinType;
+  String _getKotlinType(NativeColumn column) {
+    final kotlinType = switch (column.kind) {
+      NativeKind.integer => 'Long',
+      NativeKind.real => 'Double',
+      NativeKind.text => 'String',
+      NativeKind.blob => 'ByteArray',
+      NativeKind.boolean => 'Boolean',
+      NativeKind.dateTime => 'Instant',
+      NativeKind.duration => 'Duration',
+      NativeKind.uri => 'Uri',
+      NativeKind.enumeration => column.enumName,
+    };
+    return column.nullable ? '$kotlinType?' : kotlinType;
   }
 
-  String _serializeKotlin(ColumnSchemaSnapshot field, String accessor) {
-    final baseType = field.dartType.replaceAll('?', '');
-
-    // Handle boolean conversion to integer
-    if (baseType == 'bool' || baseType == 'Boolean') {
-      return field.nullable
-          ? '$accessor?.let { if (it) 1 else 0 }'
-          : 'if ($accessor) 1 else 0';
-    }
-
-    // Handle DateTime conversion to epoch milliseconds
-    if (baseType == 'DateTime') {
-      return field.nullable
-          ? '$accessor?.toEpochMilliseconds()'
-          : '$accessor.toEpochMilliseconds()';
-    }
-
-    // Handle binary data (Uint8List -> ByteArray)
-    if (baseType == 'Uint8List') {
-      return accessor; // ByteArray is stored directly
-    }
-
-    // Handle List serialization to JSON
-    if (baseType.startsWith('List<')) {
-      if (field.nullable) {
-        return '$accessor?.let { Json.encodeToString(it) }';
-      } else {
-        return 'Json.encodeToString($accessor)';
-      }
-    }
-
-    // Handle Map serialization to JSON
-    if (baseType.startsWith('Map<')) {
-      if (field.nullable) {
-        return '$accessor?.let { Json.encodeToString(it) }';
-      } else {
-        return 'Json.encodeToString($accessor)';
-      }
-    }
-
-    // Default: return as-is
-    return accessor;
+  /// Kotlin expression converting [accessor] to its SQLite storage value.
+  String _serializeKotlin(NativeColumn column, String accessor) {
+    final String Function(String) convert = switch (column.kind) {
+      NativeKind.integer ||
+      NativeKind.real ||
+      NativeKind.text ||
+      NativeKind.blob => (v) => v,
+      NativeKind.boolean => (v) => 'if ($v) 1L else 0L',
+      NativeKind.dateTime => (v) => '$v.toEpochMilli()',
+      NativeKind.duration => (v) => '$v.toMillis()',
+      NativeKind.uri => (v) => '$v.toString()',
+      NativeKind.enumeration =>
+        column.storesEnumByName ? (v) => '$v.name' : (v) => '$v.ordinal.toLong()',
+    };
+    final direct = convert(accessor);
+    if (direct == accessor) return accessor;
+    return column.nullable ? '$accessor?.let { ${convert('it')} }' : direct;
   }
 
-  String _deserializeKotlin(ColumnSchemaSnapshot field, String accessor) {
-    final baseType = field.dartType.replaceAll('?', '');
-
-    // Handle integer types
-    if (baseType == 'int' || baseType == 'Int') {
-      return '$accessor as Long${field.nullable ? "?" : ""}';
-    }
-    // Handle DateTime (stored as epoch milliseconds)
-    else if (baseType == 'DateTime') {
-      if (field.nullable) {
-        return '($accessor as? Long)?.let { DateTime.fromEpochMilliseconds(it) }';
-      } else {
-        return 'DateTime.fromEpochMilliseconds($accessor as Long)';
-      }
-    }
-    // Handle double types
-    else if (baseType == 'double' || baseType == 'Double') {
-      return '$accessor as Double${field.nullable ? "?" : ""}';
-    }
-    // Handle String types
-    else if (baseType == 'String') {
-      return '$accessor as String${field.nullable ? "?" : ""}';
-    }
-    // Handle boolean (stored as integer)
-    else if (baseType == 'bool' || baseType == 'Boolean') {
-      return field.nullable
-          ? '($accessor as? Long)?.let { it == 1L }'
-          : '($accessor as Long) == 1L';
-    }
-    // Handle binary data
-    else if (baseType == 'Uint8List') {
-      return '$accessor as ByteArray${field.nullable ? "?" : ""}';
-    }
-    // Handle List deserialization from JSON
-    else if (baseType.startsWith('List<')) {
-      if (field.nullable) {
-        return '($accessor as? String)?.let { Json.decodeFromString(it) }';
-      } else {
-        return 'Json.decodeFromString($accessor as String)';
-      }
-    }
-    // Handle Map deserialization from JSON
-    else if (baseType.startsWith('Map<')) {
-      if (field.nullable) {
-        return '($accessor as? String)?.let { Json.decodeFromString(it) }';
-      } else {
-        return 'Json.decodeFromString($accessor as String)';
-      }
-    }
-
-    return accessor;
+  /// Kotlin expression converting the SQLite value [accessor] (as returned
+  /// by NativeSqliteManager: Long, Double, String, ByteArray or null).
+  String _deserializeKotlin(NativeColumn column, String accessor) {
+    final String Function(String) convert = switch (column.kind) {
+      NativeKind.integer => (v) => '($v as Number).toLong()',
+      NativeKind.real => (v) => '($v as Number).toDouble()',
+      NativeKind.text => (v) => '$v as String',
+      NativeKind.blob => (v) => '$v as ByteArray',
+      // Dart decodes booleans with `== 1`.
+      NativeKind.boolean => (v) => '($v as Number).toLong() == 1L',
+      NativeKind.dateTime => (v) => 'Instant.ofEpochMilli(($v as Number).toLong())',
+      NativeKind.duration => (v) => 'Duration.ofMillis(($v as Number).toLong())',
+      NativeKind.uri => (v) => 'Uri.parse($v as String)',
+      NativeKind.enumeration =>
+        column.storesEnumByName
+            ? (v) => '${column.enumName}.valueOf($v as String)'
+            : (v) => '${column.enumName}.entries[($v as Number).toInt()]',
+    };
+    return column.nullable
+        ? '$accessor?.let { ${convert('it')} }'
+        : convert(accessor);
   }
 
-  String generateDatabaseManager(
-    List<TableSchemaSnapshot> schemas,
-    int schemaVersion,
-  ) {
+  /// Kotlin string literal for [value].
+  String _kotlinString(String value) {
+    final escaped = value
+        .replaceAll(r'\', r'\\')
+        .replaceAll('"', r'\"')
+        .replaceAll(r'$', r'\$')
+        .replaceAll('\n', r'\n');
+    return '"$escaped"';
+  }
+
+  /// Escapes Kotlin hard keywords used as identifiers.
+  String _kotlinIdentifier(String name) =>
+      _kotlinKeywords.contains(name) ? '`$name`' : name;
+
+  static const _kotlinKeywords = {
+    'as', 'break', 'class', 'continue', 'do', 'else', 'false', 'for', 'fun',
+    'if', 'in', 'interface', 'is', 'null', 'object', 'package', 'return',
+    'super', 'this', 'throw', 'true', 'try', 'typealias', 'typeof', 'val',
+    'var', 'when', 'while',
+  };
+
+  /// Kotlin counterpart of the generated Dart DatabaseManager: it opens the
+  /// database with the same version, statements and migration steps, so it
+  /// makes no difference whether Dart or native code opens it first.
+  String generateDatabaseManager(NativeDatabaseSpec spec) {
     final buffer = StringBuffer();
+    final schemas = spec.tables;
 
     buffer.writeln('package $packageName');
     buffer.writeln();
     buffer.writeln('import android.content.Context');
     buffer.writeln('import dev.nesmin.native_sqlite.DatabaseConfig');
     buffer.writeln('import dev.nesmin.native_sqlite.NativeSqliteManager');
-    buffer.writeln('import $packageName.migrations.SchemaVersionManager');
     buffer.writeln();
     buffer.writeln('/**');
-    buffer.writeln(' * Auto-generated native database manager.');
+    buffer.writeln(' * Native database manager, mirroring the generated DatabaseManager.dart.');
     buffer.writeln(
-      ' * Mirrors DatabaseManager.dart — call DatabaseManager.init() from',
+      ' * Call DatabaseManager.init() from native Android code (WorkManager,',
     );
-    buffer.writeln(
-      ' * native Android code (WorkManager, Services, App Widgets).',
-    );
+    buffer.writeln(' * Services, App Widgets) before using the generated helpers.');
     buffer.writeln(' * AUTO-GENERATED - DO NOT EDIT MANUALLY');
     buffer.writeln(' */');
     buffer.writeln('object DatabaseManager {');
-    buffer.writeln();
-    buffer.writeln('    private var initialized = false');
-    buffer.writeln('    private var currentDatabaseName: String? = null');
+    buffer.writeln('    const val SCHEMA_VERSION = ${spec.schemaVersion}');
+    buffer.writeln(
+      '    const val DEFAULT_DATABASE_NAME = ${_kotlinString(spec.databaseName)}',
+    );
     buffer.writeln();
     buffer.writeln('    val onCreateStatements: List<String> = listOf(');
     for (final schema in schemas) {
       buffer.writeln('        ${schema.className}Schema.CREATE_TABLE_SQL,');
     }
+    buffer.writeln('    ) + listOf(');
+    for (final schema in schemas) {
+      buffer.writeln('        ${schema.className}Schema.INDEX_SQL,');
+    }
+    buffer.writeln('    ).flatten()');
+    buffer.writeln();
+    buffer.writeln(
+      '    /** Versioned steps: `migrations[v]` upgrades version `v - 1` to `v`. */',
+    );
+    buffer.writeln('    val migrations: Map<Int, List<String>> = mapOf(');
+    for (final MapEntry(key: version, value: sql) in spec.migrations.entries) {
+      buffer.writeln('        $version to listOf(');
+      for (final statement in sql) {
+        buffer.writeln('            ${_kotlinString(statement)},');
+      }
+      buffer.writeln('        ),');
+    }
+    buffer.writeln('    )');
+    buffer.writeln();
+    buffer.writeln(
+      '    /** Run after every upgrade: creates any missing table or index. */',
+    );
+    buffer.writeln('    val ensureSchemaStatements: List<String> = listOf(');
+    for (final statement in spec.ensureSchema) {
+      buffer.writeln('        ${_kotlinString(statement)},');
+    }
     buffer.writeln('    )');
     buffer.writeln();
     buffer.writeln('    val tableNames: List<String> = listOf(');
     for (final schema in schemas) {
-      buffer.writeln('        "${schema.tableName}",');
+      buffer.writeln('        ${schema.className}Schema.TABLE_NAME,');
     }
     buffer.writeln('    )');
     buffer.writeln();
+    buffer.writeln('    @Volatile');
+    buffer.writeln('    private var currentDatabaseName: String? = null');
+    buffer.writeln();
     buffer.writeln('    /**');
-    buffer.writeln('     * Initialize the database.');
-    buffer.writeln(
-      '     * Creates tables on first run and runs pending migrations.',
-    );
+    buffer.writeln('     * Opens the database, creating it or applying pending migrations.');
     buffer.writeln('     *');
-    buffer.writeln('     * @param context Android application context');
-    buffer.writeln(
-      '     * @param name Database name (default: "$databaseName")',
-    );
-    buffer.writeln(
-      '     * @param enableWAL Enable Write-Ahead Logging for better concurrency',
-    );
-    buffer.writeln(
-      '     * @param enableForeignKeys Enable foreign key constraints',
-    );
+    buffer.writeln('     * @param context Any context; the application context is kept');
+    buffer.writeln('     * @param name Database name (default: ${spec.databaseName})');
     buffer.writeln('     */');
+    buffer.writeln('    @Synchronized');
     buffer.writeln('    fun init(');
     buffer.writeln('        context: Context,');
-    buffer.writeln('        name: String = "$databaseName",');
+    buffer.writeln('        name: String = DEFAULT_DATABASE_NAME,');
     buffer.writeln('        enableWAL: Boolean = true,');
     buffer.writeln('        enableForeignKeys: Boolean = true,');
     buffer.writeln('    ) {');
-    buffer.writeln('        if (initialized) {');
+    buffer.writeln('        val manager = NativeSqliteManager.Instance');
+    buffer.writeln('        manager.initialize(context)');
     buffer.writeln(
-      '            android.util.Log.d("DatabaseManager", "Already initialized")',
+      '        // Already opened (e.g. by Dart through the plugin, which shares this',
     );
+    buffer.writeln(
+      '        // manager) with the same generated schema and migrations.',
+    );
+    buffer.writeln('        if (manager.isDatabaseOpen(name)) {');
+    buffer.writeln('            currentDatabaseName = name');
     buffer.writeln('            return');
     buffer.writeln('        }');
-    buffer.writeln();
-    buffer.writeln('        try {');
-    buffer.writeln('            NativeSqliteManager.Instance.initialize(context)');
-    buffer.writeln();
-    buffer.writeln(
-      '            NativeSqliteManager.Instance.openDatabase(',
-    );
-    buffer.writeln('                DatabaseConfig(');
-    buffer.writeln('                    name = name,');
-    buffer.writeln(
-      '                    version = SchemaVersionManager.CURRENT_VERSION,',
-    );
-    buffer.writeln('                    onCreate = onCreateStatements,');
-    buffer.writeln('                    onUpgrade = null,');
-    buffer.writeln('                    enableWAL = enableWAL,');
-    buffer.writeln('                    enableForeignKeys = enableForeignKeys,');
-    buffer.writeln('                )');
+    buffer.writeln('        manager.openDatabase(');
+    buffer.writeln('            DatabaseConfig(');
+    buffer.writeln('                name = name,');
+    buffer.writeln('                version = SCHEMA_VERSION,');
+    buffer.writeln('                onCreate = onCreateStatements,');
+    buffer.writeln('                onUpgrade = ensureSchemaStatements,');
+    buffer.writeln('                enableWAL = enableWAL,');
+    buffer.writeln('                enableForeignKeys = enableForeignKeys,');
+    buffer.writeln('                migrations = migrations,');
     buffer.writeln('            )');
-    buffer.writeln();
-    buffer.writeln(
-      '            SchemaVersionManager.migrate(name)',
-    );
-    buffer.writeln();
-    buffer.writeln('            currentDatabaseName = name');
-    buffer.writeln('            initialized = true');
-    buffer.writeln(
-      '            android.util.Log.d("DatabaseManager", "✅ Initialized (v\${SchemaVersionManager.CURRENT_VERSION})")',
-    );
-    buffer.writeln('        } catch (e: Exception) {');
-    buffer.writeln(
-      '            android.util.Log.e("DatabaseManager", "❌ Init failed: \${e.message}", e)',
-    );
-    buffer.writeln('            throw e');
-    buffer.writeln('        }');
+    buffer.writeln('        )');
+    buffer.writeln('        currentDatabaseName = name');
     buffer.writeln('    }');
     buffer.writeln();
+    buffer.writeln('    @Synchronized');
     buffer.writeln('    fun close() {');
     buffer.writeln(
       '        currentDatabaseName?.let { NativeSqliteManager.Instance.closeDatabase(it) }',
     );
-    buffer.writeln('        initialized = false');
     buffer.writeln('        currentDatabaseName = null');
     buffer.writeln('    }');
     buffer.writeln();
-    buffer.writeln('    val isInitialized: Boolean get() = initialized');
+    buffer.writeln('    val isInitialized: Boolean get() = currentDatabaseName != null');
     buffer.writeln();
     buffer.writeln('    val currentDatabase: String');
-    buffer.writeln('        get() {');
     buffer.writeln(
-      '            check(initialized && currentDatabaseName != null) {',
+      '        get() = checkNotNull(currentDatabaseName) { "Call DatabaseManager.init() first" }',
     );
-    buffer.writeln('                "Call DatabaseManager.init() first"');
-    buffer.writeln('            }');
-    buffer.writeln('            return currentDatabaseName!!');
-    buffer.writeln('        }');
     buffer.writeln('}');
 
     return buffer.toString();

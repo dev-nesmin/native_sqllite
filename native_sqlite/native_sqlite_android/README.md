@@ -19,11 +19,20 @@ This package is automatically selected when your Flutter app runs on Android —
 Running `dart run native_sqlite_generator` produces Kotlin files in the path configured by `native_sqlite_config.yaml`:
 
 ```
-UserSchema.kt            ← column-name constants and CREATE TABLE SQL
-UserHelper.kt            ← insert/query helpers for direct Kotlin use
-SchemaVersionManager.kt  ← reads and writes PRAGMA user_version
-Migration_X_Y.kt         ← migration stub (addColumn, renameTable, migrateTableData helpers)
+UserSchema.kt       ← column-name constants, CREATE TABLE and index SQL
+UserHelper.kt       ← typed `User` data class and CRUD/query helper
+UserStatus.kt       ← one file per Dart enum used by a model
+DatabaseManager.kt  ← opens and migrates the database exactly like DatabaseManager.dart
 ```
+
+Call `DatabaseManager.init(context)` before using the helpers from native code
+(WorkManager, services, widgets). If Flutter already opened the database, the
+open connection is reused.
+
+## Requirements
+
+- Android Gradle Plugin 9+ with built-in Kotlin (Flutter 3.44+). The plugin no
+  longer applies the Kotlin Gradle Plugin itself.
 
 ---
 

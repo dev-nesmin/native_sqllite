@@ -1,30 +1,31 @@
 import Foundation
+import native_sqlite_ios
 
 /**
  * Struct for User.
  * AUTO-GENERATED from Dart - DO NOT EDIT MANUALLY
  */
 public struct User {
-    public let id: Int?
+    public let id: Int64?
     public let name: String
     public let email: String
     public let phoneNumber: String?
     public let address: String?
-    public let age: Int
+    public let age: Int64
     public let isActive: Bool
-    public let createdAt: Int
-    public let updatedAt: Int?
+    public let createdAt: Date
+    public let updatedAt: Date?
 
     public init(
-        id: Int? = nil,
+        id: Int64? = nil,
         name: String,
         email: String,
-        phoneNumber: String?,
-        address: String?,
-        age: Int,
+        phoneNumber: String? = nil,
+        address: String? = nil,
+        age: Int64,
         isActive: Bool,
-        createdAt: Int,
-        updatedAt: Int?
+        createdAt: Date,
+        updatedAt: Date? = nil
     ) {
         self.id = id
         self.name = name
@@ -96,7 +97,7 @@ public class UserHelper {
      */
     public static func cleanupIsolate(isolateId: Int64) {
         isolateQueue.sync {
-            isolateInstances.removeValue(forKey: isolateId)
+            _ = isolateInstances.removeValue(forKey: isolateId)
         }
     }
 
@@ -117,19 +118,20 @@ public class UserHelper {
     }
 
     public func insert(_ entity: User) throws -> Int64 {
-        var values: [String: Any] = [:]
-        values[UserSchema.name] = entity.name
-        values[UserSchema.email] = entity.email
-        values[UserSchema.phoneNumber] = entity.phoneNumber ?? NSNull()
-        values[UserSchema.address] = entity.address ?? NSNull()
-        values[UserSchema.age] = entity.age
-        values[UserSchema.isActive] = entity.isActive ? 1 : 0
-        values[UserSchema.createdAt] = Int(entity.createdAt.timeIntervalSince1970 * 1000)
-        values[UserSchema.updatedAt] = entity.updatedAt?.timeIntervalSince1970 ?? NSNull()
+        let values: [String: Any?] = [
+            UserSchema.name: entity.name,
+            UserSchema.email: entity.email,
+            UserSchema.phoneNumber: entity.phoneNumber,
+            UserSchema.address: entity.address,
+            UserSchema.age: entity.age,
+            UserSchema.isActive: (entity.isActive ? Int64(1) : Int64(0)),
+            UserSchema.createdAt: GeneratedValue.milliseconds(entity.createdAt),
+            UserSchema.updatedAt: entity.updatedAt.map { GeneratedValue.milliseconds($0) },
+        ]
         return try manager.insert(name: databaseName, table: UserSchema.tableName, values: values)
     }
 
-    public func findById(_ id: Int) throws -> User? {
+    public func findById(_ id: Int64) throws -> User? {
         let result = try manager.query(
             name: databaseName,
             sql: "SELECT * FROM \(UserSchema.tableName) WHERE \(UserSchema.id) = ? LIMIT 1",
@@ -143,7 +145,7 @@ public class UserHelper {
         for (index, column) in columns.enumerated() {
             columnMap[column] = index
         }
-        return fromRow(columnMap: columnMap, row: rows[0])
+        return try fromRow(columnMap: columnMap, row: rows[0])
     }
 
     public func findAll() throws -> [User] {
@@ -156,7 +158,7 @@ public class UserHelper {
         for (index, column) in columns.enumerated() {
             columnMap[column] = index
         }
-        return rows.map { fromRow(columnMap: columnMap, row: $0) }
+        return try rows.map { try fromRow(columnMap: columnMap, row: $0) }
     }
 
     /**
@@ -166,15 +168,16 @@ public class UserHelper {
      * - Throws: Database errors
      */
     public func update(_ entity: User) throws -> Int {
-        var values: [String: Any] = [:]
-        values[UserSchema.name] = entity.name
-        values[UserSchema.email] = entity.email
-        values[UserSchema.phoneNumber] = entity.phoneNumber ?? NSNull()
-        values[UserSchema.address] = entity.address ?? NSNull()
-        values[UserSchema.age] = entity.age
-        values[UserSchema.isActive] = entity.isActive ? 1 : 0
-        values[UserSchema.createdAt] = Int(entity.createdAt.timeIntervalSince1970 * 1000)
-        values[UserSchema.updatedAt] = entity.updatedAt?.timeIntervalSince1970 ?? NSNull()
+        let values: [String: Any?] = [
+            UserSchema.name: entity.name,
+            UserSchema.email: entity.email,
+            UserSchema.phoneNumber: entity.phoneNumber,
+            UserSchema.address: entity.address,
+            UserSchema.age: entity.age,
+            UserSchema.isActive: (entity.isActive ? Int64(1) : Int64(0)),
+            UserSchema.createdAt: GeneratedValue.milliseconds(entity.createdAt),
+            UserSchema.updatedAt: entity.updatedAt.map { GeneratedValue.milliseconds($0) },
+        ]
         return try manager.update(
             name: databaseName,
             table: UserSchema.tableName,
@@ -192,7 +195,7 @@ public class UserHelper {
      * - Returns: Number of rows affected
      * - Throws: Database errors
      */
-    public func updatePartial(id: Int, updates: [String: Any]) throws -> Int {
+    public func updatePartial(id: Int64, updates: [String: Any?]) throws -> Int {
         return try manager.update(
             name: databaseName,
             table: UserSchema.tableName,
@@ -208,7 +211,7 @@ public class UserHelper {
      * - Returns: Number of rows deleted
      * - Throws: Database errors
      */
-    public func delete(id: Int) throws -> Int {
+    public func delete(id: Int64) throws -> Int {
         return try manager.delete(
             name: databaseName,
             table: UserSchema.tableName,
@@ -243,15 +246,15 @@ public class UserHelper {
     public func insertBatch(_ entities: [User]) throws -> [Int64] {
         var results: [Int64] = []
         
-        try manager.execute(name: databaseName, sql: "BEGIN TRANSACTION")
+        _ = try manager.execute(name: databaseName, sql: "BEGIN TRANSACTION")
         do {
             for entity in entities {
                 let id = try insert(entity)
                 results.append(id)
             }
-            try manager.execute(name: databaseName, sql: "COMMIT")
+            _ = try manager.execute(name: databaseName, sql: "COMMIT")
         } catch {
-            try? manager.execute(name: databaseName, sql: "ROLLBACK")
+            _ = try? manager.execute(name: databaseName, sql: "ROLLBACK")
             throw error
         }
         return results
@@ -266,14 +269,14 @@ public class UserHelper {
     public func updateBatch(_ entities: [User]) throws -> Int {
         var totalAffected = 0
         
-        try manager.execute(name: databaseName, sql: "BEGIN TRANSACTION")
+        _ = try manager.execute(name: databaseName, sql: "BEGIN TRANSACTION")
         do {
             for entity in entities {
                 totalAffected += try update(entity)
             }
-            try manager.execute(name: databaseName, sql: "COMMIT")
+            _ = try manager.execute(name: databaseName, sql: "COMMIT")
         } catch {
-            try? manager.execute(name: databaseName, sql: "ROLLBACK")
+            _ = try? manager.execute(name: databaseName, sql: "ROLLBACK")
             throw error
         }
         return totalAffected
@@ -285,17 +288,17 @@ public class UserHelper {
      * - Returns: Total number of rows deleted
      * - Throws: Database errors
      */
-    public func deleteBatch(ids: [Int]) throws -> Int {
+    public func deleteBatch(ids: [Int64]) throws -> Int {
         var totalDeleted = 0
         
-        try manager.execute(name: databaseName, sql: "BEGIN TRANSACTION")
+        _ = try manager.execute(name: databaseName, sql: "BEGIN TRANSACTION")
         do {
             for id in ids {
                 totalDeleted += try delete(id: id)
             }
-            try manager.execute(name: databaseName, sql: "COMMIT")
+            _ = try manager.execute(name: databaseName, sql: "COMMIT")
         } catch {
-            try? manager.execute(name: databaseName, sql: "ROLLBACK")
+            _ = try? manager.execute(name: databaseName, sql: "ROLLBACK")
             throw error
         }
         return totalDeleted
@@ -341,7 +344,7 @@ public class UserHelper {
         for (index, column) in columns.enumerated() {
             columnMap[column] = index
         }
-        return rows.map { fromRow(columnMap: columnMap, row: $0) }
+        return try rows.map { try fromRow(columnMap: columnMap, row: $0) }
     }
 
     /**
@@ -385,7 +388,7 @@ public class UserHelper {
         }
         let result = try manager.query(name: databaseName, sql: sql, arguments: whereArgs)
         guard let rows = result["rows"] as? [[Any?]] else { return nil }
-        return rows.first?.first
+        return rows.first?.first ?? nil
     }
 
     /**
@@ -406,7 +409,7 @@ public class UserHelper {
         }
         let result = try manager.query(name: databaseName, sql: sql, arguments: whereArgs)
         guard let rows = result["rows"] as? [[Any?]] else { return nil }
-        return rows.first?.first
+        return rows.first?.first ?? nil
     }
 
     /**
@@ -451,17 +454,18 @@ public class UserHelper {
         return rows.first?.first as? Double
     }
 
-    private func fromRow(columnMap: [String: Int], row: [Any?]) -> User {
+    private func fromRow(columnMap: [String: Int], row values: [Any?]) throws -> User {
+        let row = GeneratedRow(columnMap: columnMap, values: values)
         return User(
-            id: row[columnMap[UserSchema.id]!] as? Int,
-            name: row[columnMap[UserSchema.name]!] as! String,
-            email: row[columnMap[UserSchema.email]!] as! String,
-            phoneNumber: row[columnMap[UserSchema.phoneNumber]!] as? String,
-            address: row[columnMap[UserSchema.address]!] as? String,
-            age: row[columnMap[UserSchema.age]!] as! Int,
-            isActive: (row[columnMap[UserSchema.isActive]!] as! Int) == 1,
-            createdAt: Date(timeIntervalSince1970: TimeInterval(row[columnMap[UserSchema.createdAt]!] as! Int) / 1000),
-            updatedAt: (row[columnMap[UserSchema.updatedAt]!] as? Int).map { Date(timeIntervalSince1970: TimeInterval($0) / 1000) }
+            id: try row.optional(UserSchema.id, GeneratedValue.int64, expected: "Int64"),
+            name: try row.required(UserSchema.name, GeneratedValue.string, expected: "String"),
+            email: try row.required(UserSchema.email, GeneratedValue.string, expected: "String"),
+            phoneNumber: try row.optional(UserSchema.phoneNumber, GeneratedValue.string, expected: "String"),
+            address: try row.optional(UserSchema.address, GeneratedValue.string, expected: "String"),
+            age: try row.required(UserSchema.age, GeneratedValue.int64, expected: "Int64"),
+            isActive: try row.required(UserSchema.isActive, GeneratedValue.bool, expected: "Bool"),
+            createdAt: try row.required(UserSchema.createdAt, GeneratedValue.date, expected: "Date"),
+            updatedAt: try row.optional(UserSchema.updatedAt, GeneratedValue.date, expected: "Date")
         )
     }
 }

@@ -13,9 +13,13 @@ import 'package:source_gen/source_gen.dart';
 
 /// Analyzes a class annotated with @DbTable and extracts table information.
 class TableAnalyzer {
-  final GeneratorOptions? options;
+  /// Generator options. Defaults match [GeneratorOptions]' defaults so every
+  /// builder derives identical table/column names — the schema snapshot,
+  /// generated Dart and native code must all describe the same database.
+  final GeneratorOptions options;
 
-  TableAnalyzer([this.options]);
+  TableAnalyzer([GeneratorOptions? options])
+    : options = options ?? const GeneratorOptions();
 
   static final _primaryKeyChecker = TypeChecker.fromUrl(
     'package:native_sqlite_annotations/src/primary_key.dart#PrimaryKey',
@@ -57,9 +61,8 @@ class TableAnalyzer {
 
     // Apply naming convention if not explicitly provided in annotation
     if (annotation.peek('name')?.stringValue == null &&
-        options != null &&
-        options!.tableNameCase != 'none') {
-      tableName = NamingConventions.format(className, options!.tableNameCase);
+        options.tableNameCase != 'none') {
+      tableName = NamingConventions.format(className, options.tableNameCase);
     }
 
     // Analyze columns
@@ -73,12 +76,10 @@ class TableAnalyzer {
     // 1. First check @DbTable annotation
     // 2. Then check build.yaml config
     // 3. Finally fall back to 'default_app'
-    String? databaseName = annotation.peek('database')?.stringValue;
-    if (databaseName == null && options != null) {
-      databaseName = options!.defaultDatabase ?? 'default_app';
-    } else if (databaseName == null) {
-      databaseName = 'default_app';
-    }
+    final databaseName =
+        annotation.peek('database')?.stringValue ??
+        options.defaultDatabase ??
+        'default_app';
 
     return TableInfo(
       dartName: className,
@@ -290,8 +291,8 @@ class TableAnalyzer {
 
     // Apply naming convention from options
     final dartName = defaultName;
-    if (options != null && options!.columnNameCase != 'none') {
-      return NamingConventions.format(dartName, options!.columnNameCase);
+    if (options.columnNameCase != 'none') {
+      return NamingConventions.format(dartName, options.columnNameCase);
     }
 
     return dartName;

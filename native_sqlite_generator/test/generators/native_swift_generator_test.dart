@@ -87,7 +87,7 @@ void main() {
       final code = generator.generateHelper(table);
       // Check Struct
       expect(code, contains('public struct User {'));
-      expect(code, contains('public let id: Int?'));
+      expect(code, contains('public let id: Int64?'));
       expect(code, contains('public let name: String'));
       expect(code, contains('public let email: String?'));
 
@@ -95,17 +95,17 @@ void main() {
       expect(code, contains('public class UserHelper {'));
       expect(
         code,
-        contains('public func insert(_ entity: User) throws -> Int {'),
+        contains('public func insert(_ entity: User) throws -> Int64 {'),
       );
       expect(
         code,
-        contains('public func findById(_ id: Int) throws -> User? {'),
+        contains('public func findById(_ id: Int64) throws -> User? {'),
       );
       expect(
         code,
         contains('public func update(_ entity: User) throws -> Int {'),
       );
-      expect(code, contains('public func delete(id: Int) throws -> Int {'));
+      expect(code, contains('public func delete(id: Int64) throws -> Int {'));
     });
   });
 }

@@ -1,6 +1,6 @@
 # native_sqlite_web
 
-Web implementation of the `native_sqlite` plugin. Powered by [sqlite3](https://pub.dev/packages/sqlite3) and [sqlite3_web](https://pub.dev/packages/sqlite3_web), which compile SQLite to WebAssembly and run it in a shared worker for persistence across tabs.
+Web implementation of the `native_sqlite` plugin. Runs SQLite compiled to WebAssembly via [sqlite3](https://pub.dev/packages/sqlite3) and stores database files in IndexedDB.
 
 This package is automatically selected when your Flutter app runs on the web — you do not add it to your `pubspec.yaml` directly.
 
@@ -8,22 +8,27 @@ This package is automatically selected when your Flutter app runs on the web —
 
 ## Features
 
-- Full CRUD, transactions, and raw SQL in the browser via sqlite3 WASM
-- Persistence via IndexedDB (data survives page reloads)
-- `deleteDatabase` removes the IndexedDB entry entirely
-
----
-
-## Limitations
-
-- **WAL mode** is not supported in the browser — the implementation falls back to MEMORY journal mode and emits a `debugPrint` warning in debug builds.
-- Concurrent multi-tab access is serialised through the shared worker; behaviour may differ from the native WAL-backed implementations.
+- Full CRUD, transactions, raw SQL and versioned migrations (same rules as Android and iOS)
+- Persistence in IndexedDB: every write is flushed before the call completes
+- `deleteDatabase` removes the database files from IndexedDB
 
 ---
 
 ## Web setup
 
-Add the sqlite3 WASM worker files to your `web/` directory. See the [sqlite3_web documentation](https://pub.dev/packages/sqlite3_web) for the required assets (`sqlite3.wasm`, `sqlite3.worker.dart.js`).
+Download `sqlite3.wasm` from the [sqlite3 release](https://github.com/simolus3/sqlite3.dart/releases) that matches the `sqlite3` version in your `pubspec.lock` and place it in your app's `web/` directory:
+
+```bash
+curl -L -o web/sqlite3.wasm \
+  https://github.com/simolus3/sqlite3.dart/releases/download/sqlite3-<version>/sqlite3.wasm
+```
+
+---
+
+## Limitations
+
+- **WAL mode** is not available in the browser; MEMORY journal mode is used instead (a `debugPrint` notice is emitted in debug builds).
+- **One tab per database:** each tab loads the database into memory, so two tabs writing to the same database can overwrite each other's changes.
 
 ---
 

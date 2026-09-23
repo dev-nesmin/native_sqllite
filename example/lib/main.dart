@@ -7,25 +7,9 @@ import 'screens/home_screen.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize database - everything is handled automatically!
-  // Tables are created, migrations run, indexes added, etc.
-  await DatabaseManager.init(
-    name: 'example_app',
-    enableWAL: true,
-    enableForeignKeys: true,
-    dropRemovedTables: false, // Set to true to auto-drop removed tables
-    onCustomMigrate: (databaseName, oldVersion, newVersion) async {
-      // Optional: Add custom migration logic here
-      // Example:
-      // if (oldVersion < 123456) {
-      //   await NativeSqlite.execute(
-      //     databaseName,
-      //     'ALTER TABLE users ADD COLUMN avatar TEXT',
-      //   );
-      // }
-      debugPrint('Custom migration: v$oldVersion → v$newVersion');
-    },
-  );
+  // Creates the database on first run and applies any pending migrations
+  // (generated from lib/generated/schemas/) on upgrade.
+  await DatabaseManager.init(name: DatabaseManager.defaultDatabaseName);
 
   runApp(const MyApp());
 }

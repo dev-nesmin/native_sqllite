@@ -3,21 +3,22 @@ version = "1.0-SNAPSHOT"
 
 plugins {
     id("com.android.library")
-    id("kotlin-android")
 }
 
 android {
     namespace = "dev.nesmin.native_sqlite"
 
-    compileSdk = 35
+    compileSdk = 36
+
+    // AGP 8+ no longer generates BuildConfig for libraries by default;
+    // NativeSqlitePlugin reads BuildConfig.DEBUG.
+    buildFeatures {
+        buildConfig = true
+    }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
-    }
-
-    kotlinOptions {
-        jvmTarget = "17"
     }
 
     sourceSets {
@@ -31,8 +32,13 @@ android {
     }
 }
 
+kotlin {
+    compilerOptions {
+        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
+    }
+}
+
 dependencies {
-    implementation("org.jetbrains.kotlin:kotlin-stdlib:2.1.0")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.mockito:mockito-core:5.11.0")
     testImplementation("org.mockito:mockito-inline:5.2.0")

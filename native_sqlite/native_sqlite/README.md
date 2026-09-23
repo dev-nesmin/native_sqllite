@@ -38,9 +38,10 @@ await NativeSqlite.close('my_app');
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `name` | `String` | required | Database identifier (also the file name) |
-| `version` | `int` | required | Schema version — increment when schema changes |
-| `onCreate` | `List<String>` | required | SQL statements to execute on first open |
-| `onMigrateCallback` | `Future<List<String>> Function(int old, int new)?` | `null` | Called when version increases; return SQL to execute |
+| `version` | `int` | `1` | Schema version — increment when schema changes |
+| `onCreate` | `List<String>?` | `null` | SQL statements to execute when the database is created |
+| `migrations` | `Map<int, List<String>>?` | `null` | Versioned steps: `migrations[v]` upgrades version `v - 1` to `v` |
+| `onUpgrade` | `List<String>?` | `null` | Statements run on every upgrade, after the applicable `migrations` |
 | `enableWAL` | `bool` | `true` | Enable Write-Ahead Logging for concurrent access |
 | `enableForeignKeys` | `bool` | `true` | Enable `PRAGMA foreign_keys = ON` |
 
@@ -58,15 +59,18 @@ await NativeSqlite.open(
       )
       ''',
     ],
-    onMigrateCallback: (oldVersion, newVersion) async {
-      if (oldVersion < 2) {
-        return ['ALTER TABLE users ADD COLUMN phone TEXT'];
-      }
-      return [];
+    migrations: {
+      2: ['ALTER TABLE users ADD COLUMN phone TEXT'],
     },
   ),
 );
 ```
+
+When an existing database at version `old` is opened, Android, iOS and web all
+apply the same rules: steps `old + 1 .. version` run in order, then `onUpgrade`,
+in one transaction with foreign keys disabled; the migration fails (and is
+rolled back) if it leaves foreign key violations. Opening a database whose
+version is newer than `version` throws.
 
 ### CRUD
 
@@ -144,7 +148,9 @@ result.toMapList();    // List<Map<String, Object?>> — convenient row maps
 
 ## `AutoMigration`
 
-`AutoMigration` bridges the generated `DatabaseManager` with `NativeSqlite.open()`. Use it instead of constructing `DatabaseConfig` manually when you have a generated schema registry.
+`AutoMigration` builds the `DatabaseConfig` used by the generated
+`DatabaseManager`. You normally just call `DatabaseManager.init()`; use
+`createConfig` directly only when opening the database yourself.
 
 ### `createConfig`
 
@@ -154,23 +160,11 @@ import 'generated/database_manager.dart';
 
 await NativeSqlite.open(
   config: AutoMigration.createConfig(
-    name: DatabaseManager.databaseName,
+    name: DatabaseManager.defaultDatabaseName,
     schemaVersion: DatabaseManager.schemaVersion,
     onCreateStatements: DatabaseManager.onCreateStatements,
-    tables: DatabaseManager.tables,
-    tableNames: DatabaseManager.tableNames,
     migrations: DatabaseManager.migrations,
-
-    // Optional: drop tables removed from your schema
-    dropRemovedTables: false,
-    deletedTableNames: DatabaseManager.deletedTableNames,
-
-    // Optional: run custom SQL after auto-migrations
-    onCustomMigrate: (dbName, oldVersion, newVersion) async {
-      if (oldVersion < 3) {
-        await NativeSqlite.execute(dbName, 'UPDATE users SET role = "user"');
-      }
-    },
+    ensureSchemaStatements: DatabaseManager.ensureSchemaStatements,
   ),
 );
 ```
@@ -181,15 +175,15 @@ await NativeSqlite.open(
 |-----------|------|---------|-------------|
 | `name` | `String` | required | Database name |
 | `schemaVersion` | `int` | required | Current schema version |
-| `onCreateStatements` | `List<String>` | required | Statements for fresh install |
-| `tables` | `Map<String, String>` | required | Table name → `CREATE TABLE` SQL |
-| `tableNames` | `List<String>` | required | Ordered list of table names |
-| `migrations` | `List<Map<String, dynamic>>` | required | Generated migration entries |
-| `deletedTableNames` | `List<String>` | `[]` | Tables to drop when `dropRemovedTables` is true |
-| `dropRemovedTables` | `bool` | `false` | Drop tables removed from schema on migrate |
+| `onCreateStatements` | `List<String>` | required | Statements for a fresh install |
+| `migrations` | `Map<int, List<String>>` | `{}` | Generated versioned steps |
+| `ensureSchemaStatements` | `List<String>` | `[]` | Idempotent `CREATE ... IF NOT EXISTS` run after every upgrade |
 | `enableWAL` | `bool` | `true` | WAL mode |
 | `enableForeignKeys` | `bool` | `true` | Foreign key enforcement |
-| `onCustomMigrate` | `Future<void> Function(String, int, int)?` | `null` | Custom migration hook |
+
+For data migrations the generator can't express, add a step yourself by
+opening with a `DatabaseConfig` whose `migrations` include your SQL for that
+version.
 
 ### `detectNewTables` / `detectRemovedTables`
 

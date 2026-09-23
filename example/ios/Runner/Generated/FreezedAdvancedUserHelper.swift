@@ -1,27 +1,28 @@
 import Foundation
+import native_sqlite_ios
 
 /**
  * Struct for FreezedAdvancedUser.
  * AUTO-GENERATED from Dart - DO NOT EDIT MANUALLY
  */
 public struct FreezedAdvancedUser {
-    public let id: Int?
+    public let id: Int64?
     public let name: String
-    public let loginDuration: Any?
-    public let profileUrl: Any?
-    public let status: Any
-    public let priority: Any?
-    public let createdAt: Int
+    public let loginDuration: TimeInterval?
+    public let profileUrl: URL?
+    public let status: UserStatus
+    public let priority: Priority?
+    public let createdAt: Date
     public let isVerified: Bool
 
     public init(
-        id: Int? = nil,
+        id: Int64? = nil,
         name: String,
-        loginDuration: Any?,
-        profileUrl: Any?,
-        status: Any,
-        priority: Any?,
-        createdAt: Int,
+        loginDuration: TimeInterval? = nil,
+        profileUrl: URL? = nil,
+        status: UserStatus,
+        priority: Priority? = nil,
+        createdAt: Date,
         isVerified: Bool
     ) {
         self.id = id
@@ -93,7 +94,7 @@ public class FreezedAdvancedUserHelper {
      */
     public static func cleanupIsolate(isolateId: Int64) {
         isolateQueue.sync {
-            isolateInstances.removeValue(forKey: isolateId)
+            _ = isolateInstances.removeValue(forKey: isolateId)
         }
     }
 
@@ -114,18 +115,19 @@ public class FreezedAdvancedUserHelper {
     }
 
     public func insert(_ entity: FreezedAdvancedUser) throws -> Int64 {
-        var values: [String: Any] = [:]
-        values[FreezedAdvancedUserSchema.name] = entity.name
-        values[FreezedAdvancedUserSchema.loginDuration] = entity.loginDuration ?? NSNull()
-        values[FreezedAdvancedUserSchema.profileUrl] = entity.profileUrl ?? NSNull()
-        values[FreezedAdvancedUserSchema.status] = entity.status
-        values[FreezedAdvancedUserSchema.priority] = entity.priority ?? NSNull()
-        values[FreezedAdvancedUserSchema.createdAt] = Int(entity.createdAt.timeIntervalSince1970 * 1000)
-        values[FreezedAdvancedUserSchema.isVerified] = entity.isVerified ? 1 : 0
+        let values: [String: Any?] = [
+            FreezedAdvancedUserSchema.name: entity.name,
+            FreezedAdvancedUserSchema.loginDuration: entity.loginDuration.map { GeneratedValue.milliseconds($0) },
+            FreezedAdvancedUserSchema.profileUrl: entity.profileUrl.map { $0.absoluteString },
+            FreezedAdvancedUserSchema.status: entity.status.ordinal,
+            FreezedAdvancedUserSchema.priority: entity.priority.map { $0.ordinal },
+            FreezedAdvancedUserSchema.createdAt: GeneratedValue.milliseconds(entity.createdAt),
+            FreezedAdvancedUserSchema.isVerified: (entity.isVerified ? Int64(1) : Int64(0)),
+        ]
         return try manager.insert(name: databaseName, table: FreezedAdvancedUserSchema.tableName, values: values)
     }
 
-    public func findById(_ id: Int) throws -> FreezedAdvancedUser? {
+    public func findById(_ id: Int64) throws -> FreezedAdvancedUser? {
         let result = try manager.query(
             name: databaseName,
             sql: "SELECT * FROM \(FreezedAdvancedUserSchema.tableName) WHERE \(FreezedAdvancedUserSchema.id) = ? LIMIT 1",
@@ -139,7 +141,7 @@ public class FreezedAdvancedUserHelper {
         for (index, column) in columns.enumerated() {
             columnMap[column] = index
         }
-        return fromRow(columnMap: columnMap, row: rows[0])
+        return try fromRow(columnMap: columnMap, row: rows[0])
     }
 
     public func findAll() throws -> [FreezedAdvancedUser] {
@@ -152,7 +154,7 @@ public class FreezedAdvancedUserHelper {
         for (index, column) in columns.enumerated() {
             columnMap[column] = index
         }
-        return rows.map { fromRow(columnMap: columnMap, row: $0) }
+        return try rows.map { try fromRow(columnMap: columnMap, row: $0) }
     }
 
     /**
@@ -162,14 +164,15 @@ public class FreezedAdvancedUserHelper {
      * - Throws: Database errors
      */
     public func update(_ entity: FreezedAdvancedUser) throws -> Int {
-        var values: [String: Any] = [:]
-        values[FreezedAdvancedUserSchema.name] = entity.name
-        values[FreezedAdvancedUserSchema.loginDuration] = entity.loginDuration ?? NSNull()
-        values[FreezedAdvancedUserSchema.profileUrl] = entity.profileUrl ?? NSNull()
-        values[FreezedAdvancedUserSchema.status] = entity.status
-        values[FreezedAdvancedUserSchema.priority] = entity.priority ?? NSNull()
-        values[FreezedAdvancedUserSchema.createdAt] = Int(entity.createdAt.timeIntervalSince1970 * 1000)
-        values[FreezedAdvancedUserSchema.isVerified] = entity.isVerified ? 1 : 0
+        let values: [String: Any?] = [
+            FreezedAdvancedUserSchema.name: entity.name,
+            FreezedAdvancedUserSchema.loginDuration: entity.loginDuration.map { GeneratedValue.milliseconds($0) },
+            FreezedAdvancedUserSchema.profileUrl: entity.profileUrl.map { $0.absoluteString },
+            FreezedAdvancedUserSchema.status: entity.status.ordinal,
+            FreezedAdvancedUserSchema.priority: entity.priority.map { $0.ordinal },
+            FreezedAdvancedUserSchema.createdAt: GeneratedValue.milliseconds(entity.createdAt),
+            FreezedAdvancedUserSchema.isVerified: (entity.isVerified ? Int64(1) : Int64(0)),
+        ]
         return try manager.update(
             name: databaseName,
             table: FreezedAdvancedUserSchema.tableName,
@@ -187,7 +190,7 @@ public class FreezedAdvancedUserHelper {
      * - Returns: Number of rows affected
      * - Throws: Database errors
      */
-    public func updatePartial(id: Int, updates: [String: Any]) throws -> Int {
+    public func updatePartial(id: Int64, updates: [String: Any?]) throws -> Int {
         return try manager.update(
             name: databaseName,
             table: FreezedAdvancedUserSchema.tableName,
@@ -203,7 +206,7 @@ public class FreezedAdvancedUserHelper {
      * - Returns: Number of rows deleted
      * - Throws: Database errors
      */
-    public func delete(id: Int) throws -> Int {
+    public func delete(id: Int64) throws -> Int {
         return try manager.delete(
             name: databaseName,
             table: FreezedAdvancedUserSchema.tableName,
@@ -238,15 +241,15 @@ public class FreezedAdvancedUserHelper {
     public func insertBatch(_ entities: [FreezedAdvancedUser]) throws -> [Int64] {
         var results: [Int64] = []
         
-        try manager.execute(name: databaseName, sql: "BEGIN TRANSACTION")
+        _ = try manager.execute(name: databaseName, sql: "BEGIN TRANSACTION")
         do {
             for entity in entities {
                 let id = try insert(entity)
                 results.append(id)
             }
-            try manager.execute(name: databaseName, sql: "COMMIT")
+            _ = try manager.execute(name: databaseName, sql: "COMMIT")
         } catch {
-            try? manager.execute(name: databaseName, sql: "ROLLBACK")
+            _ = try? manager.execute(name: databaseName, sql: "ROLLBACK")
             throw error
         }
         return results
@@ -261,14 +264,14 @@ public class FreezedAdvancedUserHelper {
     public func updateBatch(_ entities: [FreezedAdvancedUser]) throws -> Int {
         var totalAffected = 0
         
-        try manager.execute(name: databaseName, sql: "BEGIN TRANSACTION")
+        _ = try manager.execute(name: databaseName, sql: "BEGIN TRANSACTION")
         do {
             for entity in entities {
                 totalAffected += try update(entity)
             }
-            try manager.execute(name: databaseName, sql: "COMMIT")
+            _ = try manager.execute(name: databaseName, sql: "COMMIT")
         } catch {
-            try? manager.execute(name: databaseName, sql: "ROLLBACK")
+            _ = try? manager.execute(name: databaseName, sql: "ROLLBACK")
             throw error
         }
         return totalAffected
@@ -280,17 +283,17 @@ public class FreezedAdvancedUserHelper {
      * - Returns: Total number of rows deleted
      * - Throws: Database errors
      */
-    public func deleteBatch(ids: [Int]) throws -> Int {
+    public func deleteBatch(ids: [Int64]) throws -> Int {
         var totalDeleted = 0
         
-        try manager.execute(name: databaseName, sql: "BEGIN TRANSACTION")
+        _ = try manager.execute(name: databaseName, sql: "BEGIN TRANSACTION")
         do {
             for id in ids {
                 totalDeleted += try delete(id: id)
             }
-            try manager.execute(name: databaseName, sql: "COMMIT")
+            _ = try manager.execute(name: databaseName, sql: "COMMIT")
         } catch {
-            try? manager.execute(name: databaseName, sql: "ROLLBACK")
+            _ = try? manager.execute(name: databaseName, sql: "ROLLBACK")
             throw error
         }
         return totalDeleted
@@ -336,7 +339,7 @@ public class FreezedAdvancedUserHelper {
         for (index, column) in columns.enumerated() {
             columnMap[column] = index
         }
-        return rows.map { fromRow(columnMap: columnMap, row: $0) }
+        return try rows.map { try fromRow(columnMap: columnMap, row: $0) }
     }
 
     /**
@@ -380,7 +383,7 @@ public class FreezedAdvancedUserHelper {
         }
         let result = try manager.query(name: databaseName, sql: sql, arguments: whereArgs)
         guard let rows = result["rows"] as? [[Any?]] else { return nil }
-        return rows.first?.first
+        return rows.first?.first ?? nil
     }
 
     /**
@@ -401,7 +404,7 @@ public class FreezedAdvancedUserHelper {
         }
         let result = try manager.query(name: databaseName, sql: sql, arguments: whereArgs)
         guard let rows = result["rows"] as? [[Any?]] else { return nil }
-        return rows.first?.first
+        return rows.first?.first ?? nil
     }
 
     /**
@@ -446,16 +449,17 @@ public class FreezedAdvancedUserHelper {
         return rows.first?.first as? Double
     }
 
-    private func fromRow(columnMap: [String: Int], row: [Any?]) -> FreezedAdvancedUser {
+    private func fromRow(columnMap: [String: Int], row values: [Any?]) throws -> FreezedAdvancedUser {
+        let row = GeneratedRow(columnMap: columnMap, values: values)
         return FreezedAdvancedUser(
-            id: row[columnMap[FreezedAdvancedUserSchema.id]!] as? Int,
-            name: row[columnMap[FreezedAdvancedUserSchema.name]!] as! String,
-            loginDuration: row[columnMap[FreezedAdvancedUserSchema.loginDuration]!],
-            profileUrl: row[columnMap[FreezedAdvancedUserSchema.profileUrl]!],
-            status: row[columnMap[FreezedAdvancedUserSchema.status]!],
-            priority: row[columnMap[FreezedAdvancedUserSchema.priority]!],
-            createdAt: Date(timeIntervalSince1970: TimeInterval(row[columnMap[FreezedAdvancedUserSchema.createdAt]!] as! Int) / 1000),
-            isVerified: (row[columnMap[FreezedAdvancedUserSchema.isVerified]!] as! Int) == 1
+            id: try row.optional(FreezedAdvancedUserSchema.id, GeneratedValue.int64, expected: "Int64"),
+            name: try row.required(FreezedAdvancedUserSchema.name, GeneratedValue.string, expected: "String"),
+            loginDuration: try row.optional(FreezedAdvancedUserSchema.loginDuration, GeneratedValue.timeInterval, expected: "TimeInterval"),
+            profileUrl: try row.optional(FreezedAdvancedUserSchema.profileUrl, GeneratedValue.url, expected: "URL"),
+            status: try row.required(FreezedAdvancedUserSchema.status, { GeneratedValue.int64($0).flatMap(UserStatus.init(ordinal:)) }, expected: "UserStatus"),
+            priority: try row.optional(FreezedAdvancedUserSchema.priority, { GeneratedValue.int64($0).flatMap(Priority.init(ordinal:)) }, expected: "Priority"),
+            createdAt: try row.required(FreezedAdvancedUserSchema.createdAt, GeneratedValue.date, expected: "Date"),
+            isVerified: try row.required(FreezedAdvancedUserSchema.isVerified, GeneratedValue.bool, expected: "Bool")
         )
     }
 }

@@ -11,24 +11,16 @@ public enum FreezedAdvancedUserSchema {
     // Column names
     public static let id = "id"
     public static let name = "name"
-    public static let loginDuration = "loginDuration"
-    public static let profileUrl = "profileUrl"
+    public static let loginDuration = "login_duration"
+    public static let profileUrl = "profile_url"
     public static let status = "status"
     public static let priority = "priority"
-    public static let createdAt = "createdAt"
-    public static let isVerified = "isVerified"
+    public static let createdAt = "created_at"
+    public static let isVerified = "is_verified"
 
-    // CREATE TABLE SQL
-    public static let createTableSql = """
-        CREATE TABLE freezed_advanced_users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            loginDuration INTEGER,
-            profileUrl TEXT,
-            status INTEGER NOT NULL,
-            priority INTEGER,
-            createdAt INTEGER NOT NULL,
-            isVerified INTEGER NOT NULL
-        )
-        """
+    // Same statements as the Dart FreezedAdvancedUserSchema
+    public static let createTableSql = "CREATE TABLE freezed_advanced_users (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, login_duration INTEGER, profile_url TEXT, status INTEGER NOT NULL, priority INTEGER, created_at INTEGER NOT NULL, is_verified INTEGER NOT NULL)"
+
+    public static let indexSql: [String] = [
+    ]
 }

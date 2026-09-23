@@ -1,6 +1,11 @@
+@file:Suppress("UNCHECKED_CAST")
+
 package com.example.native_sqlite_example.generated
 
+import android.net.Uri
 import dev.nesmin.native_sqlite.NativeSqliteManager
+import java.time.Duration
+import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -10,11 +15,11 @@ import java.util.concurrent.ConcurrentHashMap
 data class FreezedAdvancedUser(
     val id: Long? = null,
     val name: String,
-    val loginDuration: Any?,
-    val profileUrl: Any?,
-    val status: Any,
-    val priority: Any?,
-    val createdAt: Long,
+    val loginDuration: Duration? = null,
+    val profileUrl: Uri? = null,
+    val status: UserStatus,
+    val priority: Priority? = null,
+    val createdAt: Instant,
     val isVerified: Boolean
 )
 
@@ -85,12 +90,12 @@ class FreezedAdvancedUserHelper(private val databaseName: String) {
     fun insert(entity: FreezedAdvancedUser): Long {
         val values: Map<String, Any?> = mapOf(
             FreezedAdvancedUserSchema.NAME to entity.name,
-            FreezedAdvancedUserSchema.LOGIN_DURATION to entity.loginDuration,
-            FreezedAdvancedUserSchema.PROFILE_URL to entity.profileUrl,
-            FreezedAdvancedUserSchema.STATUS to entity.status,
-            FreezedAdvancedUserSchema.PRIORITY to entity.priority,
-            FreezedAdvancedUserSchema.CREATED_AT to entity.createdAt.toEpochMilliseconds(),
-            FreezedAdvancedUserSchema.IS_VERIFIED to if (entity.isVerified) 1 else 0
+            FreezedAdvancedUserSchema.LOGIN_DURATION to entity.loginDuration?.let { it.toMillis() },
+            FreezedAdvancedUserSchema.PROFILE_URL to entity.profileUrl?.let { it.toString() },
+            FreezedAdvancedUserSchema.STATUS to entity.status.ordinal.toLong(),
+            FreezedAdvancedUserSchema.PRIORITY to entity.priority?.let { it.ordinal.toLong() },
+            FreezedAdvancedUserSchema.CREATED_AT to entity.createdAt.toEpochMilli(),
+            FreezedAdvancedUserSchema.IS_VERIFIED to if (entity.isVerified) 1L else 0L
         )
         return NativeSqliteManager.Instance.insert(databaseName, FreezedAdvancedUserSchema.TABLE_NAME, values)
     }
@@ -124,12 +129,12 @@ class FreezedAdvancedUserHelper(private val databaseName: String) {
     fun update(entity: FreezedAdvancedUser): Int {
         val values: Map<String, Any?> = mapOf(
             FreezedAdvancedUserSchema.NAME to entity.name,
-            FreezedAdvancedUserSchema.LOGIN_DURATION to entity.loginDuration,
-            FreezedAdvancedUserSchema.PROFILE_URL to entity.profileUrl,
-            FreezedAdvancedUserSchema.STATUS to entity.status,
-            FreezedAdvancedUserSchema.PRIORITY to entity.priority,
-            FreezedAdvancedUserSchema.CREATED_AT to entity.createdAt.toEpochMilliseconds(),
-            FreezedAdvancedUserSchema.IS_VERIFIED to if (entity.isVerified) 1 else 0
+            FreezedAdvancedUserSchema.LOGIN_DURATION to entity.loginDuration?.let { it.toMillis() },
+            FreezedAdvancedUserSchema.PROFILE_URL to entity.profileUrl?.let { it.toString() },
+            FreezedAdvancedUserSchema.STATUS to entity.status.ordinal.toLong(),
+            FreezedAdvancedUserSchema.PRIORITY to entity.priority?.let { it.ordinal.toLong() },
+            FreezedAdvancedUserSchema.CREATED_AT to entity.createdAt.toEpochMilli(),
+            FreezedAdvancedUserSchema.IS_VERIFIED to if (entity.isVerified) 1L else 0L
         )
         return NativeSqliteManager.Instance.update(
             databaseName,
@@ -366,14 +371,14 @@ class FreezedAdvancedUserHelper(private val databaseName: String) {
 
     private fun fromRow(columnMap: Map<String, Int>, row: List<Any?>): FreezedAdvancedUser {
         return FreezedAdvancedUser(
-            id = row[columnMap[FreezedAdvancedUserSchema.ID]!!] as Long?,
-            name = row[columnMap[FreezedAdvancedUserSchema.NAME]!!] as String,
-            loginDuration = row[columnMap[FreezedAdvancedUserSchema.LOGIN_DURATION]!!],
-            profileUrl = row[columnMap[FreezedAdvancedUserSchema.PROFILE_URL]!!],
-            status = row[columnMap[FreezedAdvancedUserSchema.STATUS]!!],
-            priority = row[columnMap[FreezedAdvancedUserSchema.PRIORITY]!!],
-            createdAt = DateTime.fromEpochMilliseconds(row[columnMap[FreezedAdvancedUserSchema.CREATED_AT]!!] as Long),
-            isVerified = (row[columnMap[FreezedAdvancedUserSchema.IS_VERIFIED]!!] as Long) == 1L
+            id = row[columnMap.getValue(FreezedAdvancedUserSchema.ID)]?.let { (it as Number).toLong() },
+            name = row[columnMap.getValue(FreezedAdvancedUserSchema.NAME)] as String,
+            loginDuration = row[columnMap.getValue(FreezedAdvancedUserSchema.LOGIN_DURATION)]?.let { Duration.ofMillis((it as Number).toLong()) },
+            profileUrl = row[columnMap.getValue(FreezedAdvancedUserSchema.PROFILE_URL)]?.let { Uri.parse(it as String) },
+            status = UserStatus.entries[(row[columnMap.getValue(FreezedAdvancedUserSchema.STATUS)] as Number).toInt()],
+            priority = row[columnMap.getValue(FreezedAdvancedUserSchema.PRIORITY)]?.let { Priority.entries[(it as Number).toInt()] },
+            createdAt = Instant.ofEpochMilli((row[columnMap.getValue(FreezedAdvancedUserSchema.CREATED_AT)] as Number).toLong()),
+            isVerified = (row[columnMap.getValue(FreezedAdvancedUserSchema.IS_VERIFIED)] as Number).toLong() == 1L
         )
     }
 }

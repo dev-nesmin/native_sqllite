@@ -100,7 +100,7 @@ class TestProduct {
           'a|lib/test_product.table.dart': decodedMatches(
             allOf(
               contains('priceLessThan(double value)'),
-              contains('priceGreaterThanOrEqual(double value)'),
+              contains('priceGreaterThan(double value)'),
               contains('priceBetween(double min, double max)'),
             ),
           ),
@@ -131,8 +131,8 @@ class TestArticle {
         outputs: {
           'a|lib/test_article.table.dart': decodedMatches(
             allOf(
-              contains('orderByTitle()'),
-              contains('orderByTitleDesc()'),
+              contains('sortByTitleAsc()'),
+              contains('sortByTitleDesc()'),
             ),
           ),
         },
@@ -193,7 +193,7 @@ class TestTag {
         outputs: {
           'a|lib/test_tag.table.dart': decodedMatches(
             allOf(
-              contains('Future<List<TestTag>> find()'),
+              contains('Future<List<TestTag>> findAll()'),
               contains('Future<int> count()'),
             ),
           ),

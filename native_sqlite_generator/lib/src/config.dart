@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:yaml/yaml.dart';
@@ -10,8 +9,11 @@ class NativeSqliteConfig {
   final IosConfig ios;
   final List<String> models;
   final String databaseName;
-  final int schemaVersion;
   final bool includeExamples;
+
+  /// Database name used when `database_name` isn't configured, by both the
+  /// generated Dart and native DatabaseManagers.
+  static const defaultDatabaseName = 'app_database';
 
   const NativeSqliteConfig({
     required this.generateNative,
@@ -19,7 +21,6 @@ class NativeSqliteConfig {
     required this.ios,
     required this.models,
     required this.databaseName,
-    required this.schemaVersion,
     required this.includeExamples,
   });
 
@@ -44,13 +45,6 @@ class NativeSqliteConfig {
       return null;
     }
 
-    // Prefer an explicit schema_version from the YAML, then fall back to
-    // reading the version that build_runner wrote to the JSON snapshot.
-    final schemaVersion =
-        nativeConfig['schema_version'] as int? ??
-        await _readSchemaVersionFromJson() ??
-        1;
-
     return NativeSqliteConfig(
       generateNative: nativeConfig['generate_native'] ?? false,
       android: AndroidConfig.fromYaml(nativeConfig['android']),
@@ -60,24 +54,9 @@ class NativeSqliteConfig {
               ?.map((e) => e.toString())
               .toList() ??
           [],
-      databaseName: nativeConfig['database_name'] ?? 'app_db',
-      schemaVersion: schemaVersion,
+      databaseName: nativeConfig['database_name'] ?? defaultDatabaseName,
       includeExamples: nativeConfig['include_examples'] ?? true,
     );
-  }
-
-  /// Reads the schema version from the generated JSON snapshot produced by
-  /// build_runner, so native code generation automatically tracks migrations.
-  static Future<int?> _readSchemaVersionFromJson() async {
-    try {
-      final file = File('lib/generated/native_sqlite_schema.json');
-      if (!file.existsSync()) return null;
-      final decoded =
-          jsonDecode(await file.readAsString()) as Map<String, dynamic>;
-      return decoded['schemaVersion'] as int?;
-    } catch (_) {
-      return null;
-    }
   }
 }
 

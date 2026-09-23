@@ -1,30 +1,36 @@
 import Foundation
+import native_sqlite_ios
 
 /**
  * Struct for Profile.
  * AUTO-GENERATED from Dart - DO NOT EDIT MANUALLY
  */
 public struct Profile {
-    public let id: Int?
+    public let id: Int64?
     public let name: String
     public let email: String
     public let phoneNumber: String?
+    /// Raw JSON text of Dart `Map<String, dynamic>?`.
     public let settings: String?
+    /// Raw JSON text of Dart `List<String>?`.
     public let tags: String?
-    public let address: Any?
+    /// Raw JSON text of Dart `Address?`.
+    public let address: String?
+    /// Raw JSON text of Dart `List<Address>?`.
     public let addresses: String?
-    public let metadata: Any
+    /// Raw JSON text of Dart `dynamic`.
+    public let metadata: String
 
     public init(
-        id: Int? = nil,
+        id: Int64? = nil,
         name: String,
         email: String,
-        phoneNumber: String?,
-        settings: String?,
-        tags: String?,
-        address: Any?,
-        addresses: String?,
-        metadata: Any
+        phoneNumber: String? = nil,
+        settings: String? = nil,
+        tags: String? = nil,
+        address: String? = nil,
+        addresses: String? = nil,
+        metadata: String
     ) {
         self.id = id
         self.name = name
@@ -96,7 +102,7 @@ public class ProfileHelper {
      */
     public static func cleanupIsolate(isolateId: Int64) {
         isolateQueue.sync {
-            isolateInstances.removeValue(forKey: isolateId)
+            _ = isolateInstances.removeValue(forKey: isolateId)
         }
     }
 
@@ -117,19 +123,20 @@ public class ProfileHelper {
     }
 
     public func insert(_ entity: Profile) throws -> Int64 {
-        var values: [String: Any] = [:]
-        values[ProfileSchema.name] = entity.name
-        values[ProfileSchema.email] = entity.email
-        values[ProfileSchema.phoneNumber] = entity.phoneNumber ?? NSNull()
-        values[ProfileSchema.settings] = entity.settings.flatMap { try? JSONSerialization.data(withJSONObject: $0) }.flatMap { String(data: $0, encoding: .utf8) } ?? NSNull()
-        values[ProfileSchema.tags] = entity.tags.flatMap { try? JSONEncoder().encode($0) }.flatMap { String(data: $0, encoding: .utf8) } ?? NSNull()
-        values[ProfileSchema.address] = entity.address ?? NSNull()
-        values[ProfileSchema.addresses] = entity.addresses.flatMap { try? JSONEncoder().encode($0) }.flatMap { String(data: $0, encoding: .utf8) } ?? NSNull()
-        values[ProfileSchema.metadata] = entity.metadata
+        let values: [String: Any?] = [
+            ProfileSchema.name: entity.name,
+            ProfileSchema.email: entity.email,
+            ProfileSchema.phoneNumber: entity.phoneNumber,
+            ProfileSchema.settings: entity.settings,
+            ProfileSchema.tags: entity.tags,
+            ProfileSchema.address: entity.address,
+            ProfileSchema.addresses: entity.addresses,
+            ProfileSchema.metadata: entity.metadata,
+        ]
         return try manager.insert(name: databaseName, table: ProfileSchema.tableName, values: values)
     }
 
-    public func findById(_ id: Int) throws -> Profile? {
+    public func findById(_ id: Int64) throws -> Profile? {
         let result = try manager.query(
             name: databaseName,
             sql: "SELECT * FROM \(ProfileSchema.tableName) WHERE \(ProfileSchema.id) = ? LIMIT 1",
@@ -143,7 +150,7 @@ public class ProfileHelper {
         for (index, column) in columns.enumerated() {
             columnMap[column] = index
         }
-        return fromRow(columnMap: columnMap, row: rows[0])
+        return try fromRow(columnMap: columnMap, row: rows[0])
     }
 
     public func findAll() throws -> [Profile] {
@@ -156,7 +163,7 @@ public class ProfileHelper {
         for (index, column) in columns.enumerated() {
             columnMap[column] = index
         }
-        return rows.map { fromRow(columnMap: columnMap, row: $0) }
+        return try rows.map { try fromRow(columnMap: columnMap, row: $0) }
     }
 
     /**
@@ -166,15 +173,16 @@ public class ProfileHelper {
      * - Throws: Database errors
      */
     public func update(_ entity: Profile) throws -> Int {
-        var values: [String: Any] = [:]
-        values[ProfileSchema.name] = entity.name
-        values[ProfileSchema.email] = entity.email
-        values[ProfileSchema.phoneNumber] = entity.phoneNumber ?? NSNull()
-        values[ProfileSchema.settings] = entity.settings.flatMap { try? JSONSerialization.data(withJSONObject: $0) }.flatMap { String(data: $0, encoding: .utf8) } ?? NSNull()
-        values[ProfileSchema.tags] = entity.tags.flatMap { try? JSONEncoder().encode($0) }.flatMap { String(data: $0, encoding: .utf8) } ?? NSNull()
-        values[ProfileSchema.address] = entity.address ?? NSNull()
-        values[ProfileSchema.addresses] = entity.addresses.flatMap { try? JSONEncoder().encode($0) }.flatMap { String(data: $0, encoding: .utf8) } ?? NSNull()
-        values[ProfileSchema.metadata] = entity.metadata
+        let values: [String: Any?] = [
+            ProfileSchema.name: entity.name,
+            ProfileSchema.email: entity.email,
+            ProfileSchema.phoneNumber: entity.phoneNumber,
+            ProfileSchema.settings: entity.settings,
+            ProfileSchema.tags: entity.tags,
+            ProfileSchema.address: entity.address,
+            ProfileSchema.addresses: entity.addresses,
+            ProfileSchema.metadata: entity.metadata,
+        ]
         return try manager.update(
             name: databaseName,
             table: ProfileSchema.tableName,
@@ -192,7 +200,7 @@ public class ProfileHelper {
      * - Returns: Number of rows affected
      * - Throws: Database errors
      */
-    public func updatePartial(id: Int, updates: [String: Any]) throws -> Int {
+    public func updatePartial(id: Int64, updates: [String: Any?]) throws -> Int {
         return try manager.update(
             name: databaseName,
             table: ProfileSchema.tableName,
@@ -208,7 +216,7 @@ public class ProfileHelper {
      * - Returns: Number of rows deleted
      * - Throws: Database errors
      */
-    public func delete(id: Int) throws -> Int {
+    public func delete(id: Int64) throws -> Int {
         return try manager.delete(
             name: databaseName,
             table: ProfileSchema.tableName,
@@ -243,15 +251,15 @@ public class ProfileHelper {
     public func insertBatch(_ entities: [Profile]) throws -> [Int64] {
         var results: [Int64] = []
         
-        try manager.execute(name: databaseName, sql: "BEGIN TRANSACTION")
+        _ = try manager.execute(name: databaseName, sql: "BEGIN TRANSACTION")
         do {
             for entity in entities {
                 let id = try insert(entity)
                 results.append(id)
             }
-            try manager.execute(name: databaseName, sql: "COMMIT")
+            _ = try manager.execute(name: databaseName, sql: "COMMIT")
         } catch {
-            try? manager.execute(name: databaseName, sql: "ROLLBACK")
+            _ = try? manager.execute(name: databaseName, sql: "ROLLBACK")
             throw error
         }
         return results
@@ -266,14 +274,14 @@ public class ProfileHelper {
     public func updateBatch(_ entities: [Profile]) throws -> Int {
         var totalAffected = 0
         
-        try manager.execute(name: databaseName, sql: "BEGIN TRANSACTION")
+        _ = try manager.execute(name: databaseName, sql: "BEGIN TRANSACTION")
         do {
             for entity in entities {
                 totalAffected += try update(entity)
             }
-            try manager.execute(name: databaseName, sql: "COMMIT")
+            _ = try manager.execute(name: databaseName, sql: "COMMIT")
         } catch {
-            try? manager.execute(name: databaseName, sql: "ROLLBACK")
+            _ = try? manager.execute(name: databaseName, sql: "ROLLBACK")
             throw error
         }
         return totalAffected
@@ -285,17 +293,17 @@ public class ProfileHelper {
      * - Returns: Total number of rows deleted
      * - Throws: Database errors
      */
-    public func deleteBatch(ids: [Int]) throws -> Int {
+    public func deleteBatch(ids: [Int64]) throws -> Int {
         var totalDeleted = 0
         
-        try manager.execute(name: databaseName, sql: "BEGIN TRANSACTION")
+        _ = try manager.execute(name: databaseName, sql: "BEGIN TRANSACTION")
         do {
             for id in ids {
                 totalDeleted += try delete(id: id)
             }
-            try manager.execute(name: databaseName, sql: "COMMIT")
+            _ = try manager.execute(name: databaseName, sql: "COMMIT")
         } catch {
-            try? manager.execute(name: databaseName, sql: "ROLLBACK")
+            _ = try? manager.execute(name: databaseName, sql: "ROLLBACK")
             throw error
         }
         return totalDeleted
@@ -341,7 +349,7 @@ public class ProfileHelper {
         for (index, column) in columns.enumerated() {
             columnMap[column] = index
         }
-        return rows.map { fromRow(columnMap: columnMap, row: $0) }
+        return try rows.map { try fromRow(columnMap: columnMap, row: $0) }
     }
 
     /**
@@ -385,7 +393,7 @@ public class ProfileHelper {
         }
         let result = try manager.query(name: databaseName, sql: sql, arguments: whereArgs)
         guard let rows = result["rows"] as? [[Any?]] else { return nil }
-        return rows.first?.first
+        return rows.first?.first ?? nil
     }
 
     /**
@@ -406,7 +414,7 @@ public class ProfileHelper {
         }
         let result = try manager.query(name: databaseName, sql: sql, arguments: whereArgs)
         guard let rows = result["rows"] as? [[Any?]] else { return nil }
-        return rows.first?.first
+        return rows.first?.first ?? nil
     }
 
     /**
@@ -451,17 +459,18 @@ public class ProfileHelper {
         return rows.first?.first as? Double
     }
 
-    private func fromRow(columnMap: [String: Int], row: [Any?]) -> Profile {
+    private func fromRow(columnMap: [String: Int], row values: [Any?]) throws -> Profile {
+        let row = GeneratedRow(columnMap: columnMap, values: values)
         return Profile(
-            id: row[columnMap[ProfileSchema.id]!] as? Int,
-            name: row[columnMap[ProfileSchema.name]!] as! String,
-            email: row[columnMap[ProfileSchema.email]!] as! String,
-            phoneNumber: row[columnMap[ProfileSchema.phoneNumber]!] as? String,
-            settings: (row[columnMap[ProfileSchema.settings]!] as? String).flatMap { try? JSONSerialization.jsonObject(with: $0.data(using: .utf8)!) as? [String: Any] },
-            tags: (row[columnMap[ProfileSchema.tags]!] as? String).flatMap { try? JSONDecoder().decode([Any].self, from: $0.data(using: .utf8)!) },
-            address: row[columnMap[ProfileSchema.address]!],
-            addresses: (row[columnMap[ProfileSchema.addresses]!] as? String).flatMap { try? JSONDecoder().decode([Any].self, from: $0.data(using: .utf8)!) },
-            metadata: row[columnMap[ProfileSchema.metadata]!]
+            id: try row.optional(ProfileSchema.id, GeneratedValue.int64, expected: "Int64"),
+            name: try row.required(ProfileSchema.name, GeneratedValue.string, expected: "String"),
+            email: try row.required(ProfileSchema.email, GeneratedValue.string, expected: "String"),
+            phoneNumber: try row.optional(ProfileSchema.phoneNumber, GeneratedValue.string, expected: "String"),
+            settings: try row.optional(ProfileSchema.settings, GeneratedValue.string, expected: "String"),
+            tags: try row.optional(ProfileSchema.tags, GeneratedValue.string, expected: "String"),
+            address: try row.optional(ProfileSchema.address, GeneratedValue.string, expected: "String"),
+            addresses: try row.optional(ProfileSchema.addresses, GeneratedValue.string, expected: "String"),
+            metadata: try row.required(ProfileSchema.metadata, GeneratedValue.string, expected: "String")
         )
     }
 }

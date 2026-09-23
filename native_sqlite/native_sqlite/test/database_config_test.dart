@@ -60,22 +60,26 @@ void main() {
       expect(config.onUpgrade, stmts);
     });
 
-    test('accepts onMigrateCallback', () async {
-      var called = false;
+    test('upgradeStatements runs missing steps in order, then onUpgrade', () {
       final config = DatabaseConfig(
         name: 'my_db',
-        version: 2,
-        onCreate: [],
-        onMigrateCallback: (oldV, newV) async {
-          called = true;
-          return ['ALTER TABLE users ADD COLUMN bio TEXT'];
+        version: 4,
+        migrations: {
+          2: ['ALTER TABLE users ADD COLUMN bio TEXT'],
+          4: ['CREATE TABLE tags (id INTEGER PRIMARY KEY)'],
         },
+        onUpgrade: ['CREATE INDEX IF NOT EXISTS idx ON users (bio)'],
       );
 
-      expect(config.onMigrateCallback, isNotNull);
-      final result = await config.onMigrateCallback!(1, 2);
-      expect(called, isTrue);
-      expect(result, ['ALTER TABLE users ADD COLUMN bio TEXT']);
+      expect(config.upgradeStatements(1), [
+        'ALTER TABLE users ADD COLUMN bio TEXT',
+        'CREATE TABLE tags (id INTEGER PRIMARY KEY)',
+        'CREATE INDEX IF NOT EXISTS idx ON users (bio)',
+      ]);
+      expect(config.upgradeStatements(3), [
+        'CREATE TABLE tags (id INTEGER PRIMARY KEY)',
+        'CREATE INDEX IF NOT EXISTS idx ON users (bio)',
+      ]);
     });
   });
 
@@ -86,11 +90,15 @@ void main() {
         version: 3,
         onCreate: ['CREATE TABLE users (id INTEGER PRIMARY KEY)'],
         onUpgrade: ['ALTER TABLE users ADD COLUMN bio TEXT'],
+        migrations: {
+          2: ['ALTER TABLE users ADD COLUMN age INTEGER'],
+        },
         enableWAL: false,
         enableForeignKeys: false,
       );
 
       final restored = DatabaseConfig.fromMap(original.toMap());
+      expect(restored.migrations, original.migrations);
 
       expect(restored.name, original.name);
       expect(restored.version, original.version);

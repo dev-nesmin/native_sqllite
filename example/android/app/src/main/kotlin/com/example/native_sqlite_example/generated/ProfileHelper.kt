@@ -1,3 +1,5 @@
+@file:Suppress("UNCHECKED_CAST")
+
 package com.example.native_sqlite_example.generated
 
 import dev.nesmin.native_sqlite.NativeSqliteManager
@@ -11,12 +13,17 @@ data class Profile(
     val id: Long? = null,
     val name: String,
     val email: String,
-    val phoneNumber: String?,
-    val settings: String?,
-    val tags: String?,
-    val address: Any?,
-    val addresses: String?,
-    val metadata: Any
+    val phoneNumber: String? = null,
+    /** Raw JSON text of Dart `Map<String, dynamic>?`. */
+    val settings: String? = null,
+    /** Raw JSON text of Dart `List<String>?`. */
+    val tags: String? = null,
+    /** Raw JSON text of Dart `Address?`. */
+    val address: String? = null,
+    /** Raw JSON text of Dart `List<Address>?`. */
+    val addresses: String? = null,
+    /** Raw JSON text of Dart `dynamic`. */
+    val metadata: String
 )
 
 /**
@@ -88,10 +95,10 @@ class ProfileHelper(private val databaseName: String) {
             ProfileSchema.NAME to entity.name,
             ProfileSchema.EMAIL to entity.email,
             ProfileSchema.PHONE_NUMBER to entity.phoneNumber,
-            ProfileSchema.SETTINGS to entity.settings?.let { Json.encodeToString(it) },
-            ProfileSchema.TAGS to entity.tags?.let { Json.encodeToString(it) },
+            ProfileSchema.SETTINGS to entity.settings,
+            ProfileSchema.TAGS to entity.tags,
             ProfileSchema.ADDRESS to entity.address,
-            ProfileSchema.ADDRESSES to entity.addresses?.let { Json.encodeToString(it) },
+            ProfileSchema.ADDRESSES to entity.addresses,
             ProfileSchema.METADATA to entity.metadata
         )
         return NativeSqliteManager.Instance.insert(databaseName, ProfileSchema.TABLE_NAME, values)
@@ -128,10 +135,10 @@ class ProfileHelper(private val databaseName: String) {
             ProfileSchema.NAME to entity.name,
             ProfileSchema.EMAIL to entity.email,
             ProfileSchema.PHONE_NUMBER to entity.phoneNumber,
-            ProfileSchema.SETTINGS to entity.settings?.let { Json.encodeToString(it) },
-            ProfileSchema.TAGS to entity.tags?.let { Json.encodeToString(it) },
+            ProfileSchema.SETTINGS to entity.settings,
+            ProfileSchema.TAGS to entity.tags,
             ProfileSchema.ADDRESS to entity.address,
-            ProfileSchema.ADDRESSES to entity.addresses?.let { Json.encodeToString(it) },
+            ProfileSchema.ADDRESSES to entity.addresses,
             ProfileSchema.METADATA to entity.metadata
         )
         return NativeSqliteManager.Instance.update(
@@ -369,15 +376,15 @@ class ProfileHelper(private val databaseName: String) {
 
     private fun fromRow(columnMap: Map<String, Int>, row: List<Any?>): Profile {
         return Profile(
-            id = row[columnMap[ProfileSchema.ID]!!] as Long?,
-            name = row[columnMap[ProfileSchema.NAME]!!] as String,
-            email = row[columnMap[ProfileSchema.EMAIL]!!] as String,
-            phoneNumber = row[columnMap[ProfileSchema.PHONE_NUMBER]!!] as String?,
-            settings = (row[columnMap[ProfileSchema.SETTINGS]!!] as? String)?.let { Json.decodeFromString(it) },
-            tags = (row[columnMap[ProfileSchema.TAGS]!!] as? String)?.let { Json.decodeFromString(it) },
-            address = row[columnMap[ProfileSchema.ADDRESS]!!],
-            addresses = (row[columnMap[ProfileSchema.ADDRESSES]!!] as? String)?.let { Json.decodeFromString(it) },
-            metadata = row[columnMap[ProfileSchema.METADATA]!!]
+            id = row[columnMap.getValue(ProfileSchema.ID)]?.let { (it as Number).toLong() },
+            name = row[columnMap.getValue(ProfileSchema.NAME)] as String,
+            email = row[columnMap.getValue(ProfileSchema.EMAIL)] as String,
+            phoneNumber = row[columnMap.getValue(ProfileSchema.PHONE_NUMBER)]?.let { it as String },
+            settings = row[columnMap.getValue(ProfileSchema.SETTINGS)]?.let { it as String },
+            tags = row[columnMap.getValue(ProfileSchema.TAGS)]?.let { it as String },
+            address = row[columnMap.getValue(ProfileSchema.ADDRESS)]?.let { it as String },
+            addresses = row[columnMap.getValue(ProfileSchema.ADDRESSES)]?.let { it as String },
+            metadata = row[columnMap.getValue(ProfileSchema.METADATA)] as String
         )
     }
 }

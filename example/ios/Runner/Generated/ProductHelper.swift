@@ -1,32 +1,33 @@
 import Foundation
+import native_sqlite_ios
 
 /**
  * Struct for Product.
  * AUTO-GENERATED from Dart - DO NOT EDIT MANUALLY
  */
 public struct Product {
-    public let id: Int?
+    public let id: Int64?
     public let name: String
     public let description: String?
     public let price: Double
-    public let stock: Int
+    public let stock: Int64
     public let isAvailable: Bool
-    public let categoryId: Int
+    public let categoryId: Int64
     public let imageUrl: String?
-    public let createdAt: Int
-    public let updatedAt: Int?
+    public let createdAt: Date
+    public let updatedAt: Date?
 
     public init(
-        id: Int? = nil,
+        id: Int64? = nil,
         name: String,
-        description: String?,
+        description: String? = nil,
         price: Double,
-        stock: Int,
+        stock: Int64,
         isAvailable: Bool,
-        categoryId: Int,
-        imageUrl: String?,
-        createdAt: Int,
-        updatedAt: Int?
+        categoryId: Int64,
+        imageUrl: String? = nil,
+        createdAt: Date,
+        updatedAt: Date? = nil
     ) {
         self.id = id
         self.name = name
@@ -99,7 +100,7 @@ public class ProductHelper {
      */
     public static func cleanupIsolate(isolateId: Int64) {
         isolateQueue.sync {
-            isolateInstances.removeValue(forKey: isolateId)
+            _ = isolateInstances.removeValue(forKey: isolateId)
         }
     }
 
@@ -120,20 +121,21 @@ public class ProductHelper {
     }
 
     public func insert(_ entity: Product) throws -> Int64 {
-        var values: [String: Any] = [:]
-        values[ProductSchema.name] = entity.name
-        values[ProductSchema.description] = entity.description ?? NSNull()
-        values[ProductSchema.price] = entity.price
-        values[ProductSchema.stock] = entity.stock
-        values[ProductSchema.isAvailable] = entity.isAvailable ? 1 : 0
-        values[ProductSchema.categoryId] = entity.categoryId
-        values[ProductSchema.imageUrl] = entity.imageUrl ?? NSNull()
-        values[ProductSchema.createdAt] = Int(entity.createdAt.timeIntervalSince1970 * 1000)
-        values[ProductSchema.updatedAt] = entity.updatedAt?.timeIntervalSince1970 ?? NSNull()
+        let values: [String: Any?] = [
+            ProductSchema.name: entity.name,
+            ProductSchema.description: entity.description,
+            ProductSchema.price: entity.price,
+            ProductSchema.stock: entity.stock,
+            ProductSchema.isAvailable: (entity.isAvailable ? Int64(1) : Int64(0)),
+            ProductSchema.categoryId: entity.categoryId,
+            ProductSchema.imageUrl: entity.imageUrl,
+            ProductSchema.createdAt: GeneratedValue.milliseconds(entity.createdAt),
+            ProductSchema.updatedAt: entity.updatedAt.map { GeneratedValue.milliseconds($0) },
+        ]
         return try manager.insert(name: databaseName, table: ProductSchema.tableName, values: values)
     }
 
-    public func findById(_ id: Int) throws -> Product? {
+    public func findById(_ id: Int64) throws -> Product? {
         let result = try manager.query(
             name: databaseName,
             sql: "SELECT * FROM \(ProductSchema.tableName) WHERE \(ProductSchema.id) = ? LIMIT 1",
@@ -147,7 +149,7 @@ public class ProductHelper {
         for (index, column) in columns.enumerated() {
             columnMap[column] = index
         }
-        return fromRow(columnMap: columnMap, row: rows[0])
+        return try fromRow(columnMap: columnMap, row: rows[0])
     }
 
     public func findAll() throws -> [Product] {
@@ -160,7 +162,7 @@ public class ProductHelper {
         for (index, column) in columns.enumerated() {
             columnMap[column] = index
         }
-        return rows.map { fromRow(columnMap: columnMap, row: $0) }
+        return try rows.map { try fromRow(columnMap: columnMap, row: $0) }
     }
 
     /**
@@ -170,16 +172,17 @@ public class ProductHelper {
      * - Throws: Database errors
      */
     public func update(_ entity: Product) throws -> Int {
-        var values: [String: Any] = [:]
-        values[ProductSchema.name] = entity.name
-        values[ProductSchema.description] = entity.description ?? NSNull()
-        values[ProductSchema.price] = entity.price
-        values[ProductSchema.stock] = entity.stock
-        values[ProductSchema.isAvailable] = entity.isAvailable ? 1 : 0
-        values[ProductSchema.categoryId] = entity.categoryId
-        values[ProductSchema.imageUrl] = entity.imageUrl ?? NSNull()
-        values[ProductSchema.createdAt] = Int(entity.createdAt.timeIntervalSince1970 * 1000)
-        values[ProductSchema.updatedAt] = entity.updatedAt?.timeIntervalSince1970 ?? NSNull()
+        let values: [String: Any?] = [
+            ProductSchema.name: entity.name,
+            ProductSchema.description: entity.description,
+            ProductSchema.price: entity.price,
+            ProductSchema.stock: entity.stock,
+            ProductSchema.isAvailable: (entity.isAvailable ? Int64(1) : Int64(0)),
+            ProductSchema.categoryId: entity.categoryId,
+            ProductSchema.imageUrl: entity.imageUrl,
+            ProductSchema.createdAt: GeneratedValue.milliseconds(entity.createdAt),
+            ProductSchema.updatedAt: entity.updatedAt.map { GeneratedValue.milliseconds($0) },
+        ]
         return try manager.update(
             name: databaseName,
             table: ProductSchema.tableName,
@@ -197,7 +200,7 @@ public class ProductHelper {
      * - Returns: Number of rows affected
      * - Throws: Database errors
      */
-    public func updatePartial(id: Int, updates: [String: Any]) throws -> Int {
+    public func updatePartial(id: Int64, updates: [String: Any?]) throws -> Int {
         return try manager.update(
             name: databaseName,
             table: ProductSchema.tableName,
@@ -213,7 +216,7 @@ public class ProductHelper {
      * - Returns: Number of rows deleted
      * - Throws: Database errors
      */
-    public func delete(id: Int) throws -> Int {
+    public func delete(id: Int64) throws -> Int {
         return try manager.delete(
             name: databaseName,
             table: ProductSchema.tableName,
@@ -248,15 +251,15 @@ public class ProductHelper {
     public func insertBatch(_ entities: [Product]) throws -> [Int64] {
         var results: [Int64] = []
         
-        try manager.execute(name: databaseName, sql: "BEGIN TRANSACTION")
+        _ = try manager.execute(name: databaseName, sql: "BEGIN TRANSACTION")
         do {
             for entity in entities {
                 let id = try insert(entity)
                 results.append(id)
             }
-            try manager.execute(name: databaseName, sql: "COMMIT")
+            _ = try manager.execute(name: databaseName, sql: "COMMIT")
         } catch {
-            try? manager.execute(name: databaseName, sql: "ROLLBACK")
+            _ = try? manager.execute(name: databaseName, sql: "ROLLBACK")
             throw error
         }
         return results
@@ -271,14 +274,14 @@ public class ProductHelper {
     public func updateBatch(_ entities: [Product]) throws -> Int {
         var totalAffected = 0
         
-        try manager.execute(name: databaseName, sql: "BEGIN TRANSACTION")
+        _ = try manager.execute(name: databaseName, sql: "BEGIN TRANSACTION")
         do {
             for entity in entities {
                 totalAffected += try update(entity)
             }
-            try manager.execute(name: databaseName, sql: "COMMIT")
+            _ = try manager.execute(name: databaseName, sql: "COMMIT")
         } catch {
-            try? manager.execute(name: databaseName, sql: "ROLLBACK")
+            _ = try? manager.execute(name: databaseName, sql: "ROLLBACK")
             throw error
         }
         return totalAffected
@@ -290,17 +293,17 @@ public class ProductHelper {
      * - Returns: Total number of rows deleted
      * - Throws: Database errors
      */
-    public func deleteBatch(ids: [Int]) throws -> Int {
+    public func deleteBatch(ids: [Int64]) throws -> Int {
         var totalDeleted = 0
         
-        try manager.execute(name: databaseName, sql: "BEGIN TRANSACTION")
+        _ = try manager.execute(name: databaseName, sql: "BEGIN TRANSACTION")
         do {
             for id in ids {
                 totalDeleted += try delete(id: id)
             }
-            try manager.execute(name: databaseName, sql: "COMMIT")
+            _ = try manager.execute(name: databaseName, sql: "COMMIT")
         } catch {
-            try? manager.execute(name: databaseName, sql: "ROLLBACK")
+            _ = try? manager.execute(name: databaseName, sql: "ROLLBACK")
             throw error
         }
         return totalDeleted
@@ -346,7 +349,7 @@ public class ProductHelper {
         for (index, column) in columns.enumerated() {
             columnMap[column] = index
         }
-        return rows.map { fromRow(columnMap: columnMap, row: $0) }
+        return try rows.map { try fromRow(columnMap: columnMap, row: $0) }
     }
 
     /**
@@ -390,7 +393,7 @@ public class ProductHelper {
         }
         let result = try manager.query(name: databaseName, sql: sql, arguments: whereArgs)
         guard let rows = result["rows"] as? [[Any?]] else { return nil }
-        return rows.first?.first
+        return rows.first?.first ?? nil
     }
 
     /**
@@ -411,7 +414,7 @@ public class ProductHelper {
         }
         let result = try manager.query(name: databaseName, sql: sql, arguments: whereArgs)
         guard let rows = result["rows"] as? [[Any?]] else { return nil }
-        return rows.first?.first
+        return rows.first?.first ?? nil
     }
 
     /**
@@ -456,18 +459,19 @@ public class ProductHelper {
         return rows.first?.first as? Double
     }
 
-    private func fromRow(columnMap: [String: Int], row: [Any?]) -> Product {
+    private func fromRow(columnMap: [String: Int], row values: [Any?]) throws -> Product {
+        let row = GeneratedRow(columnMap: columnMap, values: values)
         return Product(
-            id: row[columnMap[ProductSchema.id]!] as? Int,
-            name: row[columnMap[ProductSchema.name]!] as! String,
-            description: row[columnMap[ProductSchema.description]!] as? String,
-            price: row[columnMap[ProductSchema.price]!] as! Double,
-            stock: row[columnMap[ProductSchema.stock]!] as! Int,
-            isAvailable: (row[columnMap[ProductSchema.isAvailable]!] as! Int) == 1,
-            categoryId: row[columnMap[ProductSchema.categoryId]!] as! Int,
-            imageUrl: row[columnMap[ProductSchema.imageUrl]!] as? String,
-            createdAt: Date(timeIntervalSince1970: TimeInterval(row[columnMap[ProductSchema.createdAt]!] as! Int) / 1000),
-            updatedAt: (row[columnMap[ProductSchema.updatedAt]!] as? Int).map { Date(timeIntervalSince1970: TimeInterval($0) / 1000) }
+            id: try row.optional(ProductSchema.id, GeneratedValue.int64, expected: "Int64"),
+            name: try row.required(ProductSchema.name, GeneratedValue.string, expected: "String"),
+            description: try row.optional(ProductSchema.description, GeneratedValue.string, expected: "String"),
+            price: try row.required(ProductSchema.price, GeneratedValue.double, expected: "Double"),
+            stock: try row.required(ProductSchema.stock, GeneratedValue.int64, expected: "Int64"),
+            isAvailable: try row.required(ProductSchema.isAvailable, GeneratedValue.bool, expected: "Bool"),
+            categoryId: try row.required(ProductSchema.categoryId, GeneratedValue.int64, expected: "Int64"),
+            imageUrl: try row.optional(ProductSchema.imageUrl, GeneratedValue.string, expected: "String"),
+            createdAt: try row.required(ProductSchema.createdAt, GeneratedValue.date, expected: "Date"),
+            updatedAt: try row.optional(ProductSchema.updatedAt, GeneratedValue.date, expected: "Date")
         )
     }
 }

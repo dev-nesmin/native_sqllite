@@ -120,26 +120,18 @@ This creates `user.table.dart` containing `UserSchema`, `UserRepository`, and `U
 ### 5. Open the database and use it
 
 ```dart
-import 'package:native_sqlite/native_sqlite.dart';
+import 'package:flutter/widgets.dart';
 import 'generated/database_manager.dart';   // auto-generated
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Open the database (auto-creates tables, runs migrations)
-  await NativeSqlite.open(
-    config: AutoMigration.createConfig(
-      name: DatabaseManager.databaseName,
-      schemaVersion: DatabaseManager.schemaVersion,
-      onCreateStatements: DatabaseManager.onCreateStatements,
-      tables: DatabaseManager.tables,
-      tableNames: DatabaseManager.tableNames,
-      migrations: DatabaseManager.migrations,
-    ),
-  );
+  // Creates the tables on first launch and applies pending migrations on
+  // upgrade (database name comes from native_sqlite_config.yaml).
+  await DatabaseManager.init();
 
   // CRUD via generated repository
-  final repo = UserRepository();
+  final repo = UserRepository(DatabaseManager.currentDatabase);
 
   final id = await repo.insert(
     User(name: 'Alice', email: 'alice@example.com'),
@@ -149,12 +141,12 @@ Future<void> main() async {
   print(user?.name);  // Alice
 
   // Type-safe query builder
-  final activeUsers = await UserQueryBuilder('my_app')
-      .whereIsActiveEquals(true)
-      .whereCreatedAtGreaterThan(DateTime(2024))
-      .orderByNameAscending()
+  final activeUsers = await UserQueryBuilder(DatabaseManager.currentDatabase)
+      .isActiveIsTrue()
+      .createdAtAfter(DateTime(2024))
+      .sortByNameAsc()
       .limit(20)
-      .find();
+      .findAll();
 }
 ```
 
@@ -407,53 +399,61 @@ await UserQueryBuilder('my_app')
 
 ### How it works
 
-1. `build_runner` generates a `native_sqlite_schema.json` snapshot after each build.
-2. On the next build, the generator compares the new schema against the snapshot.
-3. Changed tables produce SQL entries in `DatabaseManager.migrations`.
-4. `AutoMigration.createConfig(...)` applies those entries automatically when `schemaVersion` increments.
+1. Every build writes the current schema to `lib/generated/native_sqlite_schema.json`.
+   When a table changes, the schema version increases and a versioned snapshot
+   `lib/generated/schemas/native_sqlite_schema_vN.json` records the **step** from
+   version `N-1` to `N`. Commit these files — they are the migration history.
+2. The generated `DatabaseManager` (Dart, Kotlin and Swift) embeds the schema
+   version, the create statements and every step as `migrations[N]`.
+3. When a database is opened, the platform (Android, iOS or web) runs only the
+   steps between the stored version and the current one, in order, in **one
+   transaction** with foreign keys disabled, verifies `PRAGMA foreign_key_check`,
+   and only then bumps the version. Any failure rolls everything back.
+4. Dart and native code use the same generated steps, so it makes no
+   difference which side opens the database first after an app update.
+   Opening a database that is newer than the app (a downgrade) fails.
 
-### Simple migrations (column additions)
+### Column additions
 
-SQLite's `ALTER TABLE ADD COLUMN` is used when only nullable columns (or columns with defaults) are added:
+`ALTER TABLE ADD COLUMN` is used when every new column is nullable or has a
+default (and isn't `UNIQUE`, a primary key or a foreign key):
 
 ```sql
-ALTER TABLE users ADD COLUMN phone_number TEXT;
+ALTER TABLE users ADD COLUMN phone_number TEXT
 ```
 
-### Complex migrations (column removal, type change, rename)
+A new `NOT NULL` column **without** a default fails the build with an
+explanation, because existing rows would have no value for it.
 
-SQLite does not support `DROP COLUMN` before 3.35 or column type changes, so the generator recreates the table:
+### Other changes (removal, type/constraint change, unique, foreign keys)
+
+The table is rebuilt with SQLite's recommended procedure; shared columns are
+copied and the table's indexes are recreated:
 
 ```sql
 CREATE TABLE users_new (...);
 INSERT INTO users_new (id, name, email) SELECT id, name, email FROM users;
 DROP TABLE users;
 ALTER TABLE users_new RENAME TO users;
+CREATE INDEX idx_users_email ON users (email);
 ```
 
-Foreign-key constraints (`REFERENCES … ON DELETE … ON UPDATE …`) defined via `@ForeignKey` are preserved through table recreation. `CHECK` constraints and `COLLATE` expressions are not yet carried over automatically.
+Foreign keys are disabled during the migration, so rebuilding a parent table
+never cascade-deletes child rows. The build logs a warning when data is
+dropped (removed columns; a renamed column is treated as removed + added).
 
-### Custom migration logic
+### Indexes and removed models
 
-Pass `onCustomMigrate` to handle edge cases:
+Added, removed or changed indexes are migrated with `CREATE INDEX` /
+`DROP INDEX`. When a model is deleted its table is **kept** (with its data) and
+the build logs a warning.
 
-```dart
-AutoMigration.createConfig(
-  ...,
-  onCustomMigrate: (dbName, oldVersion, newVersion) async {
-    if (oldVersion < 3) {
-      await NativeSqlite.execute(dbName, 'UPDATE users SET role = "user"');
-    }
-  },
-);
-```
+### Snapshots from older generator versions
 
-### Native platform migrations (Kotlin/Swift)
-
-After running `dart run native_sqlite_generator` the tool also generates:
-
-- `SchemaVersionManager.kt / .swift` — reads and writes `PRAGMA user_version`
-- `Migration_X_Y.kt / .swift` — stub classes with helper methods (`addColumn`, `renameTable`, `migrateTableData`) ready to be filled in
+Earlier versions recorded Dart field names (`userId`) instead of the real
+column names (`user_id`) and their migrations were never executed. The builder
+corrects such snapshots in place — without creating a migration — and ignores
+their old migration SQL.
 
 ---
 
@@ -531,13 +531,34 @@ native_sqlite:
     generate_helpers: true
 ```
 
-Then run:
+The `native_code` builder regenerates these files on every `build_runner` build
+(or run `dart run native_sqlite_generator`). Per model you get `XxxSchema` and
+`XxxHelper` (typed data class/struct and CRUD helper), plus one file per enum
+and a `DatabaseManager` that opens and migrates the database exactly like the
+Dart one:
 
-```bash
-dart run native_sqlite_generator
+```kotlin
+// Android (e.g. in a WorkManager worker)
+DatabaseManager.init(context)
+val users = UserHelper(DatabaseManager.currentDatabase)
+val id = users.insert(User(name = "Ada", email = "ada@example.com", age = 36, isActive = true, createdAt = Instant.now()))
 ```
 
-Generated files include `UserSchema.kt`, `UserHelper.kt`, `SchemaVersionManager.kt`, and `Migration_X_Y.kt` (and Swift equivalents).
+```swift
+// iOS (e.g. in a BGTaskScheduler task)
+try DatabaseManager.shared.initialize()
+let users = UserHelper(databaseName: try DatabaseManager.shared.currentDatabase)
+let id = try users.insert(User(name: "Ada", email: "ada@example.com", age: 36, isActive: true, createdAt: Date()))
+```
+
+Dart types map to `Instant`/`Date`, `Duration`/`TimeInterval`, `Uri`/`URL` and
+generated enums; fields using a `TypeConverter` or `@JsonField` are exposed as
+their stored SQLite value.
+
+**iOS:** add the output folder to the Runner target once as a *synchronized
+folder* (Xcode 16+: drag `ios/Runner/Generated` into the Runner group and
+choose "Create folders"). Files the generator adds or removes later are then
+picked up automatically.
 
 ---
 
@@ -549,10 +570,12 @@ Generated files include `UserSchema.kt`, `UserHelper.kt`, `SchemaVersionManager.
 | WAL mode | ✅ | ✅ | ⚠️ Falls back to MEMORY journal mode (logged in debug builds) |
 | Transactions | ✅ | ✅ | ✅ |
 | Foreign keys | ✅ | ✅ | ✅ |
-| `deleteDatabase` | ✅ | ✅ | ✅ Removes IndexedDB entry |
+| Persistence | ✅ | ✅ | ✅ IndexedDB (requires `web/sqlite3.wasm`) |
+| Versioned migrations | ✅ | ✅ | ✅ |
+| `deleteDatabase` | ✅ | ✅ | ✅ |
 | Inspector schema panel | ✅ | ✅ | ✅ |
 | Inspector edit/delete | ✅ any PK name | ✅ any PK name | ✅ any PK name |
-| Native code gen | ✅ Kotlin | ✅ Swift | — |
+| Native code gen | ✅ Kotlin | ✅ Swift (CocoaPods and Swift Package Manager) | — |
 
 ---
 
@@ -629,8 +652,6 @@ await NativeSqlite.transaction('my_app', [
 
 ## Known Limitations
 
-- **Table-recreation migration** does not preserve `CHECK` constraints or `COLLATE` expressions (foreign keys and `ON DELETE`/`ON UPDATE` actions are now preserved).
-- **Native migration stubs** (`Migration_X_Y.kt` / `.swift`) are generated but **intentionally blank** — you must implement the migration steps.
-- **Web WAL mode** falls back to MEMORY journal mode; a `debugPrint` warning is emitted in debug builds.
-
-See [MISSING_IMPLEMENTATIONS.md](MISSING_IMPLEMENTATIONS.md) for the complete historical issue log.
+- **Table rebuilds** don't carry over `CHECK` constraints or `COLLATE` expressions (not supported by the annotations either).
+- **Column renames** are migrated as remove + add, so the column's data is dropped (the build warns). Rename data manually if needed.
+- **Web** has no WAL mode (MEMORY journal instead) and supports **one tab per database**: each tab loads the database into memory, so two tabs writing to the same database can overwrite each other's changes.

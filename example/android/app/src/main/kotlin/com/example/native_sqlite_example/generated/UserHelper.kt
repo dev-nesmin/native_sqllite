@@ -1,6 +1,9 @@
+@file:Suppress("UNCHECKED_CAST")
+
 package com.example.native_sqlite_example.generated
 
 import dev.nesmin.native_sqlite.NativeSqliteManager
+import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -11,12 +14,12 @@ data class User(
     val id: Long? = null,
     val name: String,
     val email: String,
-    val phoneNumber: String?,
-    val address: String?,
+    val phoneNumber: String? = null,
+    val address: String? = null,
     val age: Long,
     val isActive: Boolean,
-    val createdAt: Long,
-    val updatedAt: Long?
+    val createdAt: Instant,
+    val updatedAt: Instant? = null
 )
 
 /**
@@ -90,9 +93,9 @@ class UserHelper(private val databaseName: String) {
             UserSchema.PHONE_NUMBER to entity.phoneNumber,
             UserSchema.ADDRESS to entity.address,
             UserSchema.AGE to entity.age,
-            UserSchema.IS_ACTIVE to if (entity.isActive) 1 else 0,
-            UserSchema.CREATED_AT to entity.createdAt.toEpochMilliseconds(),
-            UserSchema.UPDATED_AT to entity.updatedAt?.toEpochMilliseconds()
+            UserSchema.IS_ACTIVE to if (entity.isActive) 1L else 0L,
+            UserSchema.CREATED_AT to entity.createdAt.toEpochMilli(),
+            UserSchema.UPDATED_AT to entity.updatedAt?.let { it.toEpochMilli() }
         )
         return NativeSqliteManager.Instance.insert(databaseName, UserSchema.TABLE_NAME, values)
     }
@@ -130,9 +133,9 @@ class UserHelper(private val databaseName: String) {
             UserSchema.PHONE_NUMBER to entity.phoneNumber,
             UserSchema.ADDRESS to entity.address,
             UserSchema.AGE to entity.age,
-            UserSchema.IS_ACTIVE to if (entity.isActive) 1 else 0,
-            UserSchema.CREATED_AT to entity.createdAt.toEpochMilliseconds(),
-            UserSchema.UPDATED_AT to entity.updatedAt?.toEpochMilliseconds()
+            UserSchema.IS_ACTIVE to if (entity.isActive) 1L else 0L,
+            UserSchema.CREATED_AT to entity.createdAt.toEpochMilli(),
+            UserSchema.UPDATED_AT to entity.updatedAt?.let { it.toEpochMilli() }
         )
         return NativeSqliteManager.Instance.update(
             databaseName,
@@ -369,15 +372,15 @@ class UserHelper(private val databaseName: String) {
 
     private fun fromRow(columnMap: Map<String, Int>, row: List<Any?>): User {
         return User(
-            id = row[columnMap[UserSchema.ID]!!] as Long?,
-            name = row[columnMap[UserSchema.NAME]!!] as String,
-            email = row[columnMap[UserSchema.EMAIL]!!] as String,
-            phoneNumber = row[columnMap[UserSchema.PHONE_NUMBER]!!] as String?,
-            address = row[columnMap[UserSchema.ADDRESS]!!] as String?,
-            age = row[columnMap[UserSchema.AGE]!!] as Long,
-            isActive = (row[columnMap[UserSchema.IS_ACTIVE]!!] as Long) == 1L,
-            createdAt = DateTime.fromEpochMilliseconds(row[columnMap[UserSchema.CREATED_AT]!!] as Long),
-            updatedAt = (row[columnMap[UserSchema.UPDATED_AT]!!] as? Long)?.let { DateTime.fromEpochMilliseconds(it) }
+            id = row[columnMap.getValue(UserSchema.ID)]?.let { (it as Number).toLong() },
+            name = row[columnMap.getValue(UserSchema.NAME)] as String,
+            email = row[columnMap.getValue(UserSchema.EMAIL)] as String,
+            phoneNumber = row[columnMap.getValue(UserSchema.PHONE_NUMBER)]?.let { it as String },
+            address = row[columnMap.getValue(UserSchema.ADDRESS)]?.let { it as String },
+            age = (row[columnMap.getValue(UserSchema.AGE)] as Number).toLong(),
+            isActive = (row[columnMap.getValue(UserSchema.IS_ACTIVE)] as Number).toLong() == 1L,
+            createdAt = Instant.ofEpochMilli((row[columnMap.getValue(UserSchema.CREATED_AT)] as Number).toLong()),
+            updatedAt = row[columnMap.getValue(UserSchema.UPDATED_AT)]?.let { Instant.ofEpochMilli((it as Number).toLong()) }
         )
     }
 }

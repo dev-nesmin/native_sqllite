@@ -12,25 +12,18 @@ object UserSchema {
     const val ID = "id"
     const val NAME = "name"
     const val EMAIL = "email"
-    const val PHONE_NUMBER = "phoneNumber"
+    const val PHONE_NUMBER = "phone_number"
     const val ADDRESS = "address"
     const val AGE = "age"
-    const val IS_ACTIVE = "isActive"
-    const val CREATED_AT = "createdAt"
-    const val UPDATED_AT = "updatedAt"
+    const val IS_ACTIVE = "is_active"
+    const val CREATED_AT = "created_at"
+    const val UPDATED_AT = "updated_at"
 
-    // CREATE TABLE SQL
-    const val CREATE_TABLE_SQL = """
-        CREATE TABLE users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            email TEXT NOT NULL UNIQUE,
-            phoneNumber TEXT,
-            address TEXT,
-            age INTEGER NOT NULL,
-            isActive INTEGER NOT NULL,
-            createdAt INTEGER NOT NULL,
-            updatedAt INTEGER
-        )
-    """.trimIndent()
+    // Same statements as the Dart UserSchema
+    const val CREATE_TABLE_SQL = "CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, email TEXT NOT NULL UNIQUE, phone_number TEXT, address TEXT, age INTEGER NOT NULL DEFAULT 1, is_active INTEGER NOT NULL DEFAULT 1, created_at INTEGER NOT NULL, updated_at INTEGER)"
+
+    val INDEX_SQL: List<String> = listOf(
+        "CREATE INDEX idx_users_email ON users (email)",
+        "CREATE INDEX idx_users_created_at ON users (created_at)",
+    )
 }

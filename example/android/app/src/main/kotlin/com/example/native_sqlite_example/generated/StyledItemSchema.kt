@@ -11,20 +11,14 @@ object StyledItemSchema {
     // Column names
     const val ID = "id"
     const val NAME = "name"
-    const val BACKGROUND_COLOR = "backgroundColor"
-    const val TEXT_COLOR = "textColor"
+    const val BACKGROUND_COLOR = "background_color"
+    const val TEXT_COLOR = "text_color"
     const val TAGS = "tags"
-    const val CREATED_AT = "createdAt"
+    const val CREATED_AT = "created_at"
 
-    // CREATE TABLE SQL
-    const val CREATE_TABLE_SQL = """
-        CREATE TABLE styled_items (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            backgroundColor INTEGER NOT NULL,
-            textColor INTEGER,
-            tags TEXT NOT NULL,
-            createdAt INTEGER NOT NULL
-        )
-    """.trimIndent()
+    // Same statements as the Dart StyledItemSchema
+    const val CREATE_TABLE_SQL = "CREATE TABLE styled_items (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, background_color INTEGER NOT NULL, text_color INTEGER, tags TEXT NOT NULL, created_at INTEGER NOT NULL)"
+
+    val INDEX_SQL: List<String> = listOf(
+    )
 }

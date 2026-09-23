@@ -1,6 +1,9 @@
+@file:Suppress("UNCHECKED_CAST")
+
 package com.example.native_sqlite_example.generated
 
 import dev.nesmin.native_sqlite.NativeSqliteManager
+import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -10,8 +13,8 @@ import java.util.concurrent.ConcurrentHashMap
 data class Category(
     val id: Long? = null,
     val name: String,
-    val description: String?,
-    val createdAt: Long
+    val description: String? = null,
+    val createdAt: Instant
 )
 
 /**
@@ -82,7 +85,7 @@ class CategoryHelper(private val databaseName: String) {
         val values: Map<String, Any?> = mapOf(
             CategorySchema.NAME to entity.name,
             CategorySchema.DESCRIPTION to entity.description,
-            CategorySchema.CREATED_AT to entity.createdAt.toEpochMilliseconds()
+            CategorySchema.CREATED_AT to entity.createdAt.toEpochMilli()
         )
         return NativeSqliteManager.Instance.insert(databaseName, CategorySchema.TABLE_NAME, values)
     }
@@ -117,7 +120,7 @@ class CategoryHelper(private val databaseName: String) {
         val values: Map<String, Any?> = mapOf(
             CategorySchema.NAME to entity.name,
             CategorySchema.DESCRIPTION to entity.description,
-            CategorySchema.CREATED_AT to entity.createdAt.toEpochMilliseconds()
+            CategorySchema.CREATED_AT to entity.createdAt.toEpochMilli()
         )
         return NativeSqliteManager.Instance.update(
             databaseName,
@@ -354,10 +357,10 @@ class CategoryHelper(private val databaseName: String) {
 
     private fun fromRow(columnMap: Map<String, Int>, row: List<Any?>): Category {
         return Category(
-            id = row[columnMap[CategorySchema.ID]!!] as Long?,
-            name = row[columnMap[CategorySchema.NAME]!!] as String,
-            description = row[columnMap[CategorySchema.DESCRIPTION]!!] as String?,
-            createdAt = DateTime.fromEpochMilliseconds(row[columnMap[CategorySchema.CREATED_AT]!!] as Long)
+            id = row[columnMap.getValue(CategorySchema.ID)]?.let { (it as Number).toLong() },
+            name = row[columnMap.getValue(CategorySchema.NAME)] as String,
+            description = row[columnMap.getValue(CategorySchema.DESCRIPTION)]?.let { it as String },
+            createdAt = Instant.ofEpochMilli((row[columnMap.getValue(CategorySchema.CREATED_AT)] as Number).toLong())
         )
     }
 }

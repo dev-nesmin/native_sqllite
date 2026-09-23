@@ -3,256 +3,61 @@ import 'package:native_sqlite/native_sqlite.dart';
 
 void main() {
   group('AutoMigration.createConfig', () {
-    test('returns DatabaseConfig with correct name and version', () {
-      final config = AutoMigration.createConfig(
-        name: 'test_db',
-        schemaVersion: 3,
-        onCreateStatements: ['CREATE TABLE users (id INTEGER PRIMARY KEY)'],
-        tables: {'users': 'CREATE TABLE users (id INTEGER PRIMARY KEY)'},
-        tableNames: ['users'],
-        migrations: [],
-      );
+    DatabaseConfig create({
+      Map<int, List<String>> migrations = const {},
+      List<String> ensure = const [],
+      bool? enableWAL,
+      bool? enableForeignKeys,
+    }) => AutoMigration.createConfig(
+      name: 'app',
+      schemaVersion: 3,
+      onCreateStatements: ['CREATE TABLE users (id INTEGER PRIMARY KEY)'],
+      migrations: migrations,
+      ensureSchemaStatements: ensure,
+      enableWAL: enableWAL ?? true,
+      enableForeignKeys: enableForeignKeys ?? true,
+    );
 
-      expect(config.name, 'test_db');
+    test('maps name, version and create statements', () {
+      final config = create();
+      expect(config.name, 'app');
       expect(config.version, 3);
+      expect(config.onCreate, ['CREATE TABLE users (id INTEGER PRIMARY KEY)']);
     });
 
-    test('sets onCreateStatements as onCreate', () {
-      final statements = [
-        'CREATE TABLE users (id INTEGER PRIMARY KEY)',
-        'CREATE TABLE posts (id INTEGER PRIMARY KEY)',
-      ];
-      final config = AutoMigration.createConfig(
-        name: 'test_db',
-        schemaVersion: 1,
-        onCreateStatements: statements,
-        tables: {},
-        tableNames: [],
-        migrations: [],
-      );
-
-      expect(config.onCreate, statements);
-    });
-
-    test('defaults enableWAL to true', () {
-      final config = AutoMigration.createConfig(
-        name: 'test_db',
-        schemaVersion: 1,
-        onCreateStatements: [],
-        tables: {},
-        tableNames: [],
-        migrations: [],
-      );
-
+    test('defaults WAL and foreign keys to enabled', () {
+      final config = create();
       expect(config.enableWAL, isTrue);
-    });
-
-    test('defaults enableForeignKeys to true', () {
-      final config = AutoMigration.createConfig(
-        name: 'test_db',
-        schemaVersion: 1,
-        onCreateStatements: [],
-        tables: {},
-        tableNames: [],
-        migrations: [],
-      );
-
       expect(config.enableForeignKeys, isTrue);
     });
 
-    test('respects custom enableWAL=false', () {
-      final config = AutoMigration.createConfig(
-        name: 'test_db',
-        schemaVersion: 1,
-        onCreateStatements: [],
-        tables: {},
-        tableNames: [],
-        migrations: [],
-        enableWAL: false,
-      );
-
+    test('respects disabled WAL and foreign keys', () {
+      final config = create(enableWAL: false, enableForeignKeys: false);
       expect(config.enableWAL, isFalse);
-    });
-
-    test('respects custom enableForeignKeys=false', () {
-      final config = AutoMigration.createConfig(
-        name: 'test_db',
-        schemaVersion: 1,
-        onCreateStatements: [],
-        tables: {},
-        tableNames: [],
-        migrations: [],
-        enableForeignKeys: false,
-      );
-
       expect(config.enableForeignKeys, isFalse);
     });
 
-    test('attaches onMigrateCallback', () {
-      final config = AutoMigration.createConfig(
-        name: 'test_db',
-        schemaVersion: 2,
-        onCreateStatements: [],
-        tables: {},
-        tableNames: [],
-        migrations: [],
-      );
-
-      expect(config.onMigrateCallback, isNotNull);
+    test('passes migrations to the platform (sent over the channel)', () {
+      final config = create(migrations: {2: ['A'], 3: ['B']});
+      expect(config.toMap()['migrations'], {2: ['A'], 3: ['B']});
     });
-  });
 
-  group('AutoMigration.createConfig - migration callback with migrations list',
-      () {
-    test('applies migration SQL from migrations list', () async {
-      final config = AutoMigration.createConfig(
-        name: 'test_db',
-        schemaVersion: 2,
-        onCreateStatements: [],
-        tables: {},
-        tableNames: [],
-        migrations: [
-          {
-            'sql': [
-              'ALTER TABLE users ADD COLUMN bio TEXT',
-              'CREATE INDEX idx_users_email ON users (email)',
-            ],
-          },
-        ],
+    test('upgrades apply only steps after the stored version', () {
+      final config = create(
+        migrations: {2: ['A'], 3: ['B', 'C']},
+        ensure: ['CREATE TABLE IF NOT EXISTS x (id INTEGER)'],
       );
-
-      final statements = await config.onMigrateCallback!(1, 2);
-      expect(statements, [
-        'ALTER TABLE users ADD COLUMN bio TEXT',
-        'CREATE INDEX idx_users_email ON users (email)',
+      expect(config.upgradeStatements(1), [
+        'A',
+        'B',
+        'C',
+        'CREATE TABLE IF NOT EXISTS x (id INTEGER)',
       ]);
-    });
-
-    test('handles multiple migration entries', () async {
-      final config = AutoMigration.createConfig(
-        name: 'test_db',
-        schemaVersion: 3,
-        onCreateStatements: [],
-        tables: {},
-        tableNames: [],
-        migrations: [
-          {
-            'sql': ['ALTER TABLE users ADD COLUMN bio TEXT'],
-          },
-          {
-            'sql': ['ALTER TABLE posts ADD COLUMN published_at INTEGER'],
-          },
-        ],
-      );
-
-      final statements = await config.onMigrateCallback!(1, 3);
-      expect(statements.length, 2);
-      expect(statements[0], contains('bio'));
-      expect(statements[1], contains('published_at'));
-    });
-
-    test('skips migration entry with null sql', () async {
-      final config = AutoMigration.createConfig(
-        name: 'test_db',
-        schemaVersion: 2,
-        onCreateStatements: [],
-        tables: {},
-        tableNames: [],
-        migrations: [
-          {'sql': null},
-          {
-            'sql': ['ALTER TABLE users ADD COLUMN bio TEXT'],
-          },
-        ],
-      );
-
-      final statements = await config.onMigrateCallback!(1, 2);
-      expect(statements, ['ALTER TABLE users ADD COLUMN bio TEXT']);
-    });
-  });
-
-  group('AutoMigration.createConfig - fallback migration (no migrations list)',
-      () {
-    test('generates CREATE TABLE IF NOT EXISTS for each table', () async {
-      const createSql =
-          'CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT NOT NULL)';
-      final config = AutoMigration.createConfig(
-        name: 'test_db',
-        schemaVersion: 2,
-        onCreateStatements: [],
-        tables: {'users': createSql},
-        tableNames: ['users'],
-        migrations: [],
-      );
-
-      final statements = await config.onMigrateCallback!(1, 2);
-      expect(statements.length, 1);
-      expect(statements.first,
-          contains('CREATE TABLE IF NOT EXISTS users'));
-    });
-
-    test('drops deleted tables when dropRemovedTables=true', () async {
-      final config = AutoMigration.createConfig(
-        name: 'test_db',
-        schemaVersion: 2,
-        onCreateStatements: [],
-        tables: {'users': 'CREATE TABLE users (id INTEGER PRIMARY KEY)'},
-        tableNames: ['users'],
-        migrations: [],
-        deletedTableNames: ['old_table', 'legacy_data'],
-        dropRemovedTables: true,
-      );
-
-      final statements = await config.onMigrateCallback!(1, 2);
-      expect(
-          statements, contains('DROP TABLE IF EXISTS old_table'));
-      expect(
-          statements, contains('DROP TABLE IF EXISTS legacy_data'));
-    });
-
-    test('does not drop tables when dropRemovedTables=false', () async {
-      final config = AutoMigration.createConfig(
-        name: 'test_db',
-        schemaVersion: 2,
-        onCreateStatements: [],
-        tables: {},
-        tableNames: [],
-        migrations: [],
-        deletedTableNames: ['old_table'],
-        dropRemovedTables: false,
-      );
-
-      final statements = await config.onMigrateCallback!(1, 2);
-      expect(statements, isNot(contains('DROP TABLE IF EXISTS old_table')));
-    });
-
-    test('calls onCustomMigrate callback', () async {
-      var called = false;
-      String? calledDb;
-      int? calledOld;
-      int? calledNew;
-
-      final config = AutoMigration.createConfig(
-        name: 'test_db',
-        schemaVersion: 2,
-        onCreateStatements: [],
-        tables: {},
-        tableNames: [],
-        migrations: [],
-        onCustomMigrate: (db, oldV, newV) async {
-          called = true;
-          calledDb = db;
-          calledOld = oldV;
-          calledNew = newV;
-        },
-      );
-
-      await config.onMigrateCallback!(1, 2);
-
-      expect(called, isTrue);
-      expect(calledDb, 'test_db');
-      expect(calledOld, 1);
-      expect(calledNew, 2);
+      expect(config.upgradeStatements(2), [
+        'B',
+        'C',
+        'CREATE TABLE IF NOT EXISTS x (id INTEGER)',
+      ]);
     });
   });
 
@@ -338,9 +143,9 @@ void main() {
         ],
       );
 
-      expect(statements, contains('DROP TABLE IF EXISTS legacy_data'));
-      expect(statements, contains('DROP TABLE IF EXISTS old_cache'));
-      expect(statements, isNot(contains('DROP TABLE IF EXISTS users')));
+      expect(statements, contains('DROP TABLE IF EXISTS "legacy_data"'));
+      expect(statements, contains('DROP TABLE IF EXISTS "old_cache"'));
+      expect(statements, isNot(contains('DROP TABLE IF EXISTS "users"')));
     });
 
     test('returns empty list when DB matches schema exactly', () async {

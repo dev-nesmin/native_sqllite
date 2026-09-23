@@ -1,251 +1,214 @@
-/// Wraps a SQL identifier in double-quotes to prevent keyword conflicts and
-/// injection through schema-derived names.
-String _q(String identifier) => '"$identifier"';
+import 'package:native_sqlite_generator/src/models/schema_snapshot.dart';
+import 'package:native_sqlite_generator/src/sql/schema_sql.dart';
 
-/// Generates SQL migration statements by comparing old and new schemas
+/// SQL that migrates one table between two schema versions.
+class TableMigration {
+  const TableMigration({
+    required this.sql,
+    required this.summary,
+    this.warnings = const [],
+  });
+
+  final List<String> sql;
+  final String summary;
+
+  /// Consequences worth surfacing at build time (e.g. dropped column data).
+  final List<String> warnings;
+
+  Map<String, dynamic> toJson() => {
+    'sql': sql,
+    'summary': summary,
+    if (warnings.isNotEmpty) 'warnings': warnings,
+  };
+}
+
+/// A schema change that cannot be migrated safely on existing databases.
+class MigrationException implements Exception {
+  MigrationException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => 'MigrationException: $message';
+}
+
+/// Generates the SQL that brings an existing table to a new schema.
+///
+/// Statements run inside the platform's migration transaction with foreign
+/// keys disabled (see `DatabaseConfig.migrations`), following SQLite's
+/// recommended procedure for schema changes ALTER TABLE can't express.
+/// Every CREATE statement comes from [SchemaSql], so a migrated table is
+/// identical to a freshly created one.
 class MigrationSqlGenerator {
-  /// Generate migration SQL for a table that changed
-  static List<String> generateMigrationSql({
-    required String tableName,
-    required Map<String, dynamic> oldSchema,
-    required Map<String, dynamic> newSchema,
-  }) {
-    final migrations = <String>[];
+  MigrationSqlGenerator._();
 
-    final oldColumns = _parseColumns(oldSchema);
-    final newColumns = _parseColumns(newSchema);
+  /// A table added in this version.
+  static TableMigration createTable(TableSchemaSnapshot table) {
+    return TableMigration(
+      sql: [SchemaSql.createTable(table), ...SchemaSql.createIndexes(table)],
+      summary: 'Created table',
+    );
+  }
 
-    // Detect column changes
-    final oldColumnNames = oldColumns.keys.toSet();
-    final newColumnNames = newColumns.keys.toSet();
+  /// A table whose schema changed from [previous] to [current].
+  ///
+  /// Throws [MigrationException] when existing rows could not satisfy the
+  /// new schema (a new NOT NULL column without a default).
+  static TableMigration changeTable(
+    TableSchemaSnapshot previous,
+    TableSchemaSnapshot current,
+  ) {
+    final table = current.tableName;
+    final oldColumns = {for (final c in previous.columns) c.name: c};
+    final newColumns = {for (final c in current.columns) c.name: c};
 
-    final addedColumns = newColumnNames.difference(oldColumnNames);
-    final removedColumns = oldColumnNames.difference(newColumnNames);
-    final commonColumns = oldColumnNames.intersection(newColumnNames);
+    final added = [
+      for (final c in current.columns)
+        if (!oldColumns.containsKey(c.name)) c,
+    ];
+    final removed = [
+      for (final c in previous.columns)
+        if (!newColumns.containsKey(c.name)) c.name,
+    ];
+    final modified = [
+      for (final c in current.columns)
+        if (oldColumns[c.name] case final old? when _columnChanged(old, c))
+          c.name,
+    ];
 
-    // Check for type/constraint changes in common columns
-    final modifiedColumns = <String>[];
-    for (final colName in commonColumns) {
-      if (_columnChanged(oldColumns[colName]!, newColumns[colName]!)) {
-        modifiedColumns.add(colName);
+    final summary = <String>[
+      if (added.isNotEmpty) 'Added columns: ${added.map((c) => c.name).join(', ')}',
+      if (removed.isNotEmpty) 'Removed columns: ${removed.join(', ')}',
+      if (modified.isNotEmpty) 'Changed columns: ${modified.join(', ')}',
+    ];
+    final warnings = <String>[
+      if (removed.isNotEmpty)
+        '$table: data in removed column(s) ${removed.join(', ')} is deleted. '
+            'A renamed column is treated as removed + added.',
+      for (final name in modified)
+        if (oldColumns[name]!.nullable &&
+            !newColumns[name]!.nullable &&
+            newColumns[name]!.defaultValue == null)
+          '$table.$name became NOT NULL: the migration fails on devices '
+              'where it contains NULL values.',
+    ];
+
+    final canAlter =
+        removed.isEmpty && modified.isEmpty && added.every(_canAddColumn);
+
+    final sql = <String>[];
+    if (canAlter) {
+      for (final column in added) {
+        sql.add(_addColumn(table, column));
       }
-    }
-
-    // Simple case: Only adding nullable columns (can use ALTER TABLE ADD COLUMN)
-    if (removedColumns.isEmpty &&
-        modifiedColumns.isEmpty &&
-        addedColumns.isNotEmpty) {
-      for (final colName in addedColumns) {
-        final col = newColumns[colName]!;
-        if (col['nullable'] == true || col['defaultValue'] != null) {
-          final sql = _generateAddColumnSql(tableName, col);
-          migrations.add(sql);
-        } else {
-          // Non-nullable without default requires table recreation
-          return _generateTableRecreationSql(
-            tableName,
-            oldColumns,
-            newColumns,
-            removedColumns,
+      final indexChanges = _indexChanges(previous, current);
+      sql.addAll(indexChanges.sql);
+      summary.addAll(indexChanges.summary);
+    } else {
+      for (final column in added) {
+        if (!column.nullable &&
+            column.defaultValue == null &&
+            !(column.primaryKey && column.autoIncrement)) {
+          throw MigrationException(
+            'Cannot add NOT NULL column "$table.${column.name}" without a '
+            'default value: existing rows would have no value for it. Make it '
+            'nullable or give it a defaultValue in @DbColumn.',
           );
         }
       }
-      return migrations;
+      sql.addAll(_rebuildTable(current, oldColumns.keys.toSet()));
+      summary.add('Rebuilt table');
     }
 
-    // Complex case: Removals, modifications, or non-nullable additions
-    // Requires table recreation
-    if (removedColumns.isNotEmpty || modifiedColumns.isNotEmpty) {
-      return _generateTableRecreationSql(
-        tableName,
-        oldColumns,
-        newColumns,
-        removedColumns,
-      );
-    }
-
-    return migrations;
-  }
-
-  static Map<String, Map<String, dynamic>> _parseColumns(
-    Map<String, dynamic> schema,
-  ) {
-    final columns = <String, Map<String, dynamic>>{};
-    if (schema['columns'] is List) {
-      for (final col in schema['columns'] as List) {
-        final colMap = col as Map<String, dynamic>;
-        final name = colMap['name'] as String;
-        columns[name] = colMap;
-      }
-    }
-    return columns;
-  }
-
-  static bool _columnChanged(
-    Map<String, dynamic> oldCol,
-    Map<String, dynamic> newCol,
-  ) {
-    return oldCol['type'] != newCol['type'] ||
-        oldCol['nullable'] != newCol['nullable'] ||
-        oldCol['primaryKey'] != newCol['primaryKey'] ||
-        oldCol['unique'] != newCol['unique'] ||
-        oldCol['defaultValue'] != newCol['defaultValue'];
-  }
-
-  static String _generateAddColumnSql(
-    String tableName,
-    Map<String, dynamic> column,
-  ) {
-    final colName = column['name'] as String;
-    final colType = column['type'] as String;
-    final nullable = column['nullable'] as bool? ?? true;
-    final defaultValue = column['defaultValue'] as String?;
-
-    final parts = <String>[
-      'ALTER TABLE ${_q(tableName)} ADD COLUMN ${_q(colName)} $colType',
-    ];
-
-    if (!nullable) {
-      parts.add('NOT NULL');
-    }
-
-    if (defaultValue != null) {
-      parts.add('DEFAULT $defaultValue');
-    }
-
-    return '${parts.join(' ')};';
-  }
-
-  static List<String> _generateTableRecreationSql(
-    String tableName,
-    Map<String, Map<String, dynamic>> oldColumns,
-    Map<String, Map<String, dynamic>> newColumns,
-    Set<String> removedColumns,
-  ) {
-    final migrations = <String>[];
-
-    // 1. Create new table with temporary name
-    final newTableSql = _buildCreateTableSql('${tableName}_new', newColumns);
-    migrations.add(newTableSql);
-
-    // 2. Copy data from old table to new table (only common columns)
-    final commonColumns = oldColumns.keys
-        .where(
-          (col) => newColumns.containsKey(col) && !removedColumns.contains(col),
-        )
-        .toList();
-
-    if (commonColumns.isNotEmpty) {
-      final columnsList = commonColumns.map(_q).join(', ');
-      migrations.add(
-        'INSERT INTO ${_q('${tableName}_new')} ($columnsList) '
-        'SELECT $columnsList FROM ${_q(tableName)};',
-      );
-    }
-
-    // 3. Drop old table
-    migrations.add('DROP TABLE ${_q(tableName)};');
-
-    // 4. Rename new table to original name
-    migrations.add(
-      'ALTER TABLE ${_q('${tableName}_new')} RENAME TO ${_q(tableName)};',
+    return TableMigration(
+      sql: sql,
+      summary: summary.isEmpty ? 'Schema updated' : summary.join('; '),
+      warnings: warnings,
     );
-
-    return migrations;
   }
 
-  static String _buildCreateTableSql(
-    String tableName,
-    Map<String, Map<String, dynamic>> columns,
+  static bool _columnChanged(ColumnSchemaSnapshot a, ColumnSchemaSnapshot b) {
+    return a.type != b.type ||
+        a.nullable != b.nullable ||
+        a.primaryKey != b.primaryKey ||
+        a.autoIncrement != b.autoIncrement ||
+        a.unique != b.unique ||
+        a.defaultValue != b.defaultValue ||
+        a.foreignKey != b.foreignKey ||
+        a.foreignKeyOnDelete != b.foreignKeyOnDelete ||
+        a.foreignKeyOnUpdate != b.foreignKeyOnUpdate;
+  }
+
+  /// SQLite's ALTER TABLE ADD COLUMN can't add PRIMARY KEY, UNIQUE or
+  /// REFERENCES columns, nor NOT NULL columns without a default.
+  static bool _canAddColumn(ColumnSchemaSnapshot column) {
+    return !column.primaryKey &&
+        !column.unique &&
+        column.foreignKey == null &&
+        (column.nullable || column.defaultValue != null);
+  }
+
+  static String _addColumn(String table, ColumnSchemaSnapshot column) {
+    final parts = ['ALTER TABLE $table ADD COLUMN ${column.name} ${column.type}'];
+    if (!column.nullable) parts.add('NOT NULL');
+    if (column.defaultValue != null) parts.add('DEFAULT ${column.defaultValue}');
+    return parts.join(' ');
+  }
+
+  /// SQLite's 12-step table rebuild: create the new shape, copy the columns
+  /// both versions share, swap the tables and recreate the indexes (which
+  /// are dropped with the old table).
+  static List<String> _rebuildTable(
+    TableSchemaSnapshot current,
+    Set<String> previousColumnNames,
   ) {
-    final columnDefs = <String>[];
-
-    for (final col in columns.values) {
-      final parts = <String>[];
-      final colName = col['name'] as String;
-      final colType = col['type'] as String;
-
-      parts.add('${_q(colName)} $colType');
-
-      if (col['primaryKey'] == true) {
-        parts.add('PRIMARY KEY');
-        if (col['autoIncrement'] == true) {
-          parts.add('AUTOINCREMENT');
-        }
-      }
-
-      if (col['nullable'] == false && col['primaryKey'] != true) {
-        parts.add('NOT NULL');
-      }
-
-      if (col['unique'] == true && col['primaryKey'] != true) {
-        parts.add('UNIQUE');
-      }
-
-      if (col['defaultValue'] != null) {
-        parts.add('DEFAULT ${col['defaultValue']}');
-      }
-
-      if (col['foreignKey'] != null) {
-        final fkParts = (col['foreignKey'] as String).split('.');
-        if (fkParts.length == 2) {
-          var fkClause = 'REFERENCES ${_q(fkParts[0])}(${_q(fkParts[1])})';
-          final onDelete = col['foreignKeyOnDelete'] as String?;
-          final onUpdate = col['foreignKeyOnUpdate'] as String?;
-          if (onDelete != null) fkClause += ' ON DELETE $onDelete';
-          if (onUpdate != null) fkClause += ' ON UPDATE $onUpdate';
-          parts.add(fkClause);
-        }
-      }
-
-      columnDefs.add(parts.join(' '));
-    }
-
-    return 'CREATE TABLE ${_q(tableName)} (${columnDefs.join(', ')});';
+    final table = current.tableName;
+    final temp = '${table}_new';
+    final shared = [
+      for (final c in current.columns)
+        if (previousColumnNames.contains(c.name)) c.name,
+    ].join(', ');
+    return [
+      SchemaSql.createTable(current, name: temp),
+      if (shared.isNotEmpty)
+        'INSERT INTO $temp ($shared) SELECT $shared FROM $table',
+      'DROP TABLE $table',
+      'ALTER TABLE $temp RENAME TO $table',
+      ...SchemaSql.createIndexes(current),
+    ];
   }
 
-  /// Generate user-friendly migration summary
-  static String generateMigrationSummary({
-    required String tableName,
-    required Map<String, dynamic> oldSchema,
-    required Map<String, dynamic> newSchema,
-  }) {
-    final oldColumns = _parseColumns(oldSchema);
-    final newColumns = _parseColumns(newSchema);
+  static ({List<String> sql, List<String> summary}) _indexChanges(
+    TableSchemaSnapshot previous,
+    TableSchemaSnapshot current,
+  ) {
+    String signature(IndexSchemaSnapshot i) =>
+        '${i.unique}:${i.columns.join(',')}';
+    final before = {
+      for (final i in previous.indexes)
+        SchemaSql.indexName(previous.tableName, i): i,
+    };
+    final after = {
+      for (final i in current.indexes)
+        SchemaSql.indexName(current.tableName, i): i,
+    };
 
-    final oldColumnNames = oldColumns.keys.toSet();
-    final newColumnNames = newColumns.keys.toSet();
-
-    final addedColumns = newColumnNames.difference(oldColumnNames);
-    final removedColumns = oldColumnNames.difference(newColumnNames);
-
-    final changes = <String>[];
-
-    if (addedColumns.isNotEmpty) {
-      changes.add('Added columns: ${addedColumns.join(", ")}');
-    }
-
-    if (removedColumns.isNotEmpty) {
-      changes.add('Removed columns: ${removedColumns.join(", ")}');
-    }
-
-    // Check for type changes
-    for (final colName in oldColumnNames.intersection(newColumnNames)) {
-      final oldCol = oldColumns[colName]!;
-      final newCol = newColumns[colName]!;
-
-      if (oldCol['type'] != newCol['type']) {
-        changes.add(
-          'Changed $colName type: ${oldCol['type']} → ${newCol['type']}',
-        );
-      }
-
-      if (oldCol['nullable'] != newCol['nullable']) {
-        final nullStr = newCol['nullable'] == true ? 'nullable' : 'NOT NULL';
-        changes.add('Changed $colName to $nullStr');
+    final sql = <String>[];
+    final summary = <String>[];
+    for (final MapEntry(key: name, value: index) in before.entries) {
+      final replacement = after[name];
+      if (replacement == null || signature(replacement) != signature(index)) {
+        sql.add('DROP INDEX IF EXISTS $name');
+        summary.add('Dropped index $name');
       }
     }
-
-    return changes.isEmpty ? 'Schema updated' : changes.join('; ');
+    for (final MapEntry(key: name, value: index) in after.entries) {
+      final existing = before[name];
+      if (existing == null || signature(existing) != signature(index)) {
+        sql.add(SchemaSql.createIndex(current.tableName, index));
+        summary.add('Created index $name');
+      }
+    }
+    return (sql: sql, summary: summary);
   }
 }

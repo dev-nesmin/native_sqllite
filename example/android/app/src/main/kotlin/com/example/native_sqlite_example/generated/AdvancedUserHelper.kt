@@ -1,6 +1,11 @@
+@file:Suppress("UNCHECKED_CAST")
+
 package com.example.native_sqlite_example.generated
 
+import android.net.Uri
 import dev.nesmin.native_sqlite.NativeSqliteManager
+import java.time.Duration
+import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -10,18 +15,18 @@ import java.util.concurrent.ConcurrentHashMap
 data class AdvancedUser(
     val id: Long? = null,
     val name: String,
-    val phoneNumber: String?,
-    val address: String?,
-    val country: String?,
-    val zipCode: String?,
-    val age: Long?,
-    val city: String?,
-    val loginDuration: Any?,
-    val profileUrl: Any?,
-    val score: Any?,
-    val status: Any,
-    val priority: Any?,
-    val createdAt: Long,
+    val phoneNumber: String? = null,
+    val address: String? = null,
+    val country: String? = null,
+    val zipCode: String? = null,
+    val age: Long? = null,
+    val city: String? = null,
+    val loginDuration: Duration? = null,
+    val profileUrl: Uri? = null,
+    val score: Double? = null,
+    val status: UserStatus,
+    val priority: Priority? = null,
+    val createdAt: Instant,
     val isVerified: Boolean
 )
 
@@ -98,13 +103,13 @@ class AdvancedUserHelper(private val databaseName: String) {
             AdvancedUserSchema.ZIP_CODE to entity.zipCode,
             AdvancedUserSchema.AGE to entity.age,
             AdvancedUserSchema.CITY to entity.city,
-            AdvancedUserSchema.LOGIN_DURATION to entity.loginDuration,
-            AdvancedUserSchema.PROFILE_URL to entity.profileUrl,
+            AdvancedUserSchema.LOGIN_DURATION to entity.loginDuration?.let { it.toMillis() },
+            AdvancedUserSchema.PROFILE_URL to entity.profileUrl?.let { it.toString() },
             AdvancedUserSchema.SCORE to entity.score,
-            AdvancedUserSchema.STATUS to entity.status,
-            AdvancedUserSchema.PRIORITY to entity.priority,
-            AdvancedUserSchema.CREATED_AT to entity.createdAt.toEpochMilliseconds(),
-            AdvancedUserSchema.IS_VERIFIED to if (entity.isVerified) 1 else 0
+            AdvancedUserSchema.STATUS to entity.status.ordinal.toLong(),
+            AdvancedUserSchema.PRIORITY to entity.priority?.let { it.name },
+            AdvancedUserSchema.CREATED_AT to entity.createdAt.toEpochMilli(),
+            AdvancedUserSchema.IS_VERIFIED to if (entity.isVerified) 1L else 0L
         )
         return NativeSqliteManager.Instance.insert(databaseName, AdvancedUserSchema.TABLE_NAME, values)
     }
@@ -144,13 +149,13 @@ class AdvancedUserHelper(private val databaseName: String) {
             AdvancedUserSchema.ZIP_CODE to entity.zipCode,
             AdvancedUserSchema.AGE to entity.age,
             AdvancedUserSchema.CITY to entity.city,
-            AdvancedUserSchema.LOGIN_DURATION to entity.loginDuration,
-            AdvancedUserSchema.PROFILE_URL to entity.profileUrl,
+            AdvancedUserSchema.LOGIN_DURATION to entity.loginDuration?.let { it.toMillis() },
+            AdvancedUserSchema.PROFILE_URL to entity.profileUrl?.let { it.toString() },
             AdvancedUserSchema.SCORE to entity.score,
-            AdvancedUserSchema.STATUS to entity.status,
-            AdvancedUserSchema.PRIORITY to entity.priority,
-            AdvancedUserSchema.CREATED_AT to entity.createdAt.toEpochMilliseconds(),
-            AdvancedUserSchema.IS_VERIFIED to if (entity.isVerified) 1 else 0
+            AdvancedUserSchema.STATUS to entity.status.ordinal.toLong(),
+            AdvancedUserSchema.PRIORITY to entity.priority?.let { it.name },
+            AdvancedUserSchema.CREATED_AT to entity.createdAt.toEpochMilli(),
+            AdvancedUserSchema.IS_VERIFIED to if (entity.isVerified) 1L else 0L
         )
         return NativeSqliteManager.Instance.update(
             databaseName,
@@ -387,21 +392,21 @@ class AdvancedUserHelper(private val databaseName: String) {
 
     private fun fromRow(columnMap: Map<String, Int>, row: List<Any?>): AdvancedUser {
         return AdvancedUser(
-            id = row[columnMap[AdvancedUserSchema.ID]!!] as Long?,
-            name = row[columnMap[AdvancedUserSchema.NAME]!!] as String,
-            phoneNumber = row[columnMap[AdvancedUserSchema.PHONE_NUMBER]!!] as String?,
-            address = row[columnMap[AdvancedUserSchema.ADDRESS]!!] as String?,
-            country = row[columnMap[AdvancedUserSchema.COUNTRY]!!] as String?,
-            zipCode = row[columnMap[AdvancedUserSchema.ZIP_CODE]!!] as String?,
-            age = row[columnMap[AdvancedUserSchema.AGE]!!] as Long?,
-            city = row[columnMap[AdvancedUserSchema.CITY]!!] as String?,
-            loginDuration = row[columnMap[AdvancedUserSchema.LOGIN_DURATION]!!],
-            profileUrl = row[columnMap[AdvancedUserSchema.PROFILE_URL]!!],
-            score = row[columnMap[AdvancedUserSchema.SCORE]!!],
-            status = row[columnMap[AdvancedUserSchema.STATUS]!!],
-            priority = row[columnMap[AdvancedUserSchema.PRIORITY]!!],
-            createdAt = DateTime.fromEpochMilliseconds(row[columnMap[AdvancedUserSchema.CREATED_AT]!!] as Long),
-            isVerified = (row[columnMap[AdvancedUserSchema.IS_VERIFIED]!!] as Long) == 1L
+            id = row[columnMap.getValue(AdvancedUserSchema.ID)]?.let { (it as Number).toLong() },
+            name = row[columnMap.getValue(AdvancedUserSchema.NAME)] as String,
+            phoneNumber = row[columnMap.getValue(AdvancedUserSchema.PHONE_NUMBER)]?.let { it as String },
+            address = row[columnMap.getValue(AdvancedUserSchema.ADDRESS)]?.let { it as String },
+            country = row[columnMap.getValue(AdvancedUserSchema.COUNTRY)]?.let { it as String },
+            zipCode = row[columnMap.getValue(AdvancedUserSchema.ZIP_CODE)]?.let { it as String },
+            age = row[columnMap.getValue(AdvancedUserSchema.AGE)]?.let { (it as Number).toLong() },
+            city = row[columnMap.getValue(AdvancedUserSchema.CITY)]?.let { it as String },
+            loginDuration = row[columnMap.getValue(AdvancedUserSchema.LOGIN_DURATION)]?.let { Duration.ofMillis((it as Number).toLong()) },
+            profileUrl = row[columnMap.getValue(AdvancedUserSchema.PROFILE_URL)]?.let { Uri.parse(it as String) },
+            score = row[columnMap.getValue(AdvancedUserSchema.SCORE)]?.let { (it as Number).toDouble() },
+            status = UserStatus.entries[(row[columnMap.getValue(AdvancedUserSchema.STATUS)] as Number).toInt()],
+            priority = row[columnMap.getValue(AdvancedUserSchema.PRIORITY)]?.let { Priority.valueOf(it as String) },
+            createdAt = Instant.ofEpochMilli((row[columnMap.getValue(AdvancedUserSchema.CREATED_AT)] as Number).toLong()),
+            isVerified = (row[columnMap.getValue(AdvancedUserSchema.IS_VERIFIED)] as Number).toLong() == 1L
         )
     }
 }

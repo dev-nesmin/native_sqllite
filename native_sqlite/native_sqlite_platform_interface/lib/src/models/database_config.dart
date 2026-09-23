@@ -9,17 +9,19 @@ class DatabaseConfig {
   /// SQL statements to execute when creating the database for the first time.
   final List<String>? onCreate;
 
-  /// SQL statements to execute when upgrading the database.
+  /// SQL statements to execute on every upgrade, after the applicable
+  /// [migrations] steps (e.g. idempotent `CREATE ... IF NOT EXISTS`).
   final List<String>? onUpgrade;
 
-  /// Callback to handle automatic migration.
+  /// Versioned migration steps: `migrations[v]` upgrades a database from
+  /// version `v - 1` to `v`.
   ///
-  /// This callback is invoked before onUpgrade SQL statements are executed,
-  /// allowing for dynamic migration logic based on old and new versions.
-  ///
-  /// Return SQL statements to be executed during migration.
-  final Future<List<String>> Function(int oldVersion, int newVersion)?
-  onMigrateCallback;
+  /// When an existing database at version `old` is opened with [version],
+  /// every step `old + 1 .. version` runs in ascending order, followed by
+  /// [onUpgrade], in a single transaction with foreign keys disabled (so
+  /// table rebuilds can't cascade), and must leave no foreign key violations.
+  /// Android, iOS and web apply exactly the same rules.
+  final Map<int, List<String>>? migrations;
 
   /// Whether to enable Write-Ahead Logging (WAL) mode.
   ///
@@ -39,7 +41,7 @@ class DatabaseConfig {
     this.version = 1,
     this.onCreate,
     this.onUpgrade,
-    this.onMigrateCallback,
+    this.migrations,
     this.enableWAL = true,
     this.enableForeignKeys = true,
   });
@@ -50,6 +52,7 @@ class DatabaseConfig {
       'version': version,
       'onCreate': onCreate,
       'onUpgrade': onUpgrade,
+      'migrations': migrations,
       'enableWAL': enableWAL,
       'enableForeignKeys': enableForeignKeys,
     };
@@ -61,9 +64,22 @@ class DatabaseConfig {
       version: map['version'] as int? ?? 1,
       onCreate: (map['onCreate'] as List<dynamic>?)?.cast<String>(),
       onUpgrade: (map['onUpgrade'] as List<dynamic>?)?.cast<String>(),
+      migrations: (map['migrations'] as Map<dynamic, dynamic>?)?.map(
+        (version, sql) =>
+            MapEntry(version as int, (sql as List<dynamic>).cast<String>()),
+      ),
       enableWAL: map['enableWAL'] as bool? ?? true,
       enableForeignKeys: map['enableForeignKeys'] as bool? ?? true,
     );
+  }
+
+  /// Statements that upgrade a database from [oldVersion] to [version]:
+  /// the [migrations] steps in version order, then [onUpgrade].
+  List<String> upgradeStatements(int oldVersion) {
+    return [
+      for (var v = oldVersion + 1; v <= version; v++) ...?migrations?[v],
+      ...?onUpgrade,
+    ];
   }
 
   @override

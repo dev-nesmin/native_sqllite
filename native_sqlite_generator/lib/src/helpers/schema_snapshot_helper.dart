@@ -1,3 +1,5 @@
+import 'package:analyzer/dart/element/element.dart';
+import 'package:native_sqlite_generator/src/helpers/type_utils.dart';
 import 'package:native_sqlite_generator/src/models/column_info.dart';
 import 'package:native_sqlite_generator/src/models/index_info.dart';
 import 'package:native_sqlite_generator/src/models/schema_snapshot.dart';
@@ -21,6 +23,11 @@ class SchemaSnapshotHelper {
 
   /// Converts ColumnInfo to ColumnSchemaSnapshot
   static ColumnSchemaSnapshot _columnToSnapshot(ColumnInfo column) {
+    final enumElement = column.dartType.element;
+    final enumValues = TypeUtils.isEnum(column.dartType) && enumElement is EnumElement
+        ? enumElement.constants.map((c) => c.name!).toList()
+        : null;
+
     return ColumnSchemaSnapshot(
       dartName: column.dartName,
       name: column.sqlName,
@@ -38,11 +45,21 @@ class SchemaSnapshotHelper {
       isJsonField: column.isJsonField,
       hasConverter: column.hasConverter,
       dartType: column.dartType.getDisplayString(),
+      // Mirrors TypeUtils serialization: only `name` is stored by name,
+      // everything else (including the unimplemented `value`) by index.
+      enumType: enumValues == null
+          ? null
+          : (column.enumType == 'name' ? 'name' : 'ordinal'),
+      enumValues: enumValues,
     );
   }
 
   /// Converts IndexInfo to IndexSchemaSnapshot
   static IndexSchemaSnapshot _indexToSnapshot(IndexInfo index) {
-    return IndexSchemaSnapshot(columns: index.columns, unique: index.unique);
+    return IndexSchemaSnapshot(
+      columns: index.columns,
+      unique: index.unique,
+      name: index.name,
+    );
   }
 }

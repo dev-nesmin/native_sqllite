@@ -9,9 +9,9 @@ Pod::Spec.new do |s|
   s.license          = { :file => '../LICENSE' }
   s.author           = { 'Nesmin' => 'dev@nesmin.dev' }
   s.source           = { :path => '.' }
-  s.source_files     = 'Classes/**/*'
+  s.source_files     = 'native_sqlite_ios/Sources/native_sqlite_ios/**/*.swift'
   s.dependency 'Flutter'
-  s.platform = :ios, '12.0'
+  s.platform = :ios, '13.0'
   s.library = 'sqlite3'
 
   # Flutter.framework does not contain a i386 slice.

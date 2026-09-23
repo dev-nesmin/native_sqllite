@@ -1,6 +1,9 @@
+@file:Suppress("UNCHECKED_CAST")
+
 package com.example.native_sqlite_example.generated
 
 import dev.nesmin.native_sqlite.NativeSqliteManager
+import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -10,14 +13,14 @@ import java.util.concurrent.ConcurrentHashMap
 data class Product(
     val id: Long? = null,
     val name: String,
-    val description: String?,
+    val description: String? = null,
     val price: Double,
     val stock: Long,
     val isAvailable: Boolean,
     val categoryId: Long,
-    val imageUrl: String?,
-    val createdAt: Long,
-    val updatedAt: Long?
+    val imageUrl: String? = null,
+    val createdAt: Instant,
+    val updatedAt: Instant? = null
 )
 
 /**
@@ -90,11 +93,11 @@ class ProductHelper(private val databaseName: String) {
             ProductSchema.DESCRIPTION to entity.description,
             ProductSchema.PRICE to entity.price,
             ProductSchema.STOCK to entity.stock,
-            ProductSchema.IS_AVAILABLE to if (entity.isAvailable) 1 else 0,
+            ProductSchema.IS_AVAILABLE to if (entity.isAvailable) 1L else 0L,
             ProductSchema.CATEGORY_ID to entity.categoryId,
             ProductSchema.IMAGE_URL to entity.imageUrl,
-            ProductSchema.CREATED_AT to entity.createdAt.toEpochMilliseconds(),
-            ProductSchema.UPDATED_AT to entity.updatedAt?.toEpochMilliseconds()
+            ProductSchema.CREATED_AT to entity.createdAt.toEpochMilli(),
+            ProductSchema.UPDATED_AT to entity.updatedAt?.let { it.toEpochMilli() }
         )
         return NativeSqliteManager.Instance.insert(databaseName, ProductSchema.TABLE_NAME, values)
     }
@@ -131,11 +134,11 @@ class ProductHelper(private val databaseName: String) {
             ProductSchema.DESCRIPTION to entity.description,
             ProductSchema.PRICE to entity.price,
             ProductSchema.STOCK to entity.stock,
-            ProductSchema.IS_AVAILABLE to if (entity.isAvailable) 1 else 0,
+            ProductSchema.IS_AVAILABLE to if (entity.isAvailable) 1L else 0L,
             ProductSchema.CATEGORY_ID to entity.categoryId,
             ProductSchema.IMAGE_URL to entity.imageUrl,
-            ProductSchema.CREATED_AT to entity.createdAt.toEpochMilliseconds(),
-            ProductSchema.UPDATED_AT to entity.updatedAt?.toEpochMilliseconds()
+            ProductSchema.CREATED_AT to entity.createdAt.toEpochMilli(),
+            ProductSchema.UPDATED_AT to entity.updatedAt?.let { it.toEpochMilli() }
         )
         return NativeSqliteManager.Instance.update(
             databaseName,
@@ -372,16 +375,16 @@ class ProductHelper(private val databaseName: String) {
 
     private fun fromRow(columnMap: Map<String, Int>, row: List<Any?>): Product {
         return Product(
-            id = row[columnMap[ProductSchema.ID]!!] as Long?,
-            name = row[columnMap[ProductSchema.NAME]!!] as String,
-            description = row[columnMap[ProductSchema.DESCRIPTION]!!] as String?,
-            price = row[columnMap[ProductSchema.PRICE]!!] as Double,
-            stock = row[columnMap[ProductSchema.STOCK]!!] as Long,
-            isAvailable = (row[columnMap[ProductSchema.IS_AVAILABLE]!!] as Long) == 1L,
-            categoryId = row[columnMap[ProductSchema.CATEGORY_ID]!!] as Long,
-            imageUrl = row[columnMap[ProductSchema.IMAGE_URL]!!] as String?,
-            createdAt = DateTime.fromEpochMilliseconds(row[columnMap[ProductSchema.CREATED_AT]!!] as Long),
-            updatedAt = (row[columnMap[ProductSchema.UPDATED_AT]!!] as? Long)?.let { DateTime.fromEpochMilliseconds(it) }
+            id = row[columnMap.getValue(ProductSchema.ID)]?.let { (it as Number).toLong() },
+            name = row[columnMap.getValue(ProductSchema.NAME)] as String,
+            description = row[columnMap.getValue(ProductSchema.DESCRIPTION)]?.let { it as String },
+            price = (row[columnMap.getValue(ProductSchema.PRICE)] as Number).toDouble(),
+            stock = (row[columnMap.getValue(ProductSchema.STOCK)] as Number).toLong(),
+            isAvailable = (row[columnMap.getValue(ProductSchema.IS_AVAILABLE)] as Number).toLong() == 1L,
+            categoryId = (row[columnMap.getValue(ProductSchema.CATEGORY_ID)] as Number).toLong(),
+            imageUrl = row[columnMap.getValue(ProductSchema.IMAGE_URL)]?.let { it as String },
+            createdAt = Instant.ofEpochMilli((row[columnMap.getValue(ProductSchema.CREATED_AT)] as Number).toLong()),
+            updatedAt = row[columnMap.getValue(ProductSchema.UPDATED_AT)]?.let { Instant.ofEpochMilli((it as Number).toLong()) }
         )
     }
 }

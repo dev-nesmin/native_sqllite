@@ -1,75 +1,64 @@
-import 'dart:js_interop';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter_web_plugins/flutter_web_plugins.dart';
 import 'package:native_sqlite_platform_interface/native_sqlite_platform_interface.dart';
-import 'package:sqlite3/sqlite3.dart' hide DatabaseConfig;
 import 'package:sqlite3/wasm.dart' hide DatabaseConfig;
-
-// JS interop bindings for IndexedDB deletion.
-@JS('window')
-external _JsWindow get _jsWindow;
-
-extension type _JsWindow._(JSObject _) implements JSObject {
-  external _JsIdbFactory? get indexedDB;
-}
-
-extension type _JsIdbFactory._(JSObject _) implements JSObject {
-  external JSObject deleteDatabase(String name);
-}
 
 /// The Web implementation of [NativeSqlitePlatform].
 ///
-/// Uses sqlite3 WASM to provide SQLite functionality in web browsers,
-/// leveraging IndexedDB for persistence through sqlite3's VFS.
+/// Runs SQLite compiled to WebAssembly (`web/sqlite3.wasm`, see the README)
+/// and persists database files in IndexedDB through sqlite3's
+/// [IndexedDbFileSystem]. Every write completes only after it is flushed to
+/// IndexedDB.
 class NativeSqliteWeb extends NativeSqlitePlatform {
-  /// A map of database names to their sqlite3 Database instances
-  final Map<String, Database> _databases = {};
+  /// Name of the IndexedDB database holding all SQLite files.
+  static const storageName = 'native_sqlite';
 
-  /// Whether the WASM sqlite3 has been initialized
-  static bool _initialized = false;
+  /// A map of database names to their open connections.
+  final Map<String, CommonDatabase> _databases = {};
+
+  Future<({WasmSqlite3 sqlite, IndexedDbFileSystem storage})>? _runtime;
 
   /// Registers this class as the default instance of [NativeSqlitePlatform]
   static void registerWith(Registrar registrar) {
     NativeSqlitePlatform.instance = NativeSqliteWeb();
   }
 
-  /// Initialize the sqlite3 WASM module
-  Future<void> _ensureInitialized() async {
-    if (_initialized) return;
-
-    try {
-      // Initialize sqlite3 WASM
-      // The sqlite3_web package automatically loads the WASM module
-      // from the correct location and sets up persistence
-      await WasmSqlite3.loadFromUrl(Uri.parse('sqlite3.wasm'));
-
-      _initialized = true;
-    } catch (e) {
-      throw Exception(
-        'Failed to initialize sqlite3 WASM: $e\n'
-        'Make sure your app is running in a modern browser with WASM support.',
-      );
-    }
+  /// Loads the WASM module and the IndexedDB file system once, shared by
+  /// concurrent first calls.
+  Future<({WasmSqlite3 sqlite, IndexedDbFileSystem storage})> _ensureInitialized() {
+    return _runtime ??= () async {
+      try {
+        final sqlite = await WasmSqlite3.loadFromUrl(Uri.parse('sqlite3.wasm'));
+        final storage = await IndexedDbFileSystem.open(dbName: storageName);
+        sqlite.registerVirtualFileSystem(storage, makeDefault: true);
+        return (sqlite: sqlite, storage: storage);
+      } catch (e) {
+        _runtime = null;
+        throw Exception(
+          'Failed to initialize sqlite3 WASM: $e\n'
+          'Make sure web/sqlite3.wasm exists (see the native_sqlite_web README) '
+          'and the browser supports WebAssembly and IndexedDB.',
+        );
+      }
+    }();
   }
+
+  static String _path(String databaseName) => '/$databaseName.db';
+
+  /// Waits until pending writes are stored in IndexedDB.
+  Future<void> _persist() async => (await _ensureInitialized()).storage.flush();
 
   @override
   Future<String> openDatabase(DatabaseConfig config) async {
-    await _ensureInitialized();
+    final runtime = await _ensureInitialized();
 
-    // Check if database is already open
-    if (_databases.containsKey(config.name)) {
-      return 'indexed_db://${config.name}.db';
-    }
+    // Reopening replaces the connection, as on Android and iOS, so a new
+    // config (e.g. a higher version) is applied.
+    await closeDatabase(config.name);
 
+    CommonDatabase? db;
     try {
-      // Open database with IndexedDB persistence
-      final db = sqlite3.open(config.name, mode: OpenMode.readWriteCreate);
-
-      // Configure database
-      if (config.enableForeignKeys) {
-        db.execute('PRAGMA foreign_keys = ON');
-      }
+      db = runtime.sqlite.open(_path(config.name));
 
       if (config.enableWAL) {
         if (kDebugMode) {
@@ -85,22 +74,30 @@ class NativeSqliteWeb extends NativeSqlitePlatform {
         }
       }
 
-      // Check if this is a new database (needs onCreate)
       final version = _getDatabaseVersion(db);
+      if (version > config.version) {
+        throw StateError(
+          'Database is at version $version, newer than the requested '
+          'version ${config.version}; downgrades are not supported.',
+        );
+      }
+      if (version == 0) {
+        _migrate(db, config.onCreate ?? const [], config.version);
+      } else if (version < config.version) {
+        _migrate(db, config.upgradeStatements(version), config.version);
+      }
 
-      if (version == 0 && config.onCreate != null) {
-        // New database - run onCreate statements
-        _executeInTransaction(db, config.onCreate!);
-        _setDatabaseVersion(db, config.version);
-      } else if (version < config.version && config.onUpgrade != null) {
-        // Database needs upgrade
-        _executeInTransaction(db, config.onUpgrade!);
-        _setDatabaseVersion(db, config.version);
+      // Enabled only after create/upgrade: table rebuilds during a migration
+      // must not trigger ON DELETE actions on child tables.
+      if (config.enableForeignKeys) {
+        db.execute('PRAGMA foreign_keys = ON');
       }
 
       _databases[config.name] = db;
+      await _persist();
       return 'indexed_db://${config.name}.db';
     } catch (e) {
+      db?.dispose();
       throw Exception('Failed to open database ${config.name}: $e');
     }
   }
@@ -128,16 +125,16 @@ class NativeSqliteWeb extends NativeSqlitePlatform {
     try {
       if (arguments == null || arguments.isEmpty) {
         db.execute(sql);
-        return db.lastInsertRowId;
       } else {
         final stmt = db.prepare(sql);
         try {
           stmt.execute(arguments);
-          return db.lastInsertRowId;
         } finally {
           stmt.dispose();
         }
       }
+      await _persist();
+      return db.updatedRows;
     } catch (e) {
       throw Exception('Failed to execute SQL: $e');
     }
@@ -199,7 +196,9 @@ class NativeSqliteWeb extends NativeSqlitePlatform {
       final stmt = db.prepare(sql);
       try {
         stmt.execute(values.values.toList());
-        return db.lastInsertRowId;
+        final id = db.lastInsertRowId;
+        await _persist();
+        return id;
       } finally {
         stmt.dispose();
       }
@@ -238,7 +237,9 @@ class NativeSqliteWeb extends NativeSqlitePlatform {
       final stmt = db.prepare(sql);
       try {
         stmt.execute(arguments);
-        return db.updatedRows;
+        final updated = db.updatedRows;
+        await _persist();
+        return updated;
       } finally {
         stmt.dispose();
       }
@@ -265,16 +266,17 @@ class NativeSqliteWeb extends NativeSqlitePlatform {
 
       if (whereArgs == null || whereArgs.isEmpty) {
         db.execute(sql);
-        return db.updatedRows;
       } else {
         final stmt = db.prepare(sql);
         try {
           stmt.execute(whereArgs);
-          return db.updatedRows;
         } finally {
           stmt.dispose();
         }
       }
+      final deleted = db.updatedRows;
+      await _persist();
+      return deleted;
     } catch (e) {
       throw Exception('Failed to delete from $table: $e');
     }
@@ -289,6 +291,7 @@ class NativeSqliteWeb extends NativeSqlitePlatform {
 
     try {
       _executeInTransaction(db, sqlStatements);
+      await _persist();
       return true;
     } catch (e) {
       throw Exception('Transaction failed: $e');
@@ -306,19 +309,17 @@ class NativeSqliteWeb extends NativeSqlitePlatform {
   @override
   Future<void> deleteDatabase(String databaseName) async {
     await closeDatabase(databaseName);
-
-    // Remove the persisted IndexedDB entry so the database does not
-    // reappear on the next page load.
-    try {
-      _jsWindow.indexedDB?.deleteDatabase(databaseName);
-    } catch (_) {
-      // Ignore — IndexedDB may not be available or the entry may not exist.
+    final storage = (await _ensureInitialized()).storage;
+    final path = _path(databaseName);
+    for (final file in [path, '$path-journal', '$path-wal']) {
+      if (storage.xAccess(file, 0) != 0) storage.xDelete(file, 0);
     }
+    await storage.flush();
   }
 
   // Helper methods
 
-  Database _getDatabase(String databaseName) {
+  CommonDatabase _getDatabase(String databaseName) {
     final db = _databases[databaseName];
     if (db == null) {
       throw Exception('Database $databaseName is not open');
@@ -326,7 +327,7 @@ class NativeSqliteWeb extends NativeSqlitePlatform {
     return db;
   }
 
-  int _getDatabaseVersion(Database db) {
+  int _getDatabaseVersion(CommonDatabase db) {
     try {
       final result = db.select('PRAGMA user_version');
       if (result.isNotEmpty) {
@@ -338,11 +339,36 @@ class NativeSqliteWeb extends NativeSqlitePlatform {
     return 0;
   }
 
-  void _setDatabaseVersion(Database db, int version) {
+  void _setDatabaseVersion(CommonDatabase db, int version) {
     db.execute('PRAGMA user_version = $version');
   }
 
-  void _executeInTransaction(Database db, List<String> statements) {
+  /// Runs [statements] and sets [version] atomically, with foreign keys
+  /// disabled, failing if the result violates a foreign key. Mirrors the
+  /// Android and iOS implementations.
+  void _migrate(CommonDatabase db, List<String> statements, int version) {
+    db.execute('PRAGMA foreign_keys = OFF');
+    db.execute('BEGIN IMMEDIATE');
+    try {
+      for (final sql in statements) {
+        db.execute(sql);
+      }
+      final violations = db.select('PRAGMA foreign_key_check');
+      if (violations.isNotEmpty) {
+        throw StateError(
+          'Migration to version $version left ${violations.length} '
+          'foreign key violation(s), first: ${violations.first}',
+        );
+      }
+      _setDatabaseVersion(db, version);
+      db.execute('COMMIT');
+    } catch (_) {
+      db.execute('ROLLBACK');
+      rethrow;
+    }
+  }
+
+  void _executeInTransaction(CommonDatabase db, List<String> statements) {
     db.execute('BEGIN TRANSACTION');
     try {
       for (final sql in statements) {

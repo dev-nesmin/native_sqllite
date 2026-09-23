@@ -19,11 +19,25 @@ This package is automatically selected when your Flutter app runs on iOS — you
 Running `dart run native_sqlite_generator` produces Swift files in the path configured by `native_sqlite_config.yaml`:
 
 ```
-UserSchema.swift            ← column-name constants and CREATE TABLE SQL
-UserHelper.swift            ← insert/query helpers for direct Swift use
-SchemaVersionManager.swift  ← reads and writes PRAGMA user_version
-Migration_X_Y.swift         ← migration stub (addColumn, renameTable, migrateTableData helpers)
+UserSchema.swift                    ← column-name constants, CREATE TABLE and index SQL
+UserHelper.swift                    ← typed `User` struct and CRUD/query helper
+UserStatus.swift                    ← one file per Dart enum used by a model
+NativeSqliteGeneratedSupport.swift  ← row decoding shared by the helpers
+DatabaseManager.swift               ← opens and migrates the database exactly like DatabaseManager.dart
 ```
+
+The files `import native_sqlite_ios`. Add the output folder to the Runner
+target once as a **synchronized folder** (Xcode 16+: drag
+`ios/Runner/Generated` into the Runner group, choose "Create folders"), so
+files added or removed by later builds are picked up automatically.
+
+Call `try DatabaseManager.shared.initialize()` before using the helpers from
+native code (background tasks, extensions). If Flutter already opened the
+database, the open connection is reused.
+
+## Requirements
+
+- iOS 13+. Works with both CocoaPods and Swift Package Manager.
 
 ---
 

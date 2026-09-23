@@ -1,6 +1,9 @@
+@file:Suppress("UNCHECKED_CAST")
+
 package com.example.native_sqlite_example.generated
 
 import dev.nesmin.native_sqlite.NativeSqliteManager
+import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -10,10 +13,13 @@ import java.util.concurrent.ConcurrentHashMap
 data class StyledItem(
     val id: Long? = null,
     val name: String,
-    val backgroundColor: Any,
-    val textColor: Any?,
+    /** Raw value stored by the Dart TypeConverter for `Color`. */
+    val backgroundColor: Long,
+    /** Raw value stored by the Dart TypeConverter for `Color?`. */
+    val textColor: Long? = null,
+    /** Raw value stored by the Dart TypeConverter for `List<String>`. */
     val tags: String,
-    val createdAt: Long
+    val createdAt: Instant
 )
 
 /**
@@ -85,8 +91,8 @@ class StyledItemHelper(private val databaseName: String) {
             StyledItemSchema.NAME to entity.name,
             StyledItemSchema.BACKGROUND_COLOR to entity.backgroundColor,
             StyledItemSchema.TEXT_COLOR to entity.textColor,
-            StyledItemSchema.TAGS to Json.encodeToString(entity.tags),
-            StyledItemSchema.CREATED_AT to entity.createdAt.toEpochMilliseconds()
+            StyledItemSchema.TAGS to entity.tags,
+            StyledItemSchema.CREATED_AT to entity.createdAt.toEpochMilli()
         )
         return NativeSqliteManager.Instance.insert(databaseName, StyledItemSchema.TABLE_NAME, values)
     }
@@ -122,8 +128,8 @@ class StyledItemHelper(private val databaseName: String) {
             StyledItemSchema.NAME to entity.name,
             StyledItemSchema.BACKGROUND_COLOR to entity.backgroundColor,
             StyledItemSchema.TEXT_COLOR to entity.textColor,
-            StyledItemSchema.TAGS to Json.encodeToString(entity.tags),
-            StyledItemSchema.CREATED_AT to entity.createdAt.toEpochMilliseconds()
+            StyledItemSchema.TAGS to entity.tags,
+            StyledItemSchema.CREATED_AT to entity.createdAt.toEpochMilli()
         )
         return NativeSqliteManager.Instance.update(
             databaseName,
@@ -360,12 +366,12 @@ class StyledItemHelper(private val databaseName: String) {
 
     private fun fromRow(columnMap: Map<String, Int>, row: List<Any?>): StyledItem {
         return StyledItem(
-            id = row[columnMap[StyledItemSchema.ID]!!] as Long?,
-            name = row[columnMap[StyledItemSchema.NAME]!!] as String,
-            backgroundColor = row[columnMap[StyledItemSchema.BACKGROUND_COLOR]!!],
-            textColor = row[columnMap[StyledItemSchema.TEXT_COLOR]!!],
-            tags = Json.decodeFromString(row[columnMap[StyledItemSchema.TAGS]!!] as String),
-            createdAt = DateTime.fromEpochMilliseconds(row[columnMap[StyledItemSchema.CREATED_AT]!!] as Long)
+            id = row[columnMap.getValue(StyledItemSchema.ID)]?.let { (it as Number).toLong() },
+            name = row[columnMap.getValue(StyledItemSchema.NAME)] as String,
+            backgroundColor = (row[columnMap.getValue(StyledItemSchema.BACKGROUND_COLOR)] as Number).toLong(),
+            textColor = row[columnMap.getValue(StyledItemSchema.TEXT_COLOR)]?.let { (it as Number).toLong() },
+            tags = row[columnMap.getValue(StyledItemSchema.TAGS)] as String,
+            createdAt = Instant.ofEpochMilli((row[columnMap.getValue(StyledItemSchema.CREATED_AT)] as Number).toLong())
         )
     }
 }

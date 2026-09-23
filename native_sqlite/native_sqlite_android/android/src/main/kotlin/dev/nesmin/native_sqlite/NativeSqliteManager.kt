@@ -55,18 +55,8 @@ open class NativeSqliteManager {
             }
 
             val helper = DatabaseHelper(appContext, config)
-            helpers[config.name] = helper
             val db = helper.writableDatabase
-
-            // Enable WAL mode if requested
-            if (config.enableWAL) {
-                db.enableWriteAheadLogging()
-            }
-
-            // Enable foreign keys if requested
-            if (config.enableForeignKeys) {
-                db.execSQL("PRAGMA foreign_keys = ON")
-            }
+            helpers[config.name] = helper
 
             databases[config.name] = db
             return db.path
@@ -293,16 +283,28 @@ open class NativeSqliteManager {
         private val config: DatabaseConfig
     ) : SQLiteOpenHelper(context, "${config.name}.db", null, config.version) {
 
+        init {
+            setWriteAheadLoggingEnabled(config.enableWAL)
+        }
+
+        // onCreate/onUpgrade run inside SQLiteOpenHelper's transaction with
+        // foreign keys still disabled, so table rebuilds can't cascade.
         override fun onCreate(db: SQLiteDatabase) {
-            config.onCreate?.forEach { sql ->
-                db.execSQL(sql)
-            }
+            config.onCreate?.forEach { sql -> db.execSQL(sql) }
         }
 
         override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-            config.onUpgrade?.forEach { sql ->
-                db.execSQL(sql)
+            config.upgradeStatements(oldVersion).forEach { sql -> db.execSQL(sql) }
+            db.rawQuery("PRAGMA foreign_key_check", null).use { cursor ->
+                check(!cursor.moveToFirst()) {
+                    "Migration to version $newVersion left ${cursor.count} foreign key violation(s)"
+                }
             }
+        }
+
+        override fun onOpen(db: SQLiteDatabase) {
+            // After create/upgrade; applies to every pooled connection.
+            if (config.enableForeignKeys) db.setForeignKeyConstraintsEnabled(true)
         }
     }
 }

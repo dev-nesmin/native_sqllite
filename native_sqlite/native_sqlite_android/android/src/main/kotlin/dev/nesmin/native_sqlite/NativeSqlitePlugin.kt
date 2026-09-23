@@ -134,16 +134,10 @@ class NativeSqlitePlugin(
             onCreate = (map["onCreate"] as? List<*>)?.filterIsInstance<String>(),
             onUpgrade = (map["onUpgrade"] as? List<*>)?.filterIsInstance<String>(),
             enableWAL = (map["enableWAL"] as? Boolean) ?: true,
-            enableForeignKeys = (map["enableForeignKeys"] as? Boolean) ?: true
+            enableForeignKeys = (map["enableForeignKeys"] as? Boolean) ?: true,
+            migrations = (map["migrations"] as? Map<*, *>)?.entries?.associate { (version, sql) ->
+                (version as Number).toInt() to (sql as List<*>).filterIsInstance<String>()
+            }
         )
     }
 }
-
-data class DatabaseConfig(
-    val name: String,
-    val version: Int,
-    val onCreate: List<String>?,
-    val onUpgrade: List<String>?,
-    val enableWAL: Boolean,
-    val enableForeignKeys: Boolean
-)

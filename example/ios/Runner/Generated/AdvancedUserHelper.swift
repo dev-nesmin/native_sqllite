@@ -1,41 +1,42 @@
 import Foundation
+import native_sqlite_ios
 
 /**
  * Struct for AdvancedUser.
  * AUTO-GENERATED from Dart - DO NOT EDIT MANUALLY
  */
 public struct AdvancedUser {
-    public let id: Int?
+    public let id: Int64?
     public let name: String
     public let phoneNumber: String?
     public let address: String?
     public let country: String?
     public let zipCode: String?
-    public let age: Int?
+    public let age: Int64?
     public let city: String?
-    public let loginDuration: Any?
-    public let profileUrl: Any?
-    public let score: Any?
-    public let status: Any
-    public let priority: Any?
-    public let createdAt: Int
+    public let loginDuration: TimeInterval?
+    public let profileUrl: URL?
+    public let score: Double?
+    public let status: UserStatus
+    public let priority: Priority?
+    public let createdAt: Date
     public let isVerified: Bool
 
     public init(
-        id: Int? = nil,
+        id: Int64? = nil,
         name: String,
-        phoneNumber: String?,
-        address: String?,
-        country: String?,
-        zipCode: String?,
-        age: Int?,
-        city: String?,
-        loginDuration: Any?,
-        profileUrl: Any?,
-        score: Any?,
-        status: Any,
-        priority: Any?,
-        createdAt: Int,
+        phoneNumber: String? = nil,
+        address: String? = nil,
+        country: String? = nil,
+        zipCode: String? = nil,
+        age: Int64? = nil,
+        city: String? = nil,
+        loginDuration: TimeInterval? = nil,
+        profileUrl: URL? = nil,
+        score: Double? = nil,
+        status: UserStatus,
+        priority: Priority? = nil,
+        createdAt: Date,
         isVerified: Bool
     ) {
         self.id = id
@@ -114,7 +115,7 @@ public class AdvancedUserHelper {
      */
     public static func cleanupIsolate(isolateId: Int64) {
         isolateQueue.sync {
-            isolateInstances.removeValue(forKey: isolateId)
+            _ = isolateInstances.removeValue(forKey: isolateId)
         }
     }
 
@@ -135,25 +136,26 @@ public class AdvancedUserHelper {
     }
 
     public func insert(_ entity: AdvancedUser) throws -> Int64 {
-        var values: [String: Any] = [:]
-        values[AdvancedUserSchema.name] = entity.name
-        values[AdvancedUserSchema.phoneNumber] = entity.phoneNumber ?? NSNull()
-        values[AdvancedUserSchema.address] = entity.address ?? NSNull()
-        values[AdvancedUserSchema.country] = entity.country ?? NSNull()
-        values[AdvancedUserSchema.zipCode] = entity.zipCode ?? NSNull()
-        values[AdvancedUserSchema.age] = entity.age ?? NSNull()
-        values[AdvancedUserSchema.city] = entity.city ?? NSNull()
-        values[AdvancedUserSchema.loginDuration] = entity.loginDuration ?? NSNull()
-        values[AdvancedUserSchema.profileUrl] = entity.profileUrl ?? NSNull()
-        values[AdvancedUserSchema.score] = entity.score ?? NSNull()
-        values[AdvancedUserSchema.status] = entity.status
-        values[AdvancedUserSchema.priority] = entity.priority ?? NSNull()
-        values[AdvancedUserSchema.createdAt] = Int(entity.createdAt.timeIntervalSince1970 * 1000)
-        values[AdvancedUserSchema.isVerified] = entity.isVerified ? 1 : 0
+        let values: [String: Any?] = [
+            AdvancedUserSchema.name: entity.name,
+            AdvancedUserSchema.phoneNumber: entity.phoneNumber,
+            AdvancedUserSchema.address: entity.address,
+            AdvancedUserSchema.country: entity.country,
+            AdvancedUserSchema.zipCode: entity.zipCode,
+            AdvancedUserSchema.age: entity.age,
+            AdvancedUserSchema.city: entity.city,
+            AdvancedUserSchema.loginDuration: entity.loginDuration.map { GeneratedValue.milliseconds($0) },
+            AdvancedUserSchema.profileUrl: entity.profileUrl.map { $0.absoluteString },
+            AdvancedUserSchema.score: entity.score,
+            AdvancedUserSchema.status: entity.status.ordinal,
+            AdvancedUserSchema.priority: entity.priority.map { $0.rawValue },
+            AdvancedUserSchema.createdAt: GeneratedValue.milliseconds(entity.createdAt),
+            AdvancedUserSchema.isVerified: (entity.isVerified ? Int64(1) : Int64(0)),
+        ]
         return try manager.insert(name: databaseName, table: AdvancedUserSchema.tableName, values: values)
     }
 
-    public func findById(_ id: Int) throws -> AdvancedUser? {
+    public func findById(_ id: Int64) throws -> AdvancedUser? {
         let result = try manager.query(
             name: databaseName,
             sql: "SELECT * FROM \(AdvancedUserSchema.tableName) WHERE \(AdvancedUserSchema.id) = ? LIMIT 1",
@@ -167,7 +169,7 @@ public class AdvancedUserHelper {
         for (index, column) in columns.enumerated() {
             columnMap[column] = index
         }
-        return fromRow(columnMap: columnMap, row: rows[0])
+        return try fromRow(columnMap: columnMap, row: rows[0])
     }
 
     public func findAll() throws -> [AdvancedUser] {
@@ -180,7 +182,7 @@ public class AdvancedUserHelper {
         for (index, column) in columns.enumerated() {
             columnMap[column] = index
         }
-        return rows.map { fromRow(columnMap: columnMap, row: $0) }
+        return try rows.map { try fromRow(columnMap: columnMap, row: $0) }
     }
 
     /**
@@ -190,21 +192,22 @@ public class AdvancedUserHelper {
      * - Throws: Database errors
      */
     public func update(_ entity: AdvancedUser) throws -> Int {
-        var values: [String: Any] = [:]
-        values[AdvancedUserSchema.name] = entity.name
-        values[AdvancedUserSchema.phoneNumber] = entity.phoneNumber ?? NSNull()
-        values[AdvancedUserSchema.address] = entity.address ?? NSNull()
-        values[AdvancedUserSchema.country] = entity.country ?? NSNull()
-        values[AdvancedUserSchema.zipCode] = entity.zipCode ?? NSNull()
-        values[AdvancedUserSchema.age] = entity.age ?? NSNull()
-        values[AdvancedUserSchema.city] = entity.city ?? NSNull()
-        values[AdvancedUserSchema.loginDuration] = entity.loginDuration ?? NSNull()
-        values[AdvancedUserSchema.profileUrl] = entity.profileUrl ?? NSNull()
-        values[AdvancedUserSchema.score] = entity.score ?? NSNull()
-        values[AdvancedUserSchema.status] = entity.status
-        values[AdvancedUserSchema.priority] = entity.priority ?? NSNull()
-        values[AdvancedUserSchema.createdAt] = Int(entity.createdAt.timeIntervalSince1970 * 1000)
-        values[AdvancedUserSchema.isVerified] = entity.isVerified ? 1 : 0
+        let values: [String: Any?] = [
+            AdvancedUserSchema.name: entity.name,
+            AdvancedUserSchema.phoneNumber: entity.phoneNumber,
+            AdvancedUserSchema.address: entity.address,
+            AdvancedUserSchema.country: entity.country,
+            AdvancedUserSchema.zipCode: entity.zipCode,
+            AdvancedUserSchema.age: entity.age,
+            AdvancedUserSchema.city: entity.city,
+            AdvancedUserSchema.loginDuration: entity.loginDuration.map { GeneratedValue.milliseconds($0) },
+            AdvancedUserSchema.profileUrl: entity.profileUrl.map { $0.absoluteString },
+            AdvancedUserSchema.score: entity.score,
+            AdvancedUserSchema.status: entity.status.ordinal,
+            AdvancedUserSchema.priority: entity.priority.map { $0.rawValue },
+            AdvancedUserSchema.createdAt: GeneratedValue.milliseconds(entity.createdAt),
+            AdvancedUserSchema.isVerified: (entity.isVerified ? Int64(1) : Int64(0)),
+        ]
         return try manager.update(
             name: databaseName,
             table: AdvancedUserSchema.tableName,
@@ -222,7 +225,7 @@ public class AdvancedUserHelper {
      * - Returns: Number of rows affected
      * - Throws: Database errors
      */
-    public func updatePartial(id: Int, updates: [String: Any]) throws -> Int {
+    public func updatePartial(id: Int64, updates: [String: Any?]) throws -> Int {
         return try manager.update(
             name: databaseName,
             table: AdvancedUserSchema.tableName,
@@ -238,7 +241,7 @@ public class AdvancedUserHelper {
      * - Returns: Number of rows deleted
      * - Throws: Database errors
      */
-    public func delete(id: Int) throws -> Int {
+    public func delete(id: Int64) throws -> Int {
         return try manager.delete(
             name: databaseName,
             table: AdvancedUserSchema.tableName,
@@ -273,15 +276,15 @@ public class AdvancedUserHelper {
     public func insertBatch(_ entities: [AdvancedUser]) throws -> [Int64] {
         var results: [Int64] = []
         
-        try manager.execute(name: databaseName, sql: "BEGIN TRANSACTION")
+        _ = try manager.execute(name: databaseName, sql: "BEGIN TRANSACTION")
         do {
             for entity in entities {
                 let id = try insert(entity)
                 results.append(id)
             }
-            try manager.execute(name: databaseName, sql: "COMMIT")
+            _ = try manager.execute(name: databaseName, sql: "COMMIT")
         } catch {
-            try? manager.execute(name: databaseName, sql: "ROLLBACK")
+            _ = try? manager.execute(name: databaseName, sql: "ROLLBACK")
             throw error
         }
         return results
@@ -296,14 +299,14 @@ public class AdvancedUserHelper {
     public func updateBatch(_ entities: [AdvancedUser]) throws -> Int {
         var totalAffected = 0
         
-        try manager.execute(name: databaseName, sql: "BEGIN TRANSACTION")
+        _ = try manager.execute(name: databaseName, sql: "BEGIN TRANSACTION")
         do {
             for entity in entities {
                 totalAffected += try update(entity)
             }
-            try manager.execute(name: databaseName, sql: "COMMIT")
+            _ = try manager.execute(name: databaseName, sql: "COMMIT")
         } catch {
-            try? manager.execute(name: databaseName, sql: "ROLLBACK")
+            _ = try? manager.execute(name: databaseName, sql: "ROLLBACK")
             throw error
         }
         return totalAffected
@@ -315,17 +318,17 @@ public class AdvancedUserHelper {
      * - Returns: Total number of rows deleted
      * - Throws: Database errors
      */
-    public func deleteBatch(ids: [Int]) throws -> Int {
+    public func deleteBatch(ids: [Int64]) throws -> Int {
         var totalDeleted = 0
         
-        try manager.execute(name: databaseName, sql: "BEGIN TRANSACTION")
+        _ = try manager.execute(name: databaseName, sql: "BEGIN TRANSACTION")
         do {
             for id in ids {
                 totalDeleted += try delete(id: id)
             }
-            try manager.execute(name: databaseName, sql: "COMMIT")
+            _ = try manager.execute(name: databaseName, sql: "COMMIT")
         } catch {
-            try? manager.execute(name: databaseName, sql: "ROLLBACK")
+            _ = try? manager.execute(name: databaseName, sql: "ROLLBACK")
             throw error
         }
         return totalDeleted
@@ -371,7 +374,7 @@ public class AdvancedUserHelper {
         for (index, column) in columns.enumerated() {
             columnMap[column] = index
         }
-        return rows.map { fromRow(columnMap: columnMap, row: $0) }
+        return try rows.map { try fromRow(columnMap: columnMap, row: $0) }
     }
 
     /**
@@ -415,7 +418,7 @@ public class AdvancedUserHelper {
         }
         let result = try manager.query(name: databaseName, sql: sql, arguments: whereArgs)
         guard let rows = result["rows"] as? [[Any?]] else { return nil }
-        return rows.first?.first
+        return rows.first?.first ?? nil
     }
 
     /**
@@ -436,7 +439,7 @@ public class AdvancedUserHelper {
         }
         let result = try manager.query(name: databaseName, sql: sql, arguments: whereArgs)
         guard let rows = result["rows"] as? [[Any?]] else { return nil }
-        return rows.first?.first
+        return rows.first?.first ?? nil
     }
 
     /**
@@ -481,23 +484,24 @@ public class AdvancedUserHelper {
         return rows.first?.first as? Double
     }
 
-    private func fromRow(columnMap: [String: Int], row: [Any?]) -> AdvancedUser {
+    private func fromRow(columnMap: [String: Int], row values: [Any?]) throws -> AdvancedUser {
+        let row = GeneratedRow(columnMap: columnMap, values: values)
         return AdvancedUser(
-            id: row[columnMap[AdvancedUserSchema.id]!] as? Int,
-            name: row[columnMap[AdvancedUserSchema.name]!] as! String,
-            phoneNumber: row[columnMap[AdvancedUserSchema.phoneNumber]!] as? String,
-            address: row[columnMap[AdvancedUserSchema.address]!] as? String,
-            country: row[columnMap[AdvancedUserSchema.country]!] as? String,
-            zipCode: row[columnMap[AdvancedUserSchema.zipCode]!] as? String,
-            age: row[columnMap[AdvancedUserSchema.age]!] as? Int,
-            city: row[columnMap[AdvancedUserSchema.city]!] as? String,
-            loginDuration: row[columnMap[AdvancedUserSchema.loginDuration]!],
-            profileUrl: row[columnMap[AdvancedUserSchema.profileUrl]!],
-            score: row[columnMap[AdvancedUserSchema.score]!],
-            status: row[columnMap[AdvancedUserSchema.status]!],
-            priority: row[columnMap[AdvancedUserSchema.priority]!],
-            createdAt: Date(timeIntervalSince1970: TimeInterval(row[columnMap[AdvancedUserSchema.createdAt]!] as! Int) / 1000),
-            isVerified: (row[columnMap[AdvancedUserSchema.isVerified]!] as! Int) == 1
+            id: try row.optional(AdvancedUserSchema.id, GeneratedValue.int64, expected: "Int64"),
+            name: try row.required(AdvancedUserSchema.name, GeneratedValue.string, expected: "String"),
+            phoneNumber: try row.optional(AdvancedUserSchema.phoneNumber, GeneratedValue.string, expected: "String"),
+            address: try row.optional(AdvancedUserSchema.address, GeneratedValue.string, expected: "String"),
+            country: try row.optional(AdvancedUserSchema.country, GeneratedValue.string, expected: "String"),
+            zipCode: try row.optional(AdvancedUserSchema.zipCode, GeneratedValue.string, expected: "String"),
+            age: try row.optional(AdvancedUserSchema.age, GeneratedValue.int64, expected: "Int64"),
+            city: try row.optional(AdvancedUserSchema.city, GeneratedValue.string, expected: "String"),
+            loginDuration: try row.optional(AdvancedUserSchema.loginDuration, GeneratedValue.timeInterval, expected: "TimeInterval"),
+            profileUrl: try row.optional(AdvancedUserSchema.profileUrl, GeneratedValue.url, expected: "URL"),
+            score: try row.optional(AdvancedUserSchema.score, GeneratedValue.double, expected: "Double"),
+            status: try row.required(AdvancedUserSchema.status, { GeneratedValue.int64($0).flatMap(UserStatus.init(ordinal:)) }, expected: "UserStatus"),
+            priority: try row.optional(AdvancedUserSchema.priority, { GeneratedValue.string($0).flatMap(Priority.init(rawValue:)) }, expected: "Priority"),
+            createdAt: try row.required(AdvancedUserSchema.createdAt, GeneratedValue.date, expected: "Date"),
+            isVerified: try row.required(AdvancedUserSchema.isVerified, GeneratedValue.bool, expected: "Bool")
         )
     }
 }

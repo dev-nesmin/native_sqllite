@@ -14,25 +14,17 @@ public enum ProductSchema {
     public static let description = "description"
     public static let price = "price"
     public static let stock = "stock"
-    public static let isAvailable = "isAvailable"
-    public static let categoryId = "categoryId"
-    public static let imageUrl = "imageUrl"
-    public static let createdAt = "createdAt"
-    public static let updatedAt = "updatedAt"
+    public static let isAvailable = "is_available"
+    public static let categoryId = "category_id"
+    public static let imageUrl = "image_url"
+    public static let createdAt = "created_at"
+    public static let updatedAt = "updated_at"
 
-    // CREATE TABLE SQL
-    public static let createTableSql = """
-        CREATE TABLE products (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            description TEXT,
-            price REAL NOT NULL,
-            stock INTEGER NOT NULL,
-            isAvailable INTEGER NOT NULL,
-            categoryId INTEGER NOT NULL,
-            imageUrl TEXT,
-            createdAt INTEGER NOT NULL,
-            updatedAt INTEGER
-        )
-        """
+    // Same statements as the Dart ProductSchema
+    public static let createTableSql = "CREATE TABLE products (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, description TEXT, price REAL NOT NULL, stock INTEGER NOT NULL DEFAULT 0, is_available INTEGER NOT NULL DEFAULT 1, category_id INTEGER NOT NULL, image_url TEXT, created_at INTEGER NOT NULL, updated_at INTEGER, FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE ON UPDATE CASCADE)"
+
+    public static let indexSql: [String] = [
+        "CREATE INDEX idx_products_category_id_price ON products (category_id, price)",
+        "CREATE INDEX idx_products_name ON products (name)",
+    ]
 }

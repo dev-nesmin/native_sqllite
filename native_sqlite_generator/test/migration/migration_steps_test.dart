@@ -16,7 +16,7 @@ void main() {
       jsonEncode({
         'schemaVersion': version,
         if (!legacy) 'migrationFormat': migrationFormat,
-        'schemas': [],
+        'schemas': <Object?>[],
         'migrations': [
           {'tableName': 't', 'sql': sql},
         ],

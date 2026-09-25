@@ -126,47 +126,9 @@ class NamingConventions {
 
   // Helper: Split string into words
   static List<String> _splitIntoWords(String input) {
-    // First, split by underscore
-    var words = input.split('_').where((w) => w.isNotEmpty).toList();
-
-    // Then split each word by capital letters
-    final result = <String>[];
-    for (final word in words) {
-      result.addAll(_splitCamelCase(word));
-    }
-
-    return result.where((w) => w.isNotEmpty).toList();
-  }
-
-  // Helper: Split camelCase/PascalCase into words
-  static List<String> _splitCamelCase(String input) {
-    if (input.isEmpty) return [];
-
-    final words = <String>[];
-    final currentWord = StringBuffer();
-
-    for (int i = 0; i < input.length; i++) {
-      final char = input[i];
-
-      if (char == char.toUpperCase() && currentWord.isNotEmpty) {
-        // Check if this is part of an acronym
-        final isAcronym =
-            i < input.length - 1 && input[i + 1] == input[i + 1].toUpperCase();
-
-        if (!isAcronym || i == input.length - 1) {
-          words.add(currentWord.toString());
-          currentWord.clear();
-        }
-      }
-
-      currentWord.write(char);
-    }
-
-    if (currentWord.isNotEmpty) {
-      words.add(currentWord.toString());
-    }
-
-    return words;
+    return toSnakeCase(
+      input,
+    ).split('_').where((word) => word.isNotEmpty).toList();
   }
 
   // Helper: Capitalize first letter

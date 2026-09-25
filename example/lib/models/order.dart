@@ -2,6 +2,10 @@ import 'package:native_sqlite/native_sqlite.dart';
 
 part 'order.table.dart';
 
+const Object _unset = Object();
+
+enum OrderStatus { pending, processing, shipped, delivered, cancelled }
+
 /// Order model demonstrating:
 /// - Multiple foreign key relationships
 /// - String with specific values (status)
@@ -41,9 +45,10 @@ class Order {
   @DbColumn(nullable: false)
   final double totalPrice;
 
-  /// Status can be: pending, processing, shipped, delivered, cancelled
+  /// Stable text storage keeps persisted values safe if enum values reorder.
+  @EnumField(type: EnumType.name)
   @DbColumn(nullable: false, defaultValue: "'pending'")
-  final String status;
+  final OrderStatus status;
 
   @DbColumn(nullable: true)
   final String? notes;
@@ -63,7 +68,7 @@ class Order {
     required this.productId,
     required this.quantity,
     required this.totalPrice,
-    this.status = 'pending',
+    this.status = OrderStatus.pending,
     this.notes,
     DateTime? createdAt,
     this.updatedAt,
@@ -76,11 +81,11 @@ class Order {
     int? productId,
     int? quantity,
     double? totalPrice,
-    String? status,
-    String? notes,
+    OrderStatus? status,
+    Object? notes = _unset,
     DateTime? createdAt,
-    DateTime? updatedAt,
-    DateTime? deliveredAt,
+    Object? updatedAt = _unset,
+    Object? deliveredAt = _unset,
   }) {
     return Order(
       id: id ?? this.id,
@@ -89,10 +94,14 @@ class Order {
       quantity: quantity ?? this.quantity,
       totalPrice: totalPrice ?? this.totalPrice,
       status: status ?? this.status,
-      notes: notes ?? this.notes,
+      notes: identical(notes, _unset) ? this.notes : notes as String?,
       createdAt: createdAt ?? this.createdAt,
-      updatedAt: updatedAt ?? this.updatedAt,
-      deliveredAt: deliveredAt ?? this.deliveredAt,
+      updatedAt: identical(updatedAt, _unset)
+          ? this.updatedAt
+          : updatedAt as DateTime?,
+      deliveredAt: identical(deliveredAt, _unset)
+          ? this.deliveredAt
+          : deliveredAt as DateTime?,
     );
   }
 

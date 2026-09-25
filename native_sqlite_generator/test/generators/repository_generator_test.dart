@@ -11,7 +11,7 @@ void main() {
       await testBuilder(
         tableBuilder(BuilderOptions({})),
         {
-          ...mockAnnotationsPackage,
+          ...realAnnotationsPackage,
           'a|lib/test_user.dart': '''
 import 'package:native_sqlite_annotations/native_sqlite_annotations.dart';
 
@@ -46,7 +46,7 @@ class TestUser {
       await testBuilder(
         tableBuilder(BuilderOptions({})),
         {
-          ...mockAnnotationsPackage,
+          ...realAnnotationsPackage,
           'a|lib/test_product.dart': '''
 import 'package:native_sqlite_annotations/native_sqlite_annotations.dart';
 
@@ -77,7 +77,7 @@ class TestProduct {
       await testBuilder(
         tableBuilder(BuilderOptions({})),
         {
-          ...mockAnnotationsPackage,
+          ...realAnnotationsPackage,
           'a|lib/test_category.dart': '''
 import 'package:native_sqlite_annotations/native_sqlite_annotations.dart';
 
@@ -101,11 +101,11 @@ class TestCategory {
       );
     });
 
-    test('constructor accepts optional databaseName parameter', () async {
+    test('constructor requires a database handle', () async {
       await testBuilder(
         tableBuilder(BuilderOptions({})),
         {
-          ...mockAnnotationsPackage,
+          ...realAnnotationsPackage,
           'a|lib/test_tag.dart': '''
 import 'package:native_sqlite_annotations/native_sqlite_annotations.dart';
 
@@ -123,17 +123,17 @@ class TestTag {
         },
         outputs: {
           'a|lib/test_tag.table.dart': decodedMatches(
-            contains('TestTagRepository('),
+            contains('const TestTagRepository(this.database);'),
           ),
         },
       );
     });
 
-    test('generates _fromMap private deserializer', () async {
+    test('generates one shared row deserializer', () async {
       await testBuilder(
         tableBuilder(BuilderOptions({})),
         {
-          ...mockAnnotationsPackage,
+          ...realAnnotationsPackage,
           'a|lib/test_note.dart': '''
 import 'package:native_sqlite_annotations/native_sqlite_annotations.dart';
 
@@ -151,7 +151,11 @@ class TestNote {
         },
         outputs: {
           'a|lib/test_note.table.dart': decodedMatches(
-            contains('_fromMap('),
+            predicate<String>(
+              (output) =>
+                  'TestNote _TestNoteFromMap('.allMatches(output).length == 1,
+              'contains exactly one shared TestNote row mapper',
+            ),
           ),
         },
       );
@@ -161,7 +165,7 @@ class TestNote {
       await testBuilder(
         tableBuilder(BuilderOptions({})),
         {
-          ...mockAnnotationsPackage,
+          ...realAnnotationsPackage,
           'a|lib/test_order.dart': '''
 import 'package:native_sqlite_annotations/native_sqlite_annotations.dart';
 

@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:native_sqlite/native_sqlite.dart';
 
 part 'profile.table.dart';
@@ -45,7 +43,6 @@ class Profile {
   @DbColumn(name: 'email')
   final String email;
 
-  /// New field for testing migration
   @DbColumn(name: 'phone_number')
   final String? phoneNumber;
 

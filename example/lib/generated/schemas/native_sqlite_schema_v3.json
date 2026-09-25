@@ -1,0 +1,1070 @@
+{
+  "version": "1.0.0",
+  "schemaVersion": 3,
+  "schemas": [
+    {
+      "className": "AdvancedUser",
+      "tableName": "advanced_users",
+      "columns": [
+        {
+          "dartName": "id",
+          "name": "id",
+          "type": "INTEGER",
+          "nullable": true,
+          "primaryKey": true,
+          "autoIncrement": true,
+          "unique": false,
+          "isJsonField": false,
+          "hasConverter": false,
+          "dartType": "int?"
+        },
+        {
+          "dartName": "name",
+          "name": "name",
+          "type": "TEXT",
+          "nullable": false,
+          "primaryKey": false,
+          "autoIncrement": false,
+          "unique": false,
+          "isJsonField": false,
+          "hasConverter": false,
+          "dartType": "String"
+        },
+        {
+          "dartName": "phoneNumber",
+          "name": "phone_number",
+          "type": "TEXT",
+          "nullable": true,
+          "primaryKey": false,
+          "autoIncrement": false,
+          "unique": false,
+          "isJsonField": false,
+          "hasConverter": false,
+          "dartType": "String?"
+        },
+        {
+          "dartName": "address",
+          "name": "address",
+          "type": "TEXT",
+          "nullable": true,
+          "primaryKey": false,
+          "autoIncrement": false,
+          "unique": false,
+          "isJsonField": false,
+          "hasConverter": false,
+          "dartType": "String?"
+        },
+        {
+          "dartName": "country",
+          "name": "country",
+          "type": "TEXT",
+          "nullable": true,
+          "primaryKey": false,
+          "autoIncrement": false,
+          "unique": false,
+          "isJsonField": false,
+          "hasConverter": false,
+          "dartType": "String?"
+        },
+        {
+          "dartName": "zipCode",
+          "name": "zip_code",
+          "type": "TEXT",
+          "nullable": true,
+          "primaryKey": false,
+          "autoIncrement": false,
+          "unique": false,
+          "isJsonField": false,
+          "hasConverter": false,
+          "dartType": "String?"
+        },
+        {
+          "dartName": "age",
+          "name": "age",
+          "type": "INTEGER",
+          "nullable": true,
+          "primaryKey": false,
+          "autoIncrement": false,
+          "unique": false,
+          "isJsonField": false,
+          "hasConverter": false,
+          "dartType": "int?"
+        },
+        {
+          "dartName": "city",
+          "name": "city",
+          "type": "TEXT",
+          "nullable": true,
+          "primaryKey": false,
+          "autoIncrement": false,
+          "unique": false,
+          "isJsonField": false,
+          "hasConverter": false,
+          "dartType": "String?"
+        },
+        {
+          "dartName": "loginDuration",
+          "name": "login_duration",
+          "type": "INTEGER",
+          "nullable": true,
+          "primaryKey": false,
+          "autoIncrement": false,
+          "unique": false,
+          "isJsonField": false,
+          "hasConverter": false,
+          "dartType": "Duration?"
+        },
+        {
+          "dartName": "profileUrl",
+          "name": "profile_url",
+          "type": "TEXT",
+          "nullable": true,
+          "primaryKey": false,
+          "autoIncrement": false,
+          "unique": false,
+          "isJsonField": false,
+          "hasConverter": false,
+          "dartType": "Uri?"
+        },
+        {
+          "dartName": "score",
+          "name": "score",
+          "type": "REAL",
+          "nullable": true,
+          "primaryKey": false,
+          "autoIncrement": false,
+          "unique": false,
+          "isJsonField": false,
+          "hasConverter": false,
+          "dartType": "num?"
+        },
+        {
+          "dartName": "status",
+          "name": "status",
+          "type": "INTEGER",
+          "nullable": false,
+          "primaryKey": false,
+          "autoIncrement": false,
+          "unique": false,
+          "isJsonField": false,
+          "hasConverter": false,
+          "dartType": "UserStatus",
+          "enumType": "ordinal",
+          "enumValues": [
+            "active",
+            "inactive",
+            "suspended"
+          ]
+        },
+        {
+          "dartName": "priority",
+          "name": "priority",
+          "type": "TEXT",
+          "nullable": true,
+          "primaryKey": false,
+          "autoIncrement": false,
+          "unique": false,
+          "isJsonField": false,
+          "hasConverter": false,
+          "dartType": "Priority?",
+          "enumType": "name",
+          "enumValues": [
+            "low",
+            "medium",
+            "high",
+            "urgent"
+          ]
+        },
+        {
+          "dartName": "createdAt",
+          "name": "created_at",
+          "type": "INTEGER",
+          "nullable": false,
+          "primaryKey": false,
+          "autoIncrement": false,
+          "unique": false,
+          "isJsonField": false,
+          "hasConverter": false,
+          "dartType": "DateTime"
+        },
+        {
+          "dartName": "isVerified",
+          "name": "is_verified",
+          "type": "INTEGER",
+          "nullable": false,
+          "primaryKey": false,
+          "autoIncrement": false,
+          "unique": false,
+          "isJsonField": false,
+          "hasConverter": false,
+          "dartType": "bool"
+        }
+      ],
+      "indexes": [],
+      "version": 1,
+      "hash": "3801c8cd35a3b3fd"
+    },
+    {
+      "className": "Category",
+      "tableName": "categories",
+      "columns": [
+        {
+          "dartName": "id",
+          "name": "id",
+          "type": "INTEGER",
+          "nullable": true,
+          "primaryKey": true,
+          "autoIncrement": true,
+          "unique": false,
+          "isJsonField": false,
+          "hasConverter": false,
+          "dartType": "int?"
+        },
+        {
+          "dartName": "name",
+          "name": "name",
+          "type": "TEXT",
+          "nullable": false,
+          "primaryKey": false,
+          "autoIncrement": false,
+          "unique": true,
+          "isJsonField": false,
+          "hasConverter": false,
+          "dartType": "String"
+        },
+        {
+          "dartName": "description",
+          "name": "description",
+          "type": "TEXT",
+          "nullable": true,
+          "primaryKey": false,
+          "autoIncrement": false,
+          "unique": false,
+          "isJsonField": false,
+          "hasConverter": false,
+          "dartType": "String?"
+        },
+        {
+          "dartName": "createdAt",
+          "name": "created_at",
+          "type": "INTEGER",
+          "nullable": false,
+          "primaryKey": false,
+          "autoIncrement": false,
+          "unique": false,
+          "isJsonField": false,
+          "hasConverter": false,
+          "dartType": "DateTime"
+        }
+      ],
+      "indexes": [],
+      "version": 1,
+      "hash": "597a49d50ddc2976"
+    },
+    {
+      "className": "FreezedAdvancedUser",
+      "tableName": "freezed_advanced_users",
+      "columns": [
+        {
+          "dartName": "id",
+          "name": "id",
+          "type": "INTEGER",
+          "nullable": true,
+          "primaryKey": true,
+          "autoIncrement": true,
+          "unique": false,
+          "isJsonField": false,
+          "hasConverter": false,
+          "dartType": "int?"
+        },
+        {
+          "dartName": "name",
+          "name": "name",
+          "type": "TEXT",
+          "nullable": false,
+          "primaryKey": false,
+          "autoIncrement": false,
+          "unique": false,
+          "isJsonField": false,
+          "hasConverter": false,
+          "dartType": "String"
+        },
+        {
+          "dartName": "loginDuration",
+          "name": "login_duration",
+          "type": "INTEGER",
+          "nullable": true,
+          "primaryKey": false,
+          "autoIncrement": false,
+          "unique": false,
+          "isJsonField": false,
+          "hasConverter": false,
+          "dartType": "Duration?"
+        },
+        {
+          "dartName": "profileUrl",
+          "name": "profile_url",
+          "type": "TEXT",
+          "nullable": true,
+          "primaryKey": false,
+          "autoIncrement": false,
+          "unique": false,
+          "isJsonField": false,
+          "hasConverter": false,
+          "dartType": "Uri?"
+        },
+        {
+          "dartName": "status",
+          "name": "status",
+          "type": "INTEGER",
+          "nullable": false,
+          "primaryKey": false,
+          "autoIncrement": false,
+          "unique": false,
+          "isJsonField": false,
+          "hasConverter": false,
+          "dartType": "UserStatus",
+          "enumType": "ordinal",
+          "enumValues": [
+            "active",
+            "inactive",
+            "suspended"
+          ]
+        },
+        {
+          "dartName": "priority",
+          "name": "priority",
+          "type": "INTEGER",
+          "nullable": true,
+          "primaryKey": false,
+          "autoIncrement": false,
+          "unique": false,
+          "isJsonField": false,
+          "hasConverter": false,
+          "dartType": "Priority?",
+          "enumType": "ordinal",
+          "enumValues": [
+            "low",
+            "medium",
+            "high",
+            "urgent"
+          ]
+        },
+        {
+          "dartName": "createdAt",
+          "name": "created_at",
+          "type": "INTEGER",
+          "nullable": false,
+          "primaryKey": false,
+          "autoIncrement": false,
+          "unique": false,
+          "isJsonField": false,
+          "hasConverter": false,
+          "dartType": "DateTime"
+        },
+        {
+          "dartName": "isVerified",
+          "name": "is_verified",
+          "type": "INTEGER",
+          "nullable": false,
+          "primaryKey": false,
+          "autoIncrement": false,
+          "unique": false,
+          "isJsonField": false,
+          "hasConverter": false,
+          "dartType": "bool"
+        }
+      ],
+      "indexes": [],
+      "version": 1,
+      "hash": "0a9b9854974a3609"
+    },
+    {
+      "className": "Note",
+      "tableName": "notes",
+      "columns": [
+        {
+          "dartName": "id",
+          "name": "id",
+          "type": "TEXT",
+          "nullable": true,
+          "primaryKey": true,
+          "autoIncrement": false,
+          "useLocalUuid": true,
+          "unique": false,
+          "isJsonField": false,
+          "hasConverter": false,
+          "dartType": "String?"
+        },
+        {
+          "dartName": "body",
+          "name": "body",
+          "type": "TEXT",
+          "nullable": false,
+          "primaryKey": false,
+          "autoIncrement": false,
+          "unique": false,
+          "isJsonField": false,
+          "hasConverter": false,
+          "dartType": "String"
+        }
+      ],
+      "indexes": [],
+      "version": 1,
+      "hash": "2f451a9e416e978c"
+    },
+    {
+      "className": "Order",
+      "tableName": "orders",
+      "columns": [
+        {
+          "dartName": "id",
+          "name": "id",
+          "type": "INTEGER",
+          "nullable": true,
+          "primaryKey": true,
+          "autoIncrement": true,
+          "unique": false,
+          "isJsonField": false,
+          "hasConverter": false,
+          "dartType": "int?"
+        },
+        {
+          "dartName": "userId",
+          "name": "user_id",
+          "type": "INTEGER",
+          "nullable": false,
+          "primaryKey": false,
+          "autoIncrement": false,
+          "unique": false,
+          "foreignKey": "users.id",
+          "foreignKeyOnDelete": "CASCADE",
+          "foreignKeyOnUpdate": "CASCADE",
+          "isJsonField": false,
+          "hasConverter": false,
+          "dartType": "int"
+        },
+        {
+          "dartName": "productId",
+          "name": "product_id",
+          "type": "INTEGER",
+          "nullable": false,
+          "primaryKey": false,
+          "autoIncrement": false,
+          "unique": false,
+          "foreignKey": "products.id",
+          "foreignKeyOnDelete": "CASCADE",
+          "foreignKeyOnUpdate": "CASCADE",
+          "isJsonField": false,
+          "hasConverter": false,
+          "dartType": "int"
+        },
+        {
+          "dartName": "quantity",
+          "name": "quantity",
+          "type": "INTEGER",
+          "nullable": false,
+          "primaryKey": false,
+          "autoIncrement": false,
+          "unique": false,
+          "isJsonField": false,
+          "hasConverter": false,
+          "dartType": "int"
+        },
+        {
+          "dartName": "totalPrice",
+          "name": "total_price",
+          "type": "REAL",
+          "nullable": false,
+          "primaryKey": false,
+          "autoIncrement": false,
+          "unique": false,
+          "isJsonField": false,
+          "hasConverter": false,
+          "dartType": "double"
+        },
+        {
+          "dartName": "status",
+          "name": "status",
+          "type": "TEXT",
+          "nullable": false,
+          "primaryKey": false,
+          "autoIncrement": false,
+          "unique": false,
+          "defaultValue": "'pending'",
+          "isJsonField": false,
+          "hasConverter": false,
+          "dartType": "String"
+        },
+        {
+          "dartName": "notes",
+          "name": "notes",
+          "type": "TEXT",
+          "nullable": true,
+          "primaryKey": false,
+          "autoIncrement": false,
+          "unique": false,
+          "isJsonField": false,
+          "hasConverter": false,
+          "dartType": "String?"
+        },
+        {
+          "dartName": "createdAt",
+          "name": "created_at",
+          "type": "INTEGER",
+          "nullable": false,
+          "primaryKey": false,
+          "autoIncrement": false,
+          "unique": false,
+          "isJsonField": false,
+          "hasConverter": false,
+          "dartType": "DateTime"
+        },
+        {
+          "dartName": "updatedAt",
+          "name": "updated_at",
+          "type": "INTEGER",
+          "nullable": true,
+          "primaryKey": false,
+          "autoIncrement": false,
+          "unique": false,
+          "isJsonField": false,
+          "hasConverter": false,
+          "dartType": "DateTime?"
+        },
+        {
+          "dartName": "deliveredAt",
+          "name": "delivered_at",
+          "type": "INTEGER",
+          "nullable": true,
+          "primaryKey": false,
+          "autoIncrement": false,
+          "unique": false,
+          "isJsonField": false,
+          "hasConverter": false,
+          "dartType": "DateTime?"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            "user_id",
+            "created_at"
+          ],
+          "unique": false,
+          "name": "idx_orders_user_id_created_at"
+        },
+        {
+          "columns": [
+            "status"
+          ],
+          "unique": false,
+          "name": "idx_orders_status"
+        }
+      ],
+      "version": 1,
+      "hash": "ac9195fc6537bec2"
+    },
+    {
+      "className": "Product",
+      "tableName": "products",
+      "columns": [
+        {
+          "dartName": "id",
+          "name": "id",
+          "type": "INTEGER",
+          "nullable": true,
+          "primaryKey": true,
+          "autoIncrement": true,
+          "unique": false,
+          "isJsonField": false,
+          "hasConverter": false,
+          "dartType": "int?"
+        },
+        {
+          "dartName": "name",
+          "name": "name",
+          "type": "TEXT",
+          "nullable": false,
+          "primaryKey": false,
+          "autoIncrement": false,
+          "unique": false,
+          "isJsonField": false,
+          "hasConverter": false,
+          "dartType": "String"
+        },
+        {
+          "dartName": "description",
+          "name": "description",
+          "type": "TEXT",
+          "nullable": true,
+          "primaryKey": false,
+          "autoIncrement": false,
+          "unique": false,
+          "isJsonField": false,
+          "hasConverter": false,
+          "dartType": "String?"
+        },
+        {
+          "dartName": "price",
+          "name": "price",
+          "type": "REAL",
+          "nullable": false,
+          "primaryKey": false,
+          "autoIncrement": false,
+          "unique": false,
+          "isJsonField": false,
+          "hasConverter": false,
+          "dartType": "double"
+        },
+        {
+          "dartName": "stock",
+          "name": "stock",
+          "type": "INTEGER",
+          "nullable": false,
+          "primaryKey": false,
+          "autoIncrement": false,
+          "unique": false,
+          "defaultValue": "0",
+          "isJsonField": false,
+          "hasConverter": false,
+          "dartType": "int"
+        },
+        {
+          "dartName": "isAvailable",
+          "name": "is_available",
+          "type": "INTEGER",
+          "nullable": false,
+          "primaryKey": false,
+          "autoIncrement": false,
+          "unique": false,
+          "defaultValue": "1",
+          "isJsonField": false,
+          "hasConverter": false,
+          "dartType": "bool"
+        },
+        {
+          "dartName": "categoryId",
+          "name": "category_id",
+          "type": "INTEGER",
+          "nullable": false,
+          "primaryKey": false,
+          "autoIncrement": false,
+          "unique": false,
+          "foreignKey": "categories.id",
+          "foreignKeyOnDelete": "CASCADE",
+          "foreignKeyOnUpdate": "CASCADE",
+          "isJsonField": false,
+          "hasConverter": false,
+          "dartType": "int"
+        },
+        {
+          "dartName": "imageUrl",
+          "name": "image_url",
+          "type": "TEXT",
+          "nullable": true,
+          "primaryKey": false,
+          "autoIncrement": false,
+          "unique": false,
+          "isJsonField": false,
+          "hasConverter": false,
+          "dartType": "String?"
+        },
+        {
+          "dartName": "createdAt",
+          "name": "created_at",
+          "type": "INTEGER",
+          "nullable": false,
+          "primaryKey": false,
+          "autoIncrement": false,
+          "unique": false,
+          "isJsonField": false,
+          "hasConverter": false,
+          "dartType": "DateTime"
+        },
+        {
+          "dartName": "updatedAt",
+          "name": "updated_at",
+          "type": "INTEGER",
+          "nullable": true,
+          "primaryKey": false,
+          "autoIncrement": false,
+          "unique": false,
+          "isJsonField": false,
+          "hasConverter": false,
+          "dartType": "DateTime?"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            "category_id",
+            "price"
+          ],
+          "unique": false,
+          "name": "idx_products_category_id_price"
+        },
+        {
+          "columns": [
+            "name"
+          ],
+          "unique": false,
+          "name": "idx_products_name"
+        }
+      ],
+      "version": 1,
+      "hash": "0fa1685353d84e79"
+    },
+    {
+      "className": "Profile",
+      "tableName": "profiles",
+      "columns": [
+        {
+          "dartName": "id",
+          "name": "id",
+          "type": "INTEGER",
+          "nullable": true,
+          "primaryKey": true,
+          "autoIncrement": true,
+          "unique": false,
+          "isJsonField": false,
+          "hasConverter": false,
+          "dartType": "int?"
+        },
+        {
+          "dartName": "name",
+          "name": "name",
+          "type": "TEXT",
+          "nullable": false,
+          "primaryKey": false,
+          "autoIncrement": false,
+          "unique": false,
+          "isJsonField": false,
+          "hasConverter": false,
+          "dartType": "String"
+        },
+        {
+          "dartName": "email",
+          "name": "email",
+          "type": "TEXT",
+          "nullable": false,
+          "primaryKey": false,
+          "autoIncrement": false,
+          "unique": false,
+          "isJsonField": false,
+          "hasConverter": false,
+          "dartType": "String"
+        },
+        {
+          "dartName": "phoneNumber",
+          "name": "phone_number",
+          "type": "TEXT",
+          "nullable": true,
+          "primaryKey": false,
+          "autoIncrement": false,
+          "unique": false,
+          "isJsonField": false,
+          "hasConverter": false,
+          "dartType": "String?"
+        },
+        {
+          "dartName": "settings",
+          "name": "settings",
+          "type": "TEXT",
+          "nullable": true,
+          "primaryKey": false,
+          "autoIncrement": false,
+          "unique": false,
+          "isJsonField": true,
+          "hasConverter": false,
+          "dartType": "Map<String, dynamic>?"
+        },
+        {
+          "dartName": "tags",
+          "name": "tags",
+          "type": "TEXT",
+          "nullable": true,
+          "primaryKey": false,
+          "autoIncrement": false,
+          "unique": false,
+          "isJsonField": true,
+          "hasConverter": false,
+          "dartType": "List<String>?"
+        },
+        {
+          "dartName": "address",
+          "name": "address",
+          "type": "TEXT",
+          "nullable": true,
+          "primaryKey": false,
+          "autoIncrement": false,
+          "unique": false,
+          "isJsonField": true,
+          "hasConverter": false,
+          "dartType": "Address?"
+        },
+        {
+          "dartName": "addresses",
+          "name": "addresses",
+          "type": "TEXT",
+          "nullable": true,
+          "primaryKey": false,
+          "autoIncrement": false,
+          "unique": false,
+          "isJsonField": true,
+          "hasConverter": false,
+          "dartType": "List<Address>?"
+        },
+        {
+          "dartName": "metadata",
+          "name": "metadata",
+          "type": "TEXT",
+          "nullable": false,
+          "primaryKey": false,
+          "autoIncrement": false,
+          "unique": false,
+          "isJsonField": true,
+          "hasConverter": false,
+          "dartType": "dynamic"
+        }
+      ],
+      "indexes": [],
+      "version": 1,
+      "hash": "b1a7078a24e7c1a5"
+    },
+    {
+      "className": "StyledItem",
+      "tableName": "styled_items",
+      "columns": [
+        {
+          "dartName": "id",
+          "name": "id",
+          "type": "INTEGER",
+          "nullable": true,
+          "primaryKey": true,
+          "autoIncrement": true,
+          "unique": false,
+          "isJsonField": false,
+          "hasConverter": false,
+          "dartType": "int?"
+        },
+        {
+          "dartName": "name",
+          "name": "name",
+          "type": "TEXT",
+          "nullable": false,
+          "primaryKey": false,
+          "autoIncrement": false,
+          "unique": false,
+          "isJsonField": false,
+          "hasConverter": false,
+          "dartType": "String"
+        },
+        {
+          "dartName": "backgroundColor",
+          "name": "background_color",
+          "type": "INTEGER",
+          "nullable": false,
+          "primaryKey": false,
+          "autoIncrement": false,
+          "unique": false,
+          "isJsonField": false,
+          "hasConverter": true,
+          "dartType": "Color"
+        },
+        {
+          "dartName": "textColor",
+          "name": "text_color",
+          "type": "INTEGER",
+          "nullable": true,
+          "primaryKey": false,
+          "autoIncrement": false,
+          "unique": false,
+          "isJsonField": false,
+          "hasConverter": true,
+          "dartType": "Color?"
+        },
+        {
+          "dartName": "tags",
+          "name": "tags",
+          "type": "TEXT",
+          "nullable": false,
+          "primaryKey": false,
+          "autoIncrement": false,
+          "unique": false,
+          "isJsonField": false,
+          "hasConverter": true,
+          "dartType": "List<String>"
+        },
+        {
+          "dartName": "createdAt",
+          "name": "created_at",
+          "type": "INTEGER",
+          "nullable": false,
+          "primaryKey": false,
+          "autoIncrement": false,
+          "unique": false,
+          "isJsonField": false,
+          "hasConverter": false,
+          "dartType": "DateTime"
+        }
+      ],
+      "indexes": [],
+      "version": 1,
+      "hash": "92e8efd0e2753161"
+    },
+    {
+      "className": "User",
+      "tableName": "users",
+      "columns": [
+        {
+          "dartName": "id",
+          "name": "id",
+          "type": "INTEGER",
+          "nullable": true,
+          "primaryKey": true,
+          "autoIncrement": true,
+          "unique": false,
+          "isJsonField": false,
+          "hasConverter": false,
+          "dartType": "int?"
+        },
+        {
+          "dartName": "name",
+          "name": "name",
+          "type": "TEXT",
+          "nullable": false,
+          "primaryKey": false,
+          "autoIncrement": false,
+          "unique": false,
+          "isJsonField": false,
+          "hasConverter": false,
+          "dartType": "String"
+        },
+        {
+          "dartName": "email",
+          "name": "email",
+          "type": "TEXT",
+          "nullable": false,
+          "primaryKey": false,
+          "autoIncrement": false,
+          "unique": true,
+          "isJsonField": false,
+          "hasConverter": false,
+          "dartType": "String"
+        },
+        {
+          "dartName": "phoneNumber",
+          "name": "phone_number",
+          "type": "TEXT",
+          "nullable": true,
+          "primaryKey": false,
+          "autoIncrement": false,
+          "unique": false,
+          "isJsonField": false,
+          "hasConverter": false,
+          "dartType": "String?"
+        },
+        {
+          "dartName": "address",
+          "name": "address",
+          "type": "TEXT",
+          "nullable": true,
+          "primaryKey": false,
+          "autoIncrement": false,
+          "unique": false,
+          "isJsonField": false,
+          "hasConverter": false,
+          "dartType": "String?"
+        },
+        {
+          "dartName": "age",
+          "name": "age",
+          "type": "INTEGER",
+          "nullable": false,
+          "primaryKey": false,
+          "autoIncrement": false,
+          "unique": false,
+          "defaultValue": "1",
+          "isJsonField": false,
+          "hasConverter": false,
+          "dartType": "int"
+        },
+        {
+          "dartName": "isActive",
+          "name": "is_active",
+          "type": "INTEGER",
+          "nullable": false,
+          "primaryKey": false,
+          "autoIncrement": false,
+          "unique": false,
+          "defaultValue": "1",
+          "isJsonField": false,
+          "hasConverter": false,
+          "dartType": "bool"
+        },
+        {
+          "dartName": "createdAt",
+          "name": "created_at",
+          "type": "INTEGER",
+          "nullable": false,
+          "primaryKey": false,
+          "autoIncrement": false,
+          "unique": false,
+          "isJsonField": false,
+          "hasConverter": false,
+          "dartType": "DateTime"
+        },
+        {
+          "dartName": "updatedAt",
+          "name": "updated_at",
+          "type": "INTEGER",
+          "nullable": true,
+          "primaryKey": false,
+          "autoIncrement": false,
+          "unique": false,
+          "isJsonField": false,
+          "hasConverter": false,
+          "dartType": "DateTime?"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            "email"
+          ],
+          "unique": false,
+          "name": "idx_users_email"
+        },
+        {
+          "columns": [
+            "created_at"
+          ],
+          "unique": false,
+          "name": "idx_users_created_at"
+        },
+        {
+          "columns": [
+            "phone_number"
+          ],
+          "unique": true,
+          "name": "idx_users_phone"
+        }
+      ],
+      "version": 2,
+      "hash": "fda79b8da7736a32"
+    }
+  ],
+  "deletedTables": [],
+  "migrationFormat": 2,
+  "migrations": [
+    {
+      "tableName": "users",
+      "className": "User",
+      "sql": [
+        "CREATE UNIQUE INDEX \"idx_users_phone\" ON \"users\" (\"phone_number\")"
+      ],
+      "summary": "Created index idx_users_phone"
+    }
+  ]
+}

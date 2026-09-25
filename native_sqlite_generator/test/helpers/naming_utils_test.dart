@@ -65,6 +65,11 @@ void main() {
       expect(NamingUtils.toPascalCase('userName'), 'UserName');
     });
 
+    test('normalizes trailing acronyms', () {
+      expect(NamingUtils.toPascalCase('userID'), 'UserId');
+      expect(NamingUtils.toPascalCase('requestURLValue'), 'RequestUrlValue');
+    });
+
     test('preserves existing PascalCase', () {
       expect(NamingUtils.toPascalCase('UserName'), 'UserName');
     });
@@ -119,7 +124,10 @@ void main() {
     });
 
     test('works with multi-word class names', () {
-      expect(NamingUtils.getSchemaClassName('UserProfile'), 'UserProfileSchema');
+      expect(
+        NamingUtils.getSchemaClassName('UserProfile'),
+        'UserProfileSchema',
+      );
     });
   });
 

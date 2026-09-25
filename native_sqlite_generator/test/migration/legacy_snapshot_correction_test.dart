@@ -21,13 +21,8 @@ TableSchemaSnapshot _table(
   String tableName,
   List<ColumnSchemaSnapshot> columns, {
   List<IndexSchemaSnapshot> indexes = const [],
-}) => TableSchemaSnapshot.fromTableInfo(
-  'Order',
-  tableName,
-  columns,
-  indexes,
-  1,
-);
+}) =>
+    TableSchemaSnapshot.fromTableInfo('Order', tableName, columns, indexes, 1);
 
 String _hash(Map<String, dynamic> json) {
   final s = TableSchemaSnapshot.fromJson(json);
@@ -53,16 +48,18 @@ void main() {
     final legacy = _table(
       'orders',
       [_col('id', 'id', pk: true), _col('userId', 'userId')],
-      indexes: [const IndexSchemaSnapshot(columns: ['userId'], unique: false)],
+      indexes: [
+        const IndexSchemaSnapshot(columns: ['userId'], unique: false),
+      ],
     ).toJson();
 
     final result = correction.correct(legacy, current);
 
     expect(result.changed, isTrue);
-    expect(
-      (result.schema['columns'] as List).map((c) => c['name']),
-      ['id', 'user_id'],
-    );
+    expect((result.schema['columns'] as List).map((c) => c['name']), [
+      'id',
+      'user_id',
+    ]);
     expect((result.schema['indexes'] as List).single['columns'], ['user_id']);
     // Corrected snapshot equals the current schema: no migration is generated.
     expect(_hash(result.schema), current.hash);

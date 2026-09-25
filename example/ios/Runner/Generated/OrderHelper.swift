@@ -11,7 +11,7 @@ public struct Order {
     public let productId: Int64
     public let quantity: Int64
     public let totalPrice: Double
-    public let status: String
+    public let status: OrderStatus
     public let notes: String?
     public let createdAt: Date
     public let updatedAt: Date?
@@ -23,7 +23,7 @@ public struct Order {
         productId: Int64,
         quantity: Int64,
         totalPrice: Double,
-        status: String,
+        status: OrderStatus,
         notes: String? = nil,
         createdAt: Date,
         updatedAt: Date? = nil,
@@ -45,7 +45,7 @@ public struct Order {
 /**
  * Helper class for Order CRUD operations.
  * AUTO-GENERATED from Dart - DO NOT EDIT MANUALLY
- * Thread-safe for multi-isolate access.
+ * Create an instance for each native caller/database.
  *
  * Example usage (single isolate):
  * ```
@@ -53,68 +53,10 @@ public struct Order {
  * let id = try helper.insert(Order(...))
  * let item = try helper.findById(id)
  * ```
- *
- * Example usage (multi-isolate safe):
- * ```
- * // In BGTaskScheduler or background isolate
- * let isolateId = Int64(pthread_self())
- * let helper = OrderHelper.getInstance(databaseName: "example_app", isolateId: isolateId)
- * let users = try helper.findAll()
- * // When done, cleanup:
- * OrderHelper.cleanupIsolate(isolateId: isolateId)
- * ```
  */
 public class OrderHelper {
     private let databaseName: String
     private let manager = NativeSqliteManager.shared
-
-    // Track helper instances per isolate for thread safety
-    private static var isolateInstances = [Int64: OrderHelper]()
-    private static let isolateQueue = DispatchQueue(label: "OrderHelper.isolate")
-
-    /**
-     * Get or create helper instance for the given isolate.
-     * Safe to call from different Dart isolates or native threads.
-     *
-     * - Parameters:
-     *   - databaseName: Name of the database
-     *   - isolateId: Unique identifier for the isolate/thread
-     * - Returns: Helper instance for this isolate
-     */
-    public static func getInstance(databaseName: String, isolateId: Int64) -> OrderHelper {
-        return isolateQueue.sync {
-            if let existing = isolateInstances[isolateId] {
-                return existing
-            }
-            let helper = OrderHelper(databaseName: databaseName)
-            isolateInstances[isolateId] = helper
-            return helper
-        }
-    }
-
-    /**
-     * Cleanup resources for a specific isolate.
-     * Call this when an isolate is being destroyed.
-     *
-     * - Parameter isolateId: The isolate ID to cleanup
-     */
-    public static func cleanupIsolate(isolateId: Int64) {
-        isolateQueue.sync {
-            _ = isolateInstances.removeValue(forKey: isolateId)
-        }
-    }
-
-    /**
-     * Get all active isolate IDs currently using this helper.
-     * Useful for debugging.
-     *
-     * - Returns: Set of active isolate IDs
-     */
-    public static func getActiveIsolates() -> Set<Int64> {
-        return isolateQueue.sync {
-            return Set(isolateInstances.keys)
-        }
-    }
 
     public init(databaseName: String) {
         self.databaseName = databaseName
@@ -126,7 +68,7 @@ public class OrderHelper {
             OrderSchema.productId: entity.productId,
             OrderSchema.quantity: entity.quantity,
             OrderSchema.totalPrice: entity.totalPrice,
-            OrderSchema.status: entity.status,
+            OrderSchema.status: entity.status.rawValue,
             OrderSchema.notes: entity.notes,
             OrderSchema.createdAt: GeneratedValue.milliseconds(entity.createdAt),
             OrderSchema.updatedAt: entity.updatedAt.map { GeneratedValue.milliseconds($0) },
@@ -138,7 +80,7 @@ public class OrderHelper {
     public func findById(_ id: Int64) throws -> Order? {
         let result = try manager.query(
             name: databaseName,
-            sql: "SELECT * FROM \(OrderSchema.tableName) WHERE \(OrderSchema.id) = ? LIMIT 1",
+            sql: "SELECT * FROM \(NativeSqliteManager.quoteIdentifier(OrderSchema.tableName)) WHERE \(NativeSqliteManager.quoteIdentifier(OrderSchema.id)) = ? LIMIT 1",
             arguments: [id]
         )
         guard let rows = result["rows"] as? [[Any?]], !rows.isEmpty,
@@ -153,7 +95,7 @@ public class OrderHelper {
     }
 
     public func findAll() throws -> [Order] {
-        let result = try manager.query(name: databaseName, sql: "SELECT * FROM \(OrderSchema.tableName)")
+        let result = try manager.query(name: databaseName, sql: "SELECT * FROM \(NativeSqliteManager.quoteIdentifier(OrderSchema.tableName))")
         guard let rows = result["rows"] as? [[Any?]],
               let columns = result["columns"] as? [String] else {
             return []
@@ -177,7 +119,7 @@ public class OrderHelper {
             OrderSchema.productId: entity.productId,
             OrderSchema.quantity: entity.quantity,
             OrderSchema.totalPrice: entity.totalPrice,
-            OrderSchema.status: entity.status,
+            OrderSchema.status: entity.status.rawValue,
             OrderSchema.notes: entity.notes,
             OrderSchema.createdAt: GeneratedValue.milliseconds(entity.createdAt),
             OrderSchema.updatedAt: entity.updatedAt.map { GeneratedValue.milliseconds($0) },
@@ -227,6 +169,7 @@ public class OrderHelper {
 
     /**
      * Delete entities matching a WHERE clause.
+     * Important: `whereClause` is trusted SQL. Never pass user input; use `whereArgs` for values.
      * - Parameters:
      *   - whereClause: SQL WHERE clause (without "WHERE" keyword)
      *   - whereArgs: Arguments for the WHERE clause
@@ -311,6 +254,7 @@ public class OrderHelper {
 
     /**
      * Find entities matching a WHERE clause with optional ordering and limit.
+     * Important: `whereClause` and `orderBy` are trusted SQL. Never pass user input; use `whereArgs` for values.
      * - Parameters:
      *   - whereClause: SQL WHERE clause (without "WHERE" keyword)
      *   - whereArgs: Arguments for the WHERE clause
@@ -327,7 +271,7 @@ public class OrderHelper {
         limit: Int? = nil,
         offset: Int? = nil
     ) throws -> [Order] {
-        var sql = "SELECT * FROM \(OrderSchema.tableName)"
+        var sql = "SELECT * FROM \(NativeSqliteManager.quoteIdentifier(OrderSchema.tableName))"
         if let whereClause = whereClause {
             sql += " WHERE \(whereClause)"
         }
@@ -336,6 +280,8 @@ public class OrderHelper {
         }
         if let limit = limit {
             sql += " LIMIT \(limit)"
+        } else if offset != nil {
+            sql += " LIMIT -1"
         }
         if let offset = offset {
             sql += " OFFSET \(offset)"
@@ -354,6 +300,7 @@ public class OrderHelper {
 
     /**
      * Count entities matching a WHERE clause.
+     * Important: `whereClause` is trusted SQL. Never pass user input; use `whereArgs` for values.
      * - Parameters:
      *   - whereClause: SQL WHERE clause (without "WHERE" keyword)
      *   - whereArgs: Arguments for the WHERE clause
@@ -363,9 +310,9 @@ public class OrderHelper {
     public func count(whereClause: String? = nil, whereArgs: [Any?]? = nil) throws -> Int64 {
         let sql: String
         if let whereClause = whereClause {
-            sql = "SELECT COUNT(*) FROM \(OrderSchema.tableName) WHERE \(whereClause)"
+            sql = "SELECT COUNT(*) FROM \(NativeSqliteManager.quoteIdentifier(OrderSchema.tableName)) WHERE \(whereClause)"
         } else {
-            sql = "SELECT COUNT(*) FROM \(OrderSchema.tableName)"
+            sql = "SELECT COUNT(*) FROM \(NativeSqliteManager.quoteIdentifier(OrderSchema.tableName))"
         }
         let result = try manager.query(name: databaseName, sql: sql, arguments: whereArgs)
         guard let rows = result["rows"] as? [[Any?]],
@@ -377,6 +324,7 @@ public class OrderHelper {
 
     /**
      * Get the maximum value of a column.
+     * Important: `whereClause` is trusted SQL. Never pass user input; use `whereArgs` for values.
      * - Parameters:
      *   - column: Column name to get max value from
      *   - whereClause: Optional WHERE clause
@@ -387,9 +335,9 @@ public class OrderHelper {
     public func max(column: String, whereClause: String? = nil, whereArgs: [Any?]? = nil) throws -> Any? {
         let sql: String
         if let whereClause = whereClause {
-            sql = "SELECT MAX(\(column)) FROM \(OrderSchema.tableName) WHERE \(whereClause)"
+            sql = "SELECT MAX(\(NativeSqliteManager.quoteIdentifier(column))) FROM \(NativeSqliteManager.quoteIdentifier(OrderSchema.tableName)) WHERE \(whereClause)"
         } else {
-            sql = "SELECT MAX(\(column)) FROM \(OrderSchema.tableName)"
+            sql = "SELECT MAX(\(NativeSqliteManager.quoteIdentifier(column))) FROM \(NativeSqliteManager.quoteIdentifier(OrderSchema.tableName))"
         }
         let result = try manager.query(name: databaseName, sql: sql, arguments: whereArgs)
         guard let rows = result["rows"] as? [[Any?]] else { return nil }
@@ -398,6 +346,7 @@ public class OrderHelper {
 
     /**
      * Get the minimum value of a column.
+     * Important: `whereClause` is trusted SQL. Never pass user input; use `whereArgs` for values.
      * - Parameters:
      *   - column: Column name to get min value from
      *   - whereClause: Optional WHERE clause
@@ -408,9 +357,9 @@ public class OrderHelper {
     public func min(column: String, whereClause: String? = nil, whereArgs: [Any?]? = nil) throws -> Any? {
         let sql: String
         if let whereClause = whereClause {
-            sql = "SELECT MIN(\(column)) FROM \(OrderSchema.tableName) WHERE \(whereClause)"
+            sql = "SELECT MIN(\(NativeSqliteManager.quoteIdentifier(column))) FROM \(NativeSqliteManager.quoteIdentifier(OrderSchema.tableName)) WHERE \(whereClause)"
         } else {
-            sql = "SELECT MIN(\(column)) FROM \(OrderSchema.tableName)"
+            sql = "SELECT MIN(\(NativeSqliteManager.quoteIdentifier(column))) FROM \(NativeSqliteManager.quoteIdentifier(OrderSchema.tableName))"
         }
         let result = try manager.query(name: databaseName, sql: sql, arguments: whereArgs)
         guard let rows = result["rows"] as? [[Any?]] else { return nil }
@@ -419,6 +368,7 @@ public class OrderHelper {
 
     /**
      * Get the average value of a column.
+     * Important: `whereClause` is trusted SQL. Never pass user input; use `whereArgs` for values.
      * - Parameters:
      *   - column: Column name to get average from
      *   - whereClause: Optional WHERE clause
@@ -429,9 +379,9 @@ public class OrderHelper {
     public func avg(column: String, whereClause: String? = nil, whereArgs: [Any?]? = nil) throws -> Double? {
         let sql: String
         if let whereClause = whereClause {
-            sql = "SELECT AVG(\(column)) FROM \(OrderSchema.tableName) WHERE \(whereClause)"
+            sql = "SELECT AVG(\(NativeSqliteManager.quoteIdentifier(column))) FROM \(NativeSqliteManager.quoteIdentifier(OrderSchema.tableName)) WHERE \(whereClause)"
         } else {
-            sql = "SELECT AVG(\(column)) FROM \(OrderSchema.tableName)"
+            sql = "SELECT AVG(\(NativeSqliteManager.quoteIdentifier(column))) FROM \(NativeSqliteManager.quoteIdentifier(OrderSchema.tableName))"
         }
         let result = try manager.query(name: databaseName, sql: sql, arguments: whereArgs)
         guard let rows = result["rows"] as? [[Any?]] else { return nil }
@@ -440,6 +390,7 @@ public class OrderHelper {
 
     /**
      * Get the sum of a column.
+     * Important: `whereClause` is trusted SQL. Never pass user input; use `whereArgs` for values.
      * - Parameters:
      *   - column: Column name to sum
      *   - whereClause: Optional WHERE clause
@@ -450,9 +401,9 @@ public class OrderHelper {
     public func sum(column: String, whereClause: String? = nil, whereArgs: [Any?]? = nil) throws -> Double? {
         let sql: String
         if let whereClause = whereClause {
-            sql = "SELECT SUM(\(column)) FROM \(OrderSchema.tableName) WHERE \(whereClause)"
+            sql = "SELECT SUM(\(NativeSqliteManager.quoteIdentifier(column))) FROM \(NativeSqliteManager.quoteIdentifier(OrderSchema.tableName)) WHERE \(whereClause)"
         } else {
-            sql = "SELECT SUM(\(column)) FROM \(OrderSchema.tableName)"
+            sql = "SELECT SUM(\(NativeSqliteManager.quoteIdentifier(column))) FROM \(NativeSqliteManager.quoteIdentifier(OrderSchema.tableName))"
         }
         let result = try manager.query(name: databaseName, sql: sql, arguments: whereArgs)
         guard let rows = result["rows"] as? [[Any?]] else { return nil }
@@ -467,7 +418,7 @@ public class OrderHelper {
             productId: try row.required(OrderSchema.productId, GeneratedValue.int64, expected: "Int64"),
             quantity: try row.required(OrderSchema.quantity, GeneratedValue.int64, expected: "Int64"),
             totalPrice: try row.required(OrderSchema.totalPrice, GeneratedValue.double, expected: "Double"),
-            status: try row.required(OrderSchema.status, GeneratedValue.string, expected: "String"),
+            status: try row.required(OrderSchema.status, { GeneratedValue.string($0).flatMap(OrderStatus.init(rawValue:)) }, expected: "OrderStatus"),
             notes: try row.optional(OrderSchema.notes, GeneratedValue.string, expected: "String"),
             createdAt: try row.required(OrderSchema.createdAt, GeneratedValue.date, expected: "Date"),
             updatedAt: try row.optional(OrderSchema.updatedAt, GeneratedValue.date, expected: "Date"),

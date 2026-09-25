@@ -9,6 +9,7 @@ import 'package:source_gen/source_gen.dart';
 import '../analyzer/table_analyzer.dart';
 import '../config.dart';
 import '../config/generator_options.dart';
+import '../helpers/naming_conventions.dart';
 import '../migration/migration_steps.dart';
 import '../models/table_info.dart';
 
@@ -18,7 +19,6 @@ import '../models/table_info.dart';
 /// Just run build_runner and DatabaseManager is ready to use.
 class SchemaRegistryBuilder implements Builder {
   final GeneratorOptions options;
-  bool _hasRun = false;
 
   SchemaRegistryBuilder(this.options);
 
@@ -31,20 +31,20 @@ class SchemaRegistryBuilder implements Builder {
 
   @override
   Future<void> build(BuildStep buildStep) async {
-    // Only run once per build (like Flutter's l10n)
-    if (_hasRun) return;
-    _hasRun = true;
-
     log.info('🔧 Generating DatabaseManager...');
 
     final packageName = buildStep.inputId.package;
     final resolver = buildStep.resolver;
     final tables = <TableInfo>[];
     final tableFiles = <String, String>{};
+    final tableElements = <String, ClassElement>{};
 
     // Read schema via build system to declare dependency on migration builder
     // and avoid dart:io timing issues (file may not be flushed to disk yet).
-    final schemaAsset = AssetId(packageName, 'lib/generated/native_sqlite_schema.json');
+    final schemaAsset = AssetId(
+      packageName,
+      'lib/generated/native_sqlite_schema.json',
+    );
     String? schemaContent;
     if (await buildStep.canRead(schemaAsset)) {
       schemaContent = await buildStep.readAsString(schemaAsset);
@@ -55,55 +55,57 @@ class SchemaRegistryBuilder implements Builder {
     final assets = await buildStep.findAssets(dartFiles).toList();
 
     for (final assetId in assets) {
-      try {
-        if (!await resolver.isLibrary(assetId)) continue;
+      if (!await resolver.isLibrary(assetId)) continue;
 
-        final lib = await resolver.libraryFor(assetId);
-        final reader = LibraryReader(lib);
-        final tableChecker = TypeChecker.fromUrl(
-          'package:native_sqlite_annotations/src/table.dart#DbTable',
-        );
+      final lib = await resolver.libraryFor(assetId);
+      final reader = LibraryReader(lib);
+      final tableChecker = TypeChecker.fromUrl(
+        'package:native_sqlite_annotations/src/table.dart#DbTable',
+      );
 
-        for (final annotatedElement in reader.annotatedWith(tableChecker)) {
-          final element = annotatedElement.element;
-          if (element is! ClassElement) continue;
+      for (final annotatedElement in reader.annotatedWith(tableChecker)) {
+        final element = annotatedElement.element;
+        if (element is! ClassElement) continue;
 
-          final annotation = annotatedElement.annotation;
-          final autoValue = annotation.read('auto').literalValue as bool?;
+        final annotation = annotatedElement.annotation;
+        final autoValue = annotation.read('auto').literalValue as bool?;
 
-          // Skip if auto=false
-          if (autoValue == false) continue;
+        // Skip if auto=false
+        if (autoValue == false) continue;
 
-          try {
-            final analyzer = TableAnalyzer(options);
-            final tableInfo = analyzer.analyze(element, annotation);
-            tables.add(tableInfo);
+        final analyzer = TableAnalyzer(options);
+        final tableInfo = analyzer.analyze(element, annotation);
+        tables.add(tableInfo);
+        tableElements[tableInfo.sqlName] = element;
 
-            // Store path relative to lib/ (without extension) so the import
-            // is reconstructed as package:<pkg>/<rel_path>.dart
-            final relPath = assetId.path
-                .replaceFirst('lib/', '')
-                .replaceAll('.dart', '');
-            tableFiles[tableInfo.dartName] = relPath;
-          } catch (e) {
-            log.warning('⚠️  Failed to analyze ${element.name}: $e');
-          }
-        }
-      } catch (e) {
-        log.fine('Skipping ${assetId.path}: $e');
+        // Store path relative to lib/ (without extension) so the import
+        // is reconstructed as package:<pkg>/<rel_path>.dart
+        final relPath = assetId.path
+            .replaceFirst('lib/', '')
+            .replaceAll('.dart', '');
+        tableFiles[tableInfo.dartName] = relPath;
       }
     }
 
     if (tables.isEmpty) {
-      log.warning(
-        '⚠️  No @DbTable models found. DatabaseManager not generated.',
-      );
+      log.warning('No @DbTable models found. DatabaseManager not generated.');
       return;
     }
 
-    log.info('✅ Found ${tables.length} tables');
+    final firstElement = tableElements.values.first;
+    if (schemaContent == null) {
+      throw InvalidGenerationSourceError(
+        'lib/generated/native_sqlite_schema.json is missing. Refusing to '
+        'generate DatabaseManager with a guessed schema version.',
+        element: firstElement,
+        todo: 'Run the migration builder and fix any preceding build error.',
+      );
+    }
+    _validateSchema(schemaContent, firstElement);
 
-    _verifySchemaMatchesTables(tables, schemaContent);
+    log.fine('Found ${tables.length} tables');
+
+    _verifySchemaMatchesTables(tables, tableElements, schemaContent);
 
     final sortedTables = _topologicalSort(tables);
     final databaseName =
@@ -123,7 +125,7 @@ class SchemaRegistryBuilder implements Builder {
       code,
     );
 
-    log.info('✅ generated/database_manager.dart');
+    log.fine('Generated lib/generated/database_manager.dart');
   }
 
   /// The schema snapshot (written by the `migration` builder) drives runtime
@@ -131,16 +133,19 @@ class SchemaRegistryBuilder implements Builder {
   /// this builder's analysis. If they disagree — e.g. `column_name_case` was
   /// configured for one builder but not the others — migrations would target
   /// columns that don't exist, so fail the build instead.
-  void _verifySchemaMatchesTables(List<TableInfo> tables, String? schemaContent) {
-    if (schemaContent == null) return;
+  void _verifySchemaMatchesTables(
+    List<TableInfo> tables,
+    Map<String, ClassElement> tableElements,
+    String schemaContent,
+  ) {
     final schemas =
-        (jsonDecode(schemaContent) as Map<String, dynamic>)['schemas'] as List?;
-    if (schemas == null) return;
+        (jsonDecode(schemaContent) as Map<String, dynamic>)['schemas'] as List;
 
     final snapshotColumns = <String, Set<String>>{
       for (final schema in schemas.cast<Map<String, dynamic>>())
         schema['tableName'] as String: {
-          for (final c in (schema['columns'] as List).cast<Map<String, dynamic>>())
+          for (final c
+              in (schema['columns'] as List).cast<Map<String, dynamic>>())
             c['name'] as String,
         },
     };
@@ -160,12 +165,33 @@ class SchemaRegistryBuilder implements Builder {
     }
 
     if (mismatches.isNotEmpty) {
-      throw StateError(
+      throw InvalidGenerationSourceError(
         'native_sqlite_schema.json does not match the generated tables:\n'
         '  ${mismatches.join('\n  ')}\n'
-        'Naming options (table_name_case, column_name_case) must be identical '
-        'for the native_sqlite_generator:table, :migration and '
-        ':schema_registry builders in build.yaml.',
+        'Use one YAML-anchored naming-options map for the '
+        'native_sqlite_generator:table, :migration and :schema_registry '
+        'builders in build.yaml.',
+        element: tableElements[tables.first.sqlName],
+        todo: 'Regenerate the schema with the shared builder options.',
+      );
+    }
+  }
+
+  void _validateSchema(String content, ClassElement element) {
+    try {
+      final json = jsonDecode(content);
+      if (json is! Map<String, dynamic> ||
+          json['schemaVersion'] is! int ||
+          json['schemas'] is! List) {
+        throw const FormatException(
+          'expected an object with integer schemaVersion and schemas list',
+        );
+      }
+    } catch (error) {
+      throw InvalidGenerationSourceError(
+        'lib/generated/native_sqlite_schema.json is unreadable: $error',
+        element: element,
+        todo: 'Fix the migration builder error, then regenerate the schema.',
       );
     }
   }
@@ -207,60 +233,68 @@ class SchemaRegistryBuilder implements Builder {
     List<TableInfo> tables,
     Map<String, String> tableFiles,
     String packageName,
-    String? schemaContent,
+    String schemaContent,
     String databaseName,
   ) {
     final buffer = StringBuffer();
 
     // Everything the runtime needs is embedded at build time: the schema
     // JSON only exists in the project, not on devices or the web.
-    final schemaVersion = schemaContent == null
-        ? 1
-        : (jsonDecode(schemaContent) as Map<String, dynamic>)['schemaVersion']
-                  as int? ??
-              1;
+    final schemaVersion =
+        (jsonDecode(schemaContent) as Map<String, dynamic>)['schemaVersion']
+            as int;
     final migrations = MigrationSteps.load(
       currentSchemaJson: schemaContent,
       onSkipped: (file) => log.warning(
-        '⚠️  Ignoring migrations in $file: written by an older generator '
+        'Ignoring migrations in $file: written by an older generator '
         'whose migrations were never applied.',
       ),
     );
-    final ensureSchema = schemaContent == null
-        ? const <String>[]
-        : MigrationSteps.ensureSchema(MigrationSteps.tablesOf(schemaContent));
+    final ensureSchema = MigrationSteps.ensureSchema(
+      MigrationSteps.tablesOf(schemaContent),
+    );
 
     buffer.writeln('// GENERATED CODE - DO NOT MODIFY BY HAND');
     buffer.writeln('// Generated by native_sqlite_generator');
     buffer.writeln('// coverage:ignore-file');
     buffer.writeln();
-    buffer.writeln("import 'package:flutter/foundation.dart';");
     buffer.writeln("import 'package:native_sqlite/native_sqlite.dart';");
     buffer.writeln();
 
     for (final table in tables) {
       final relPath =
-          tableFiles[table.dartName] ?? 'models/${_toSnakeCase(table.dartName)}';
+          tableFiles[table.dartName] ??
+          'models/${NamingConventions.toSnakeCase(table.dartName)}';
       buffer.writeln("import 'package:$packageName/$relPath.dart';");
     }
 
     buffer.writeln();
     buffer.writeln('/// Auto-generated database manager.');
-    buffer.writeln('/// Call DatabaseManager.init() at app startup.');
+    buffer.writeln('///');
+    buffer.writeln(
+      '/// Call `DatabaseManager.init()` at app startup. Regenerate',
+    );
+    buffer.writeln(
+      '/// with `flutter pub run build_runner build` after model changes.',
+    );
     buffer.writeln('class DatabaseManager {');
     buffer.writeln('  DatabaseManager._();');
     buffer.writeln();
     buffer.writeln('  static bool _initialized = false;');
-    buffer.writeln('  static String? _currentDatabaseName;');
+    buffer.writeln('  static NativeSqliteDatabase? _currentDatabase;');
     buffer.writeln();
 
     buffer.writeln('  /// Schema version from native_sqlite_schema.json.');
     buffer.writeln('  /// Increments whenever tables are added or changed.');
     buffer.writeln('  static const int schemaVersion = $schemaVersion;');
     buffer.writeln();
-    buffer.writeln('  /// Database name from native_sqlite_config.yaml, shared with the');
+    buffer.writeln(
+      '  /// Database name from native_sqlite_config.yaml, shared with the',
+    );
     buffer.writeln('  /// generated native DatabaseManager.');
-    buffer.writeln("  static const String defaultDatabaseName = ${_dartString(databaseName)};");
+    buffer.writeln(
+      "  static const String defaultDatabaseName = ${_dartString(databaseName)};",
+    );
     buffer.writeln();
 
     buffer.writeln('  static const tables = <String, String>{');
@@ -294,7 +328,9 @@ class SchemaRegistryBuilder implements Builder {
     buffer.writeln(
       '  /// Versioned migration steps: `migrations[v]` upgrades version',
     );
-    buffer.writeln('  /// `v - 1` to `v`. Generated from lib/generated/schemas/.');
+    buffer.writeln(
+      '  /// `v - 1` to `v`. Generated from lib/generated/schemas/.',
+    );
     buffer.writeln('  static const Map<int, List<String>> migrations = {');
     for (final MapEntry(key: version, value: sql) in migrations.entries) {
       buffer.writeln('    $version: [');
@@ -336,7 +372,9 @@ class SchemaRegistryBuilder implements Builder {
   }
 
   void _generateInitMethod(StringBuffer buffer) {
-    buffer.writeln('  /// Opens the database, creating it or applying pending migrations.');
+    buffer.writeln(
+      '  /// Opens the database, creating it or applying pending migrations.',
+    );
     buffer.writeln('  ///');
     buffer.writeln(
       '  /// The platform runs the steps while opening, identically to the',
@@ -350,36 +388,22 @@ class SchemaRegistryBuilder implements Builder {
     buffer.writeln('    bool enableForeignKeys = true,');
     buffer.writeln('  }) async {');
     buffer.writeln('    if (_initialized) {');
-    buffer.writeln(
-      '      debugPrint(\'DatabaseManager already initialized\');',
-    );
     buffer.writeln('      return;');
     buffer.writeln('    }');
     buffer.writeln();
-    buffer.writeln('    try {');
-    buffer.writeln('      _currentDatabaseName = name;');
+    buffer.writeln('    _currentDatabase = await NativeSqlite.open(');
+    buffer.writeln('      AutoMigration.createConfig(');
+    buffer.writeln('        name: name,');
+    buffer.writeln('        schemaVersion: schemaVersion,');
+    buffer.writeln('        onCreateStatements: onCreateStatements,');
+    buffer.writeln('        migrations: migrations,');
+    buffer.writeln('        ensureSchemaStatements: ensureSchemaStatements,');
+    buffer.writeln('        enableWAL: enableWAL,');
+    buffer.writeln('        enableForeignKeys: enableForeignKeys,');
+    buffer.writeln('      ),');
+    buffer.writeln('    );');
     buffer.writeln();
-    buffer.writeln('      await NativeSqlite.open(');
-    buffer.writeln('        config: AutoMigration.createConfig(');
-    buffer.writeln('          name: name,');
-    buffer.writeln('          schemaVersion: schemaVersion,');
-    buffer.writeln('          onCreateStatements: onCreateStatements,');
-    buffer.writeln('          migrations: migrations,');
-    buffer.writeln('          ensureSchemaStatements: ensureSchemaStatements,');
-    buffer.writeln('          enableWAL: enableWAL,');
-    buffer.writeln('          enableForeignKeys: enableForeignKeys,');
-    buffer.writeln('        ),');
-    buffer.writeln('      );');
-    buffer.writeln();
-    buffer.writeln('      _initialized = true;');
-    buffer.writeln(
-      '      debugPrint(\'✅ DatabaseManager initialized (v\$schemaVersion)\');',
-    );
-    buffer.writeln('    } catch (e, stack) {');
-    buffer.writeln('      debugPrint(\'❌ DatabaseManager init failed: \$e\');');
-    buffer.writeln('      debugPrint(stack.toString());');
-    buffer.writeln('      rethrow;');
-    buffer.writeln('    }');
+    buffer.writeln('    _initialized = true;');
     buffer.writeln('  }');
     buffer.writeln();
   }
@@ -387,11 +411,11 @@ class SchemaRegistryBuilder implements Builder {
   void _generateCloseMethod(StringBuffer buffer) {
     buffer.writeln('  static Future<void> close() async {');
     buffer.writeln(
-      '    if (!_initialized || _currentDatabaseName == null) return;',
+      '    if (!_initialized || _currentDatabase == null) return;',
     );
-    buffer.writeln('    await NativeSqlite.close(_currentDatabaseName!);');
+    buffer.writeln('    await _currentDatabase!.close();');
     buffer.writeln('    _initialized = false;');
-    buffer.writeln('    _currentDatabaseName = null;');
+    buffer.writeln('    _currentDatabase = null;');
     buffer.writeln('  }');
     buffer.writeln();
   }
@@ -399,23 +423,18 @@ class SchemaRegistryBuilder implements Builder {
   void _generateGetters(StringBuffer buffer) {
     buffer.writeln('  static bool get isInitialized => _initialized;');
     buffer.writeln();
-    buffer.writeln('  static String get currentDatabase {');
-    buffer.writeln('    if (!_initialized || _currentDatabaseName == null) {');
+    buffer.writeln('  static NativeSqliteDatabase get currentDatabase {');
+    buffer.writeln('    if (!_initialized || _currentDatabase == null) {');
     buffer.writeln(
       '      throw StateError(\'Call DatabaseManager.init() first\');',
     );
     buffer.writeln('    }');
-    buffer.writeln('    return _currentDatabaseName!;');
+    buffer.writeln('    return _currentDatabase!;');
     buffer.writeln('  }');
     buffer.writeln();
-  }
-
-  String _toSnakeCase(String input) {
-    return input
-        .replaceAllMapped(
-          RegExp(r'([A-Z])'),
-          (match) => '_${match.group(1)!.toLowerCase()}',
-        )
-        .replaceFirst(RegExp(r'^_'), '');
+    buffer.writeln(
+      '  static String get currentDatabaseName => currentDatabase.name;',
+    );
+    buffer.writeln();
   }
 }

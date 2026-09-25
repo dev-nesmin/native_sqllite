@@ -2,10 +2,6 @@ native_sqlite:
   generate_native: true
   database_name: 'example_app'
   include_examples: true
-  
-  models:
-    - 'lib/models/*.dart'
-  
   android:
     enabled: true
     output_path: 'android/app/src/main/kotlin/com/example/native_sqlite_example/generated'

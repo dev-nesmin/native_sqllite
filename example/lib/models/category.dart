@@ -2,6 +2,8 @@ import 'package:native_sqlite/native_sqlite.dart';
 
 part 'category.table.dart';
 
+const Object _unset = Object();
+
 /// Category model demonstrating:
 /// - Simple table structure
 /// - Unique name constraint
@@ -23,13 +25,15 @@ class Category {
   Category copyWith({
     int? id,
     String? name,
-    String? description,
+    Object? description = _unset,
     DateTime? createdAt,
   }) {
     return Category(
       id: id ?? this.id,
       name: name ?? this.name,
-      description: description ?? this.description,
+      description: identical(description, _unset)
+          ? this.description
+          : description as String?,
       createdAt: createdAt ?? this.createdAt,
     );
   }

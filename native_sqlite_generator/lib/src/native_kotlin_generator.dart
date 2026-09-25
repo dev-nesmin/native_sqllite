@@ -1,4 +1,5 @@
 import 'package:native_sqlite_generator/src/models/schema_snapshot.dart';
+import 'package:native_sqlite_generator/src/helpers/naming_conventions.dart';
 import 'package:native_sqlite_generator/src/native/native_column.dart';
 import 'package:native_sqlite_generator/src/native/native_database_spec.dart';
 import 'package:native_sqlite_generator/src/sql/schema_sql.dart';
@@ -16,6 +17,7 @@ class NativeKotlinGenerator {
   });
 
   String generateSchema(TableSchemaSnapshot model) {
+    _validateSchemaMembers(model);
     final buffer = StringBuffer();
 
     buffer.writeln('package $packageName');
@@ -24,21 +26,27 @@ class NativeKotlinGenerator {
     buffer.writeln(' * Schema constants for ${model.className} table.');
     buffer.writeln(' * AUTO-GENERATED from Dart - DO NOT EDIT MANUALLY');
     buffer.writeln(
-      ' * Generated from: lib/models/${_toSnakeCase(model.className)}.dart',
+      ' * Generated from: ${model.sourcePath ?? 'unknown Dart source'}',
     );
     buffer.writeln(' */');
     buffer.writeln('object ${model.className}Schema {');
-    buffer.writeln('    const val TABLE_NAME = ${_kotlinString(model.tableName)}');
+    buffer.writeln(
+      '    const val TABLE_NAME = ${_kotlinString(model.tableName)}',
+    );
     buffer.writeln();
     buffer.writeln('    // Column names');
 
     for (final field in model.columns) {
       final constantName = _toScreamingSnakeCase(field.dartName);
-      buffer.writeln('    const val $constantName = ${_kotlinString(field.name)}');
+      buffer.writeln(
+        '    const val $constantName = ${_kotlinString(field.name)}',
+      );
     }
 
     buffer.writeln();
-    buffer.writeln('    // Same statements as the Dart ${model.className}Schema');
+    buffer.writeln(
+      '    // Same statements as the Dart ${model.className}Schema',
+    );
     buffer.writeln(
       '    const val CREATE_TABLE_SQL = ${_kotlinString(SchemaSql.createTable(model))}',
     );
@@ -62,7 +70,9 @@ class NativeKotlinGenerator {
     buffer.writeln();
     buffer.writeln('/**');
     buffer.writeln(' * Mirrors the Dart enum ${nativeEnum.name}.');
-    buffer.writeln(' * Declaration order matches Dart, so ordinals are compatible.');
+    buffer.writeln(
+      ' * Declaration order matches Dart, so ordinals are compatible.',
+    );
     buffer.writeln(' * AUTO-GENERATED from Dart - DO NOT EDIT MANUALLY');
     buffer.writeln(' */');
     buffer.writeln('enum class ${nativeEnum.name} {');
@@ -75,10 +85,16 @@ class NativeKotlinGenerator {
 
   String generateHelper(TableSchemaSnapshot model) {
     final buffer = StringBuffer();
-    final primaryKey = model.columns.firstWhere(
-      (f) => f.primaryKey,
-      orElse: () => model.columns.first,
-    );
+    final primaryKeys = model.columns
+        .where((field) => field.primaryKey)
+        .toList();
+    if (primaryKeys.length != 1) {
+      throw ArgumentError(
+        'Native helper generation for ${model.className} requires exactly '
+        'one primary key; found ${primaryKeys.length}.',
+      );
+    }
+    final primaryKey = primaryKeys.single;
 
     final columns = model.columns.map(NativeColumn.of).toList();
     final kinds = columns.map((c) => c.kind).toSet();
@@ -88,7 +104,9 @@ class NativeKotlinGenerator {
     buffer.writeln();
     buffer.writeln('package $packageName');
     buffer.writeln();
-    if (kinds.contains(NativeKind.uri)) buffer.writeln('import android.net.Uri');
+    if (kinds.contains(NativeKind.uri)) {
+      buffer.writeln('import android.net.Uri');
+    }
     buffer.writeln('import dev.nesmin.native_sqlite.NativeSqliteManager');
     if (kinds.contains(NativeKind.duration)) {
       buffer.writeln('import java.time.Duration');
@@ -96,7 +114,7 @@ class NativeKotlinGenerator {
     if (kinds.contains(NativeKind.dateTime)) {
       buffer.writeln('import java.time.Instant');
     }
-    buffer.writeln('import java.util.concurrent.ConcurrentHashMap');
+    if (primaryKey.useLocalUuid) buffer.writeln('import java.util.UUID');
     buffer.writeln();
     buffer.writeln('/**');
     buffer.writeln(' * Data class for ${model.className}.');
@@ -122,7 +140,7 @@ class NativeKotlinGenerator {
     buffer.writeln('/**');
     buffer.writeln(' * Helper class for ${model.className} CRUD operations.');
     buffer.writeln(' * AUTO-GENERATED from Dart - DO NOT EDIT MANUALLY');
-    buffer.writeln(' * Thread-safe for multi-isolate access.');
+    buffer.writeln(' * Create an instance for each native caller/database.');
     if (includeExamples) {
       buffer.writeln(' *');
       buffer.writeln(' * Example usage (single isolate):');
@@ -133,18 +151,6 @@ class NativeKotlinGenerator {
       buffer.writeln(' * val id = helper.insert(${model.className}(...))');
       buffer.writeln(' * val item = helper.findById(id)');
       buffer.writeln(' * ```');
-      buffer.writeln(' *');
-      buffer.writeln(' * Example usage (multi-isolate safe):');
-      buffer.writeln(' * ```');
-      buffer.writeln(' * // In WorkManager or background task');
-      buffer.writeln(' * val isolateId = Thread.currentThread().id');
-      buffer.writeln(
-        ' * val helper = ${model.className}Helper.getInstance("$databaseName", isolateId)',
-      );
-      buffer.writeln(' * val users = helper.findAll()');
-      buffer.writeln(' * // When done, cleanup:');
-      buffer.writeln(' * ${model.className}Helper.cleanupIsolate(isolateId)');
-      buffer.writeln(' * ```');
     }
     buffer.writeln(' */');
     buffer.writeln(
@@ -152,81 +158,44 @@ class NativeKotlinGenerator {
     );
     buffer.writeln();
 
-    // Add companion object for isolate-aware singleton pattern
-    buffer.writeln('    companion object {');
-    buffer.writeln(
-      '        // Track helper instances per isolate for thread safety',
-    );
-    buffer.writeln(
-      '        private val isolateInstances = ConcurrentHashMap<Long, ${model.className}Helper>()',
-    );
-    buffer.writeln();
-    buffer.writeln('        /**');
-    buffer.writeln(
-      '         * Get or create helper instance for the given isolate.',
-    );
-    buffer.writeln(
-      '         * Safe to call from different Dart isolates or native threads.',
-    );
-    buffer.writeln('         *');
-    buffer.writeln('         * @param databaseName Name of the database');
-    buffer.writeln(
-      '         * @param isolateId Unique identifier for the isolate/thread',
-    );
-    buffer.writeln('         * @return Helper instance for this isolate');
-    buffer.writeln('         */');
-    buffer.writeln('        @JvmStatic');
-    buffer.writeln(
-      '        fun getInstance(databaseName: String, isolateId: Long): ${model.className}Helper {',
-    );
-    buffer.writeln('            return isolateInstances.getOrPut(isolateId) {');
-    buffer.writeln('                ${model.className}Helper(databaseName)');
-    buffer.writeln('            }');
-    buffer.writeln('        }');
-    buffer.writeln();
-    buffer.writeln('        /**');
-    buffer.writeln('         * Cleanup resources for a specific isolate.');
-    buffer.writeln('         * Call this when an isolate is being destroyed.');
-    buffer.writeln('         *');
-    buffer.writeln('         * @param isolateId The isolate ID to cleanup');
-    buffer.writeln('         */');
-    buffer.writeln('        @JvmStatic');
-    buffer.writeln('        fun cleanupIsolate(isolateId: Long) {');
-    buffer.writeln('            isolateInstances.remove(isolateId)');
-    buffer.writeln('        }');
-    buffer.writeln();
-    buffer.writeln('        /**');
-    buffer.writeln(
-      '         * Get all active isolate IDs currently using this helper.',
-    );
-    buffer.writeln('         * Useful for debugging.');
-    buffer.writeln('         */');
-    buffer.writeln('        @JvmStatic');
-    buffer.writeln('        fun getActiveIsolates(): Set<Long> {');
-    buffer.writeln('            return isolateInstances.keys.toSet()');
-    buffer.writeln('        }');
-    buffer.writeln('    }');
-    buffer.writeln();
-
     // Insert method
-    buffer.writeln('    fun insert(entity: ${model.className}): Long {');
+    final insertReturnType = primaryKey.useLocalUuid ? 'String' : 'Long';
+    buffer.writeln(
+      '    fun insert(entity: ${model.className}): $insertReturnType {',
+    );
+    if (primaryKey.useLocalUuid) {
+      buffer.writeln(
+        '        val primaryKeyValue = entity.${_kotlinIdentifier(primaryKey.dartName)} ?: UUID.randomUUID().toString()',
+      );
+    }
     buffer.writeln('        val values: Map<String, Any?> = mapOf(');
-    final insertFields = model.columns.where((f) => !(f.primaryKey && f.autoIncrement)).toList();
+    final insertFields = model.columns
+        .where((f) => !(f.primaryKey && f.autoIncrement))
+        .toList();
     for (var i = 0; i < insertFields.length; i++) {
       final field = insertFields[i];
-      final value = _serializeKotlin(
-        NativeColumn.of(field),
-        'entity.${_kotlinIdentifier(field.dartName)}',
-      );
+      final value = field.primaryKey && field.useLocalUuid
+          ? 'primaryKeyValue'
+          : _serializeKotlin(
+              NativeColumn.of(field),
+              'entity.${_kotlinIdentifier(field.dartName)}',
+            );
       final comma = i < insertFields.length - 1 ? ',' : '';
       buffer.writeln(
         '            ${model.className}Schema.${_toScreamingSnakeCase(field.dartName)} to $value$comma',
       );
     }
     buffer.writeln('        )');
-    buffer.writeln(
-      '        return NativeSqliteManager.Instance.insert(databaseName, ${model.className}Schema.TABLE_NAME, values)',
-    );
+    if (primaryKey.useLocalUuid) {
+      buffer.writeln(
+        '        NativeSqliteManager.Instance.insert(databaseName, ${model.className}Schema.TABLE_NAME, values)',
+      );
+      buffer.writeln('        return primaryKeyValue');
+    } else {
+      buffer.writeln(
+        '        return NativeSqliteManager.Instance.insert(databaseName, ${model.className}Schema.TABLE_NAME, values)',
+      );
+    }
     buffer.writeln('    }');
     buffer.writeln();
 
@@ -234,11 +203,13 @@ class NativeKotlinGenerator {
     final pkKotlinType = _getKotlinType(
       NativeColumn.of(primaryKey),
     ).replaceAll('?', '');
-    buffer.writeln('    fun findById(id: $pkKotlinType): ${model.className}? {');
+    buffer.writeln(
+      '    fun findById(id: $pkKotlinType): ${model.className}? {',
+    );
     buffer.writeln('        val result = NativeSqliteManager.Instance.query(');
     buffer.writeln('            databaseName,');
     buffer.writeln(
-      '            "SELECT * FROM \${${model.className}Schema.TABLE_NAME} WHERE \${${model.className}Schema.${_toScreamingSnakeCase(primaryKey.dartName)}} = ? LIMIT 1",',
+      '            "SELECT * FROM \${NativeSqliteManager.quoteIdentifier(${model.className}Schema.TABLE_NAME)} WHERE \${NativeSqliteManager.quoteIdentifier(${model.className}Schema.${_toScreamingSnakeCase(primaryKey.dartName)})} = ? LIMIT 1",',
     );
     buffer.writeln('            listOf(id)');
     buffer.writeln('        )');
@@ -257,7 +228,7 @@ class NativeKotlinGenerator {
     // FindAll method
     buffer.writeln('    fun findAll(): List<${model.className}> {');
     buffer.writeln(
-      '        val result = NativeSqliteManager.Instance.query(databaseName, "SELECT * FROM \${${model.className}Schema.TABLE_NAME}")',
+      '        val result = NativeSqliteManager.Instance.query(databaseName, "SELECT * FROM \${NativeSqliteManager.quoteIdentifier(${model.className}Schema.TABLE_NAME)}")',
     );
     buffer.writeln(
       '        val rows = result["rows"] as? List<List<Any?>> ?: return emptyList()',
@@ -351,6 +322,9 @@ class NativeKotlinGenerator {
     buffer.writeln('    /**');
     buffer.writeln('     * Delete entities matching a WHERE clause.');
     buffer.writeln(
+      '     * IMPORTANT: whereClause is trusted SQL. Never pass user input; use whereArgs for values.',
+    );
+    buffer.writeln(
       '     * @param whereClause SQL WHERE clause (without "WHERE" keyword)',
     );
     buffer.writeln('     * @param whereArgs Arguments for the WHERE clause');
@@ -375,12 +349,12 @@ class NativeKotlinGenerator {
     buffer.writeln('     * @return List of inserted row IDs');
     buffer.writeln('     */');
     buffer.writeln(
-      '    fun insertBatch(entities: List<${model.className}>): List<Long> {',
+      '    fun insertBatch(entities: List<${model.className}>): List<$insertReturnType> {',
     );
     buffer.writeln(
       '        val db = NativeSqliteManager.Instance.getDatabase(databaseName)',
     );
-    buffer.writeln('        val results = mutableListOf<Long>()');
+    buffer.writeln('        val results = mutableListOf<$insertReturnType>()');
     buffer.writeln('        db.beginTransaction()');
     buffer.writeln('        try {');
     buffer.writeln('            entities.forEach { entity ->');
@@ -452,6 +426,9 @@ class NativeKotlinGenerator {
       '     * Find entities matching a WHERE clause with optional ordering and limit.',
     );
     buffer.writeln(
+      '     * IMPORTANT: whereClause and orderBy are trusted SQL. Never pass user input; use whereArgs for values.',
+    );
+    buffer.writeln(
       '     * @param whereClause SQL WHERE clause (without "WHERE" keyword)',
     );
     buffer.writeln('     * @param whereArgs Arguments for the WHERE clause');
@@ -471,11 +448,15 @@ class NativeKotlinGenerator {
     buffer.writeln('    ): List<${model.className}> {');
     buffer.writeln('        val sql = buildString {');
     buffer.writeln(
-      '            append("SELECT * FROM \${${model.className}Schema.TABLE_NAME}")',
+      '            append("SELECT * FROM \${NativeSqliteManager.quoteIdentifier(${model.className}Schema.TABLE_NAME)}")',
     );
     buffer.writeln('            whereClause?.let { append(" WHERE \$it") }');
     buffer.writeln('            orderBy?.let { append(" ORDER BY \$it") }');
-    buffer.writeln('            limit?.let { append(" LIMIT \$it") }');
+    buffer.writeln('            if (limit != null) {');
+    buffer.writeln('                append(" LIMIT \$limit")');
+    buffer.writeln('            } else if (offset != null) {');
+    buffer.writeln('                append(" LIMIT -1")');
+    buffer.writeln('            }');
     buffer.writeln('            offset?.let { append(" OFFSET \$it") }');
     buffer.writeln('        }');
     buffer.writeln(
@@ -496,6 +477,9 @@ class NativeKotlinGenerator {
     buffer.writeln('    /**');
     buffer.writeln('     * Count entities matching a WHERE clause.');
     buffer.writeln(
+      '     * IMPORTANT: whereClause is trusted SQL. Never pass user input; use whereArgs for values.',
+    );
+    buffer.writeln(
       '     * @param whereClause SQL WHERE clause (without "WHERE" keyword)',
     );
     buffer.writeln('     * @param whereArgs Arguments for the WHERE clause');
@@ -506,11 +490,11 @@ class NativeKotlinGenerator {
     );
     buffer.writeln('        val sql = if (whereClause != null) {');
     buffer.writeln(
-      '            "SELECT COUNT(*) FROM \${${model.className}Schema.TABLE_NAME} WHERE \$whereClause"',
+      '            "SELECT COUNT(*) FROM \${NativeSqliteManager.quoteIdentifier(${model.className}Schema.TABLE_NAME)} WHERE \$whereClause"',
     );
     buffer.writeln('        } else {');
     buffer.writeln(
-      '            "SELECT COUNT(*) FROM \${${model.className}Schema.TABLE_NAME}"',
+      '            "SELECT COUNT(*) FROM \${NativeSqliteManager.quoteIdentifier(${model.className}Schema.TABLE_NAME)}"',
     );
     buffer.writeln('        }');
     buffer.writeln(
@@ -528,6 +512,9 @@ class NativeKotlinGenerator {
     // Aggregation methods
     buffer.writeln('    /**');
     buffer.writeln('     * Get the maximum value of a column.');
+    buffer.writeln(
+      '     * IMPORTANT: whereClause is trusted SQL. Never pass user input; use whereArgs for values.',
+    );
     buffer.writeln('     * @param column Column name to get max value from');
     buffer.writeln('     * @param whereClause Optional WHERE clause');
     buffer.writeln('     * @param whereArgs Arguments for WHERE clause');
@@ -538,11 +525,11 @@ class NativeKotlinGenerator {
     );
     buffer.writeln('        val sql = if (whereClause != null) {');
     buffer.writeln(
-      '            "SELECT MAX(\$column) FROM \${${model.className}Schema.TABLE_NAME} WHERE \$whereClause"',
+      '            "SELECT MAX(\${NativeSqliteManager.quoteIdentifier(column)}) FROM \${NativeSqliteManager.quoteIdentifier(${model.className}Schema.TABLE_NAME)} WHERE \$whereClause"',
     );
     buffer.writeln('        } else {');
     buffer.writeln(
-      '            "SELECT MAX(\$column) FROM \${${model.className}Schema.TABLE_NAME}"',
+      '            "SELECT MAX(\${NativeSqliteManager.quoteIdentifier(column)}) FROM \${NativeSqliteManager.quoteIdentifier(${model.className}Schema.TABLE_NAME)}"',
     );
     buffer.writeln('        }');
     buffer.writeln(
@@ -557,6 +544,9 @@ class NativeKotlinGenerator {
 
     buffer.writeln('    /**');
     buffer.writeln('     * Get the minimum value of a column.');
+    buffer.writeln(
+      '     * IMPORTANT: whereClause is trusted SQL. Never pass user input; use whereArgs for values.',
+    );
     buffer.writeln('     * @param column Column name to get min value from');
     buffer.writeln('     * @param whereClause Optional WHERE clause');
     buffer.writeln('     * @param whereArgs Arguments for WHERE clause');
@@ -567,11 +557,11 @@ class NativeKotlinGenerator {
     );
     buffer.writeln('        val sql = if (whereClause != null) {');
     buffer.writeln(
-      '            "SELECT MIN(\$column) FROM \${${model.className}Schema.TABLE_NAME} WHERE \$whereClause"',
+      '            "SELECT MIN(\${NativeSqliteManager.quoteIdentifier(column)}) FROM \${NativeSqliteManager.quoteIdentifier(${model.className}Schema.TABLE_NAME)} WHERE \$whereClause"',
     );
     buffer.writeln('        } else {');
     buffer.writeln(
-      '            "SELECT MIN(\$column) FROM \${${model.className}Schema.TABLE_NAME}"',
+      '            "SELECT MIN(\${NativeSqliteManager.quoteIdentifier(column)}) FROM \${NativeSqliteManager.quoteIdentifier(${model.className}Schema.TABLE_NAME)}"',
     );
     buffer.writeln('        }');
     buffer.writeln(
@@ -586,6 +576,9 @@ class NativeKotlinGenerator {
 
     buffer.writeln('    /**');
     buffer.writeln('     * Get the average value of a column.');
+    buffer.writeln(
+      '     * IMPORTANT: whereClause is trusted SQL. Never pass user input; use whereArgs for values.',
+    );
     buffer.writeln('     * @param column Column name to get average from');
     buffer.writeln('     * @param whereClause Optional WHERE clause');
     buffer.writeln('     * @param whereArgs Arguments for WHERE clause');
@@ -596,11 +589,11 @@ class NativeKotlinGenerator {
     );
     buffer.writeln('        val sql = if (whereClause != null) {');
     buffer.writeln(
-      '            "SELECT AVG(\$column) FROM \${${model.className}Schema.TABLE_NAME} WHERE \$whereClause"',
+      '            "SELECT AVG(\${NativeSqliteManager.quoteIdentifier(column)}) FROM \${NativeSqliteManager.quoteIdentifier(${model.className}Schema.TABLE_NAME)} WHERE \$whereClause"',
     );
     buffer.writeln('        } else {');
     buffer.writeln(
-      '            "SELECT AVG(\$column) FROM \${${model.className}Schema.TABLE_NAME}"',
+      '            "SELECT AVG(\${NativeSqliteManager.quoteIdentifier(column)}) FROM \${NativeSqliteManager.quoteIdentifier(${model.className}Schema.TABLE_NAME)}"',
     );
     buffer.writeln('        }');
     buffer.writeln(
@@ -617,6 +610,9 @@ class NativeKotlinGenerator {
 
     buffer.writeln('    /**');
     buffer.writeln('     * Get the sum of a column.');
+    buffer.writeln(
+      '     * IMPORTANT: whereClause is trusted SQL. Never pass user input; use whereArgs for values.',
+    );
     buffer.writeln('     * @param column Column name to sum');
     buffer.writeln('     * @param whereClause Optional WHERE clause');
     buffer.writeln('     * @param whereArgs Arguments for WHERE clause');
@@ -627,11 +623,11 @@ class NativeKotlinGenerator {
     );
     buffer.writeln('        val sql = if (whereClause != null) {');
     buffer.writeln(
-      '            "SELECT SUM(\$column) FROM \${${model.className}Schema.TABLE_NAME} WHERE \$whereClause"',
+      '            "SELECT SUM(\${NativeSqliteManager.quoteIdentifier(column)}) FROM \${NativeSqliteManager.quoteIdentifier(${model.className}Schema.TABLE_NAME)} WHERE \$whereClause"',
     );
     buffer.writeln('        } else {');
     buffer.writeln(
-      '            "SELECT SUM(\$column) FROM \${${model.className}Schema.TABLE_NAME}"',
+      '            "SELECT SUM(\${NativeSqliteManager.quoteIdentifier(column)}) FROM \${NativeSqliteManager.quoteIdentifier(${model.className}Schema.TABLE_NAME)}"',
     );
     buffer.writeln('        }');
     buffer.writeln(
@@ -659,7 +655,9 @@ class NativeKotlinGenerator {
         column,
         'row[columnMap.getValue(${model.className}Schema.${_toScreamingSnakeCase(field.dartName)})]',
       );
-      fieldInits.add('            ${_kotlinIdentifier(field.dartName)} = $value');
+      fieldInits.add(
+        '            ${_kotlinIdentifier(field.dartName)} = $value',
+      );
     }
     buffer.writeln(fieldInits.join(',\n'));
     buffer.writeln('        )');
@@ -696,7 +694,9 @@ class NativeKotlinGenerator {
       NativeKind.duration => (v) => '$v.toMillis()',
       NativeKind.uri => (v) => '$v.toString()',
       NativeKind.enumeration =>
-        column.storesEnumByName ? (v) => '$v.name' : (v) => '$v.ordinal.toLong()',
+        column.storesEnumByName
+            ? (v) => '$v.name'
+            : (v) => '$v.ordinal.toLong()',
     };
     final direct = convert(accessor);
     if (direct == accessor) return accessor;
@@ -713,8 +713,10 @@ class NativeKotlinGenerator {
       NativeKind.blob => (v) => '$v as ByteArray',
       // Dart decodes booleans with `== 1`.
       NativeKind.boolean => (v) => '($v as Number).toLong() == 1L',
-      NativeKind.dateTime => (v) => 'Instant.ofEpochMilli(($v as Number).toLong())',
-      NativeKind.duration => (v) => 'Duration.ofMillis(($v as Number).toLong())',
+      NativeKind.dateTime =>
+        (v) => 'Instant.ofEpochMilli(($v as Number).toLong())',
+      NativeKind.duration =>
+        (v) => 'Duration.ofMillis(($v as Number).toLong())',
       NativeKind.uri => (v) => 'Uri.parse($v as String)',
       NativeKind.enumeration =>
         column.storesEnumByName
@@ -741,10 +743,34 @@ class NativeKotlinGenerator {
       _kotlinKeywords.contains(name) ? '`$name`' : name;
 
   static const _kotlinKeywords = {
-    'as', 'break', 'class', 'continue', 'do', 'else', 'false', 'for', 'fun',
-    'if', 'in', 'interface', 'is', 'null', 'object', 'package', 'return',
-    'super', 'this', 'throw', 'true', 'try', 'typealias', 'typeof', 'val',
-    'var', 'when', 'while',
+    'as',
+    'break',
+    'class',
+    'continue',
+    'do',
+    'else',
+    'false',
+    'for',
+    'fun',
+    'if',
+    'in',
+    'interface',
+    'is',
+    'null',
+    'object',
+    'package',
+    'return',
+    'super',
+    'this',
+    'throw',
+    'true',
+    'try',
+    'typealias',
+    'typeof',
+    'val',
+    'var',
+    'when',
+    'while',
   };
 
   /// Kotlin counterpart of the generated Dart DatabaseManager: it opens the
@@ -761,11 +787,18 @@ class NativeKotlinGenerator {
     buffer.writeln('import dev.nesmin.native_sqlite.NativeSqliteManager');
     buffer.writeln();
     buffer.writeln('/**');
-    buffer.writeln(' * Native database manager, mirroring the generated DatabaseManager.dart.');
+    buffer.writeln(
+      ' * Native database manager, mirroring the generated DatabaseManager.dart.',
+    );
     buffer.writeln(
       ' * Call DatabaseManager.init() from native Android code (WorkManager,',
     );
-    buffer.writeln(' * Services, App Widgets) before using the generated helpers.');
+    buffer.writeln(
+      ' * Services, App Widgets) before using the generated helpers.',
+    );
+    buffer.writeln(
+      ' * Generated helpers are synchronous; always call them from a background thread.',
+    );
     buffer.writeln(' * AUTO-GENERATED - DO NOT EDIT MANUALLY');
     buffer.writeln(' */');
     buffer.writeln('object DatabaseManager {');
@@ -816,10 +849,16 @@ class NativeKotlinGenerator {
     buffer.writeln('    private var currentDatabaseName: String? = null');
     buffer.writeln();
     buffer.writeln('    /**');
-    buffer.writeln('     * Opens the database, creating it or applying pending migrations.');
+    buffer.writeln(
+      '     * Opens the database, creating it or applying pending migrations.',
+    );
     buffer.writeln('     *');
-    buffer.writeln('     * @param context Any context; the application context is kept');
-    buffer.writeln('     * @param name Database name (default: ${spec.databaseName})');
+    buffer.writeln(
+      '     * @param context Any context; the application context is kept',
+    );
+    buffer.writeln(
+      '     * @param name Database name (default: ${spec.databaseName})',
+    );
     buffer.writeln('     */');
     buffer.writeln('    @Synchronized');
     buffer.writeln('    fun init(');
@@ -831,13 +870,17 @@ class NativeKotlinGenerator {
     buffer.writeln('        val manager = NativeSqliteManager.Instance');
     buffer.writeln('        manager.initialize(context)');
     buffer.writeln(
-      '        // Already opened (e.g. by Dart through the plugin, which shares this',
+      '        // This manager owns one reference. Repeated calls by the same',
     );
     buffer.writeln(
-      '        // manager) with the same generated schema and migrations.',
+      '        // native caller do not acquire additional references.',
     );
-    buffer.writeln('        if (manager.isDatabaseOpen(name)) {');
-    buffer.writeln('            currentDatabaseName = name');
+    buffer.writeln('        currentDatabaseName?.let { current ->');
+    buffer.writeln('            check(current == name) {');
+    buffer.writeln(
+      '                "DatabaseManager is already initialized for \'\$current\'"',
+    );
+    buffer.writeln('            }');
     buffer.writeln('            return');
     buffer.writeln('        }');
     buffer.writeln('        manager.openDatabase(');
@@ -862,7 +905,9 @@ class NativeKotlinGenerator {
     buffer.writeln('        currentDatabaseName = null');
     buffer.writeln('    }');
     buffer.writeln();
-    buffer.writeln('    val isInitialized: Boolean get() = currentDatabaseName != null');
+    buffer.writeln(
+      '    val isInitialized: Boolean get() = currentDatabaseName != null',
+    );
     buffer.writeln();
     buffer.writeln('    val currentDatabase: String');
     buffer.writeln(
@@ -873,16 +918,22 @@ class NativeKotlinGenerator {
     return buffer.toString();
   }
 
-  String _toSnakeCase(String input) {
-    return input
-        .replaceAllMapped(
-          RegExp(r'([A-Z])'),
-          (match) => '_${match.group(1)!.toLowerCase()}',
-        )
-        .replaceFirst(RegExp(r'^_'), '');
+  String _toScreamingSnakeCase(String input) {
+    return NamingConventions.toSnakeCase(input).toUpperCase();
   }
 
-  String _toScreamingSnakeCase(String input) {
-    return _toSnakeCase(input).toUpperCase();
+  void _validateSchemaMembers(TableSchemaSnapshot model) {
+    const reserved = {'TABLE_NAME', 'CREATE_TABLE_SQL', 'INDEX_SQL'};
+    final seen = <String>{...reserved};
+    for (final column in model.columns) {
+      final member = _toScreamingSnakeCase(column.dartName);
+      if (!seen.add(member)) {
+        throw StateError(
+          'Cannot generate ${model.className}Schema.kt: column '
+          '"${column.dartName}" maps to the duplicate or reserved Kotlin '
+          'member "$member". Rename the Dart field.',
+        );
+      }
+    }
   }
 }

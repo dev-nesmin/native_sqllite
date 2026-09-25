@@ -1,0 +1,10 @@
+native_sqlite
+
+Portions of the database inspector are adapted from Isar Community Inspector
+and Isar Connect:
+
+  Copyright 2022 Simon Leier
+
+Those portions are licensed under the Apache License, Version 2.0. A copy of
+that license is provided in LICENSES/Apache-2.0.txt. The adapted files have
+been modified for SQLite, the native_sqlite protocol, and Flutter DevTools.

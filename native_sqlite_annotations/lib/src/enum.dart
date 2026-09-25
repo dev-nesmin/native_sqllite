@@ -1,4 +1,3 @@
-
 /// Strategy for storing enum values in the database.
 enum EnumType {
   /// Store enum as its integer index (0, 1, 2, ...).
@@ -16,6 +15,7 @@ class EnumField {
   /// The strategy to use for storing this enum.
   final EnumType type;
 
+  /// Creates an enum storage annotation using [type].
   const EnumField({this.type = EnumType.ordinal});
 }
 
@@ -25,5 +25,6 @@ class EnumValue {
   /// The value to store in the database for this enum value.
   final dynamic value;
 
+  /// Creates a custom stored representation for an enum constant.
   const EnumValue(this.value);
 }

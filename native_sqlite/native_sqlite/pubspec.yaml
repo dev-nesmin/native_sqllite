@@ -18,6 +18,12 @@ flutter:
         default_package: native_sqlite_ios
       web:
         default_package: native_sqlite_web
+      linux:
+        dartPluginClass: NativeSqliteDesktop
+        fileName: src/desktop/native_sqlite_desktop.dart
+      windows:
+        dartPluginClass: NativeSqliteDesktop
+        fileName: src/desktop/native_sqlite_desktop.dart
 
 dependencies:
   flutter:
@@ -27,6 +33,7 @@ dependencies:
   native_sqlite_android: any
   native_sqlite_ios: any
   native_sqlite_web: any
+  sqlite3: ^2.9.3
 
 dev_dependencies:
   flutter_test:

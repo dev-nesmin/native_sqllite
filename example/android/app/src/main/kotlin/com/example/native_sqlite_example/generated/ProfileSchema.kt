@@ -20,7 +20,7 @@ object ProfileSchema {
     const val METADATA = "metadata"
 
     // Same statements as the Dart ProfileSchema
-    const val CREATE_TABLE_SQL = "CREATE TABLE profiles (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, email TEXT NOT NULL, phone_number TEXT, settings TEXT, tags TEXT, address TEXT, addresses TEXT, metadata TEXT NOT NULL)"
+    const val CREATE_TABLE_SQL = "CREATE TABLE \"profiles\" (\"id\" INTEGER PRIMARY KEY AUTOINCREMENT, \"name\" TEXT NOT NULL, \"email\" TEXT NOT NULL, \"phone_number\" TEXT, \"settings\" TEXT, \"tags\" TEXT, \"address\" TEXT, \"addresses\" TEXT, \"metadata\" TEXT NOT NULL)"
 
     val INDEX_SQL: List<String> = listOf(
     )

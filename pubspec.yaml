@@ -17,6 +17,7 @@ workspace:
   - example
 
 dev_dependencies:
+  crypto: ^3.0.6
   melos: ^7.0.0
 
 melos:
@@ -24,59 +25,67 @@ melos:
 
   command:
     version:
+      branch: main
+      linkToCommits: true
       updateGitTagRefs: true
       workspaceChangelog: true
+      message: |
+        chore(release): publish packages
+
+        {new_package_versions}
 
   scripts:
     analyze:
-      run: melos exec -- flutter analyze
+      run: flutter pub run melos exec --fail-fast -- flutter analyze
       description: Run flutter analyze in all Flutter packages
       packageFilters:
         flutter: true
 
     analyze:dart:
-      run: melos exec -- dart analyze
+      run: flutter pub run melos exec --fail-fast -- dart analyze
       description: Run dart analyze in pure Dart packages
       packageFilters:
         flutter: false
 
-    test:
-      run: melos exec -- flutter test
-      description: Run tests in all packages
+    test:flutter:
+      run: flutter pub run melos exec --concurrency=1 --fail-fast -- flutter test
+      description: Run tests in Flutter packages
       packageFilters:
         flutter: true
         dirExists: test
 
-    format:
-      run: melos exec -- dart format .
+    test:generator:
+      run: tool/test_generator.sh
+      description: Run the generator suite with its direct test runner
+
+    test:all:
+      description: Run every Flutter and generator test suite
+      steps:
+        - flutter pub run melos run test:flutter --no-select
+        - flutter pub run melos run test:generator
+
+    fmt:
+      run: flutter pub run melos exec --fail-fast -- dart format .
       description: Format all Dart files
 
-    format:check:
-      run: melos exec -- dart format --output=none --set-exit-if-changed .
+    fmt:check:
+      run: flutter pub run melos exec --fail-fast -- dart format --output=none --set-exit-if-changed .
       description: Check formatting without making changes (CI)
 
     build:runner:
-      run: melos exec -- dart run build_runner build --delete-conflicting-outputs
+      run: flutter pub run melos exec --fail-fast -- flutter pub run build_runner build
       description: Run build_runner in packages that use code generation
       packageFilters:
         dependsOn: build_runner
 
     build:runner:watch:
-      run: melos exec -- dart run build_runner watch --delete-conflicting-outputs
+      run: flutter pub run melos exec --concurrency=1 --fail-fast -- flutter pub run build_runner watch
       description: Run build_runner in watch mode
       packageFilters:
         dependsOn: build_runner
 
-    clean:
-      run: melos exec -- flutter clean
+    clean:all:
+      run: flutter pub run melos exec --fail-fast -- flutter clean
       description: Run flutter clean in all Flutter packages
       packageFilters:
         flutter: true
-
-    publish:dry:
-      run: melos publish --dry-run
-      description: Dry run publish for all publishable packages
-
-    publish:
-      run: melos publish
-      description: Publish all publishable packages to pub.dev

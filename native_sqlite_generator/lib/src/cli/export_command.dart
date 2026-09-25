@@ -11,7 +11,7 @@ class ExportCommand {
   ExportCommand(this.verbose);
 
   Future<void> execute(List<String> args) async {
-    print('📤 Exporting schemas to JSON...\n');
+    print('Exporting schemas to JSON...\n');
 
     // Parse arguments
     String? outputPath;
@@ -26,7 +26,7 @@ class ExportCommand {
     }
 
     if (outputPath == null) {
-      print('❌ Error: Missing required --output argument\n');
+      print('Error: Missing required --output argument\n');
       print('Usage: dart run native_sqlite_generator export \\');
       print('  --output <output.json> \\');
       print('  --format <json|yaml> (optional, default: json)');
@@ -42,14 +42,14 @@ class ExportCommand {
       final tables = await _findTables();
 
       if (tables.isEmpty) {
-        print('⚠️  No tables found');
+        print('No tables found');
         return;
       }
 
       if (verbose) {
         print('Found ${tables.length} table(s):');
         for (final table in tables) {
-          print('  • ${table.name}');
+          print('  - ${table.name}');
         }
         print('');
       }
@@ -64,13 +64,13 @@ class ExportCommand {
       await outputFile.create(recursive: true);
       await outputFile.writeAsString(output);
 
-      print('✅ Schema exported successfully!');
+      print('Schema exported successfully!');
       print('');
       print('Output: $outputPath');
       print('Tables: ${tables.length}');
       print('Format: $format');
     } catch (e, stackTrace) {
-      print('❌ Error exporting schema: $e');
+      print('Error exporting schema: $e');
       if (verbose) {
         print('');
         print('Stack trace:');
@@ -101,10 +101,12 @@ class ExportCommand {
         }
       } catch (e) {
         if (verbose) {
-          print('⚠️  Error parsing ${entity.path}: $e');
+          print('Error parsing ${entity.path}: $e');
         }
       }
     }
+
+    tables.sort((left, right) => left.tableName.compareTo(right.tableName));
 
     return tables;
   }
@@ -213,7 +215,6 @@ class ExportCommand {
   Map<String, dynamic> _generateSchema(List<_TableInfo> tables) {
     return {
       'version': '1.0.0',
-      'generatedAt': DateTime.now().toIso8601String(),
       'generator': 'native_sqlite_generator',
       'tableCount': tables.length,
       'tables': tables

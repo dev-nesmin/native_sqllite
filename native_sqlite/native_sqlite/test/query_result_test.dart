@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:native_sqlite/native_sqlite.dart';
 
@@ -93,7 +95,7 @@ void main() {
   });
 
   group('QueryResult equality and toString', () {
-    test('two results with same columns and row count are equal', () {
+    test('results with different row contents are not equal', () {
       final a = QueryResult(
         columns: ['id', 'name'],
         rows: [
@@ -107,7 +109,29 @@ void main() {
         ],
       );
 
+      expect(a, isNot(equals(b)));
+    });
+
+    test('equal results have equal deep hashes, including blobs', () {
+      final a = QueryResult(
+        columns: ['payload'],
+        rows: [
+          [
+            Uint8List.fromList([1, 2, 3]),
+          ],
+        ],
+      );
+      final b = QueryResult(
+        columns: ['payload'],
+        rows: [
+          [
+            Uint8List.fromList([1, 2, 3]),
+          ],
+        ],
+      );
+
       expect(a, equals(b));
+      expect(a.hashCode, b.hashCode);
     });
 
     test('results with different columns are not equal', () {

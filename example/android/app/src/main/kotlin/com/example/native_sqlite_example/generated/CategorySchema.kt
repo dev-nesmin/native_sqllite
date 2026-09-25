@@ -15,7 +15,7 @@ object CategorySchema {
     const val CREATED_AT = "created_at"
 
     // Same statements as the Dart CategorySchema
-    const val CREATE_TABLE_SQL = "CREATE TABLE categories (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, description TEXT, created_at INTEGER NOT NULL)"
+    const val CREATE_TABLE_SQL = "CREATE TABLE \"categories\" (\"id\" INTEGER PRIMARY KEY AUTOINCREMENT, \"name\" TEXT NOT NULL UNIQUE, \"description\" TEXT, \"created_at\" INTEGER NOT NULL)"
 
     val INDEX_SQL: List<String> = listOf(
     )

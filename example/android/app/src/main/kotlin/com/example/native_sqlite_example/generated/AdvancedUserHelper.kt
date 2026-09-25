@@ -6,7 +6,6 @@ import android.net.Uri
 import dev.nesmin.native_sqlite.NativeSqliteManager
 import java.time.Duration
 import java.time.Instant
-import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Data class for AdvancedUser.
@@ -33,7 +32,7 @@ data class AdvancedUser(
 /**
  * Helper class for AdvancedUser CRUD operations.
  * AUTO-GENERATED from Dart - DO NOT EDIT MANUALLY
- * Thread-safe for multi-isolate access.
+ * Create an instance for each native caller/database.
  *
  * Example usage (single isolate):
  * ```
@@ -41,58 +40,8 @@ data class AdvancedUser(
  * val id = helper.insert(AdvancedUser(...))
  * val item = helper.findById(id)
  * ```
- *
- * Example usage (multi-isolate safe):
- * ```
- * // In WorkManager or background task
- * val isolateId = Thread.currentThread().id
- * val helper = AdvancedUserHelper.getInstance("example_app", isolateId)
- * val users = helper.findAll()
- * // When done, cleanup:
- * AdvancedUserHelper.cleanupIsolate(isolateId)
- * ```
  */
 class AdvancedUserHelper(private val databaseName: String) {
-
-    companion object {
-        // Track helper instances per isolate for thread safety
-        private val isolateInstances = ConcurrentHashMap<Long, AdvancedUserHelper>()
-
-        /**
-         * Get or create helper instance for the given isolate.
-         * Safe to call from different Dart isolates or native threads.
-         *
-         * @param databaseName Name of the database
-         * @param isolateId Unique identifier for the isolate/thread
-         * @return Helper instance for this isolate
-         */
-        @JvmStatic
-        fun getInstance(databaseName: String, isolateId: Long): AdvancedUserHelper {
-            return isolateInstances.getOrPut(isolateId) {
-                AdvancedUserHelper(databaseName)
-            }
-        }
-
-        /**
-         * Cleanup resources for a specific isolate.
-         * Call this when an isolate is being destroyed.
-         *
-         * @param isolateId The isolate ID to cleanup
-         */
-        @JvmStatic
-        fun cleanupIsolate(isolateId: Long) {
-            isolateInstances.remove(isolateId)
-        }
-
-        /**
-         * Get all active isolate IDs currently using this helper.
-         * Useful for debugging.
-         */
-        @JvmStatic
-        fun getActiveIsolates(): Set<Long> {
-            return isolateInstances.keys.toSet()
-        }
-    }
 
     fun insert(entity: AdvancedUser): Long {
         val values: Map<String, Any?> = mapOf(
@@ -117,7 +66,7 @@ class AdvancedUserHelper(private val databaseName: String) {
     fun findById(id: Long): AdvancedUser? {
         val result = NativeSqliteManager.Instance.query(
             databaseName,
-            "SELECT * FROM ${AdvancedUserSchema.TABLE_NAME} WHERE ${AdvancedUserSchema.ID} = ? LIMIT 1",
+            "SELECT * FROM ${NativeSqliteManager.quoteIdentifier(AdvancedUserSchema.TABLE_NAME)} WHERE ${NativeSqliteManager.quoteIdentifier(AdvancedUserSchema.ID)} = ? LIMIT 1",
             listOf(id)
         )
         val rows = result["rows"] as? List<List<Any?>> ?: return null
@@ -128,7 +77,7 @@ class AdvancedUserHelper(private val databaseName: String) {
     }
 
     fun findAll(): List<AdvancedUser> {
-        val result = NativeSqliteManager.Instance.query(databaseName, "SELECT * FROM ${AdvancedUserSchema.TABLE_NAME}")
+        val result = NativeSqliteManager.Instance.query(databaseName, "SELECT * FROM ${NativeSqliteManager.quoteIdentifier(AdvancedUserSchema.TABLE_NAME)}")
         val rows = result["rows"] as? List<List<Any?>> ?: return emptyList()
         val columns = result["columns"] as List<String>
         val columnMap = columns.withIndex().associate { it.value to it.index }
@@ -198,6 +147,7 @@ class AdvancedUserHelper(private val databaseName: String) {
 
     /**
      * Delete entities matching a WHERE clause.
+     * IMPORTANT: whereClause is trusted SQL. Never pass user input; use whereArgs for values.
      * @param whereClause SQL WHERE clause (without "WHERE" keyword)
      * @param whereArgs Arguments for the WHERE clause
      * @return Number of rows deleted
@@ -273,6 +223,7 @@ class AdvancedUserHelper(private val databaseName: String) {
 
     /**
      * Find entities matching a WHERE clause with optional ordering and limit.
+     * IMPORTANT: whereClause and orderBy are trusted SQL. Never pass user input; use whereArgs for values.
      * @param whereClause SQL WHERE clause (without "WHERE" keyword)
      * @param whereArgs Arguments for the WHERE clause
      * @param orderBy Column to order by (e.g., "name ASC", "age DESC")
@@ -288,10 +239,14 @@ class AdvancedUserHelper(private val databaseName: String) {
         offset: Int? = null
     ): List<AdvancedUser> {
         val sql = buildString {
-            append("SELECT * FROM ${AdvancedUserSchema.TABLE_NAME}")
+            append("SELECT * FROM ${NativeSqliteManager.quoteIdentifier(AdvancedUserSchema.TABLE_NAME)}")
             whereClause?.let { append(" WHERE $it") }
             orderBy?.let { append(" ORDER BY $it") }
-            limit?.let { append(" LIMIT $it") }
+            if (limit != null) {
+                append(" LIMIT $limit")
+            } else if (offset != null) {
+                append(" LIMIT -1")
+            }
             offset?.let { append(" OFFSET $it") }
         }
         val result = NativeSqliteManager.Instance.query(databaseName, sql, whereArgs)
@@ -303,15 +258,16 @@ class AdvancedUserHelper(private val databaseName: String) {
 
     /**
      * Count entities matching a WHERE clause.
+     * IMPORTANT: whereClause is trusted SQL. Never pass user input; use whereArgs for values.
      * @param whereClause SQL WHERE clause (without "WHERE" keyword)
      * @param whereArgs Arguments for the WHERE clause
      * @return Number of matching entities
      */
     fun count(whereClause: String? = null, whereArgs: List<Any?>? = null): Long {
         val sql = if (whereClause != null) {
-            "SELECT COUNT(*) FROM ${AdvancedUserSchema.TABLE_NAME} WHERE $whereClause"
+            "SELECT COUNT(*) FROM ${NativeSqliteManager.quoteIdentifier(AdvancedUserSchema.TABLE_NAME)} WHERE $whereClause"
         } else {
-            "SELECT COUNT(*) FROM ${AdvancedUserSchema.TABLE_NAME}"
+            "SELECT COUNT(*) FROM ${NativeSqliteManager.quoteIdentifier(AdvancedUserSchema.TABLE_NAME)}"
         }
         val result = NativeSqliteManager.Instance.query(databaseName, sql, whereArgs)
         val rows = result["rows"] as? List<List<Any?>> ?: return 0
@@ -320,6 +276,7 @@ class AdvancedUserHelper(private val databaseName: String) {
 
     /**
      * Get the maximum value of a column.
+     * IMPORTANT: whereClause is trusted SQL. Never pass user input; use whereArgs for values.
      * @param column Column name to get max value from
      * @param whereClause Optional WHERE clause
      * @param whereArgs Arguments for WHERE clause
@@ -327,9 +284,9 @@ class AdvancedUserHelper(private val databaseName: String) {
      */
     fun max(column: String, whereClause: String? = null, whereArgs: List<Any?>? = null): Any? {
         val sql = if (whereClause != null) {
-            "SELECT MAX($column) FROM ${AdvancedUserSchema.TABLE_NAME} WHERE $whereClause"
+            "SELECT MAX(${NativeSqliteManager.quoteIdentifier(column)}) FROM ${NativeSqliteManager.quoteIdentifier(AdvancedUserSchema.TABLE_NAME)} WHERE $whereClause"
         } else {
-            "SELECT MAX($column) FROM ${AdvancedUserSchema.TABLE_NAME}"
+            "SELECT MAX(${NativeSqliteManager.quoteIdentifier(column)}) FROM ${NativeSqliteManager.quoteIdentifier(AdvancedUserSchema.TABLE_NAME)}"
         }
         val result = NativeSqliteManager.Instance.query(databaseName, sql, whereArgs)
         val rows = result["rows"] as? List<List<Any?>> ?: return null
@@ -338,6 +295,7 @@ class AdvancedUserHelper(private val databaseName: String) {
 
     /**
      * Get the minimum value of a column.
+     * IMPORTANT: whereClause is trusted SQL. Never pass user input; use whereArgs for values.
      * @param column Column name to get min value from
      * @param whereClause Optional WHERE clause
      * @param whereArgs Arguments for WHERE clause
@@ -345,9 +303,9 @@ class AdvancedUserHelper(private val databaseName: String) {
      */
     fun min(column: String, whereClause: String? = null, whereArgs: List<Any?>? = null): Any? {
         val sql = if (whereClause != null) {
-            "SELECT MIN($column) FROM ${AdvancedUserSchema.TABLE_NAME} WHERE $whereClause"
+            "SELECT MIN(${NativeSqliteManager.quoteIdentifier(column)}) FROM ${NativeSqliteManager.quoteIdentifier(AdvancedUserSchema.TABLE_NAME)} WHERE $whereClause"
         } else {
-            "SELECT MIN($column) FROM ${AdvancedUserSchema.TABLE_NAME}"
+            "SELECT MIN(${NativeSqliteManager.quoteIdentifier(column)}) FROM ${NativeSqliteManager.quoteIdentifier(AdvancedUserSchema.TABLE_NAME)}"
         }
         val result = NativeSqliteManager.Instance.query(databaseName, sql, whereArgs)
         val rows = result["rows"] as? List<List<Any?>> ?: return null
@@ -356,6 +314,7 @@ class AdvancedUserHelper(private val databaseName: String) {
 
     /**
      * Get the average value of a column.
+     * IMPORTANT: whereClause is trusted SQL. Never pass user input; use whereArgs for values.
      * @param column Column name to get average from
      * @param whereClause Optional WHERE clause
      * @param whereArgs Arguments for WHERE clause
@@ -363,9 +322,9 @@ class AdvancedUserHelper(private val databaseName: String) {
      */
     fun avg(column: String, whereClause: String? = null, whereArgs: List<Any?>? = null): Double? {
         val sql = if (whereClause != null) {
-            "SELECT AVG($column) FROM ${AdvancedUserSchema.TABLE_NAME} WHERE $whereClause"
+            "SELECT AVG(${NativeSqliteManager.quoteIdentifier(column)}) FROM ${NativeSqliteManager.quoteIdentifier(AdvancedUserSchema.TABLE_NAME)} WHERE $whereClause"
         } else {
-            "SELECT AVG($column) FROM ${AdvancedUserSchema.TABLE_NAME}"
+            "SELECT AVG(${NativeSqliteManager.quoteIdentifier(column)}) FROM ${NativeSqliteManager.quoteIdentifier(AdvancedUserSchema.TABLE_NAME)}"
         }
         val result = NativeSqliteManager.Instance.query(databaseName, sql, whereArgs)
         val rows = result["rows"] as? List<List<Any?>> ?: return null
@@ -374,6 +333,7 @@ class AdvancedUserHelper(private val databaseName: String) {
 
     /**
      * Get the sum of a column.
+     * IMPORTANT: whereClause is trusted SQL. Never pass user input; use whereArgs for values.
      * @param column Column name to sum
      * @param whereClause Optional WHERE clause
      * @param whereArgs Arguments for WHERE clause
@@ -381,9 +341,9 @@ class AdvancedUserHelper(private val databaseName: String) {
      */
     fun sum(column: String, whereClause: String? = null, whereArgs: List<Any?>? = null): Double? {
         val sql = if (whereClause != null) {
-            "SELECT SUM($column) FROM ${AdvancedUserSchema.TABLE_NAME} WHERE $whereClause"
+            "SELECT SUM(${NativeSqliteManager.quoteIdentifier(column)}) FROM ${NativeSqliteManager.quoteIdentifier(AdvancedUserSchema.TABLE_NAME)} WHERE $whereClause"
         } else {
-            "SELECT SUM($column) FROM ${AdvancedUserSchema.TABLE_NAME}"
+            "SELECT SUM(${NativeSqliteManager.quoteIdentifier(column)}) FROM ${NativeSqliteManager.quoteIdentifier(AdvancedUserSchema.TABLE_NAME)}"
         }
         val result = NativeSqliteManager.Instance.query(databaseName, sql, whereArgs)
         val rows = result["rows"] as? List<List<Any?>> ?: return null

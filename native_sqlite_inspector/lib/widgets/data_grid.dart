@@ -1,95 +1,156 @@
-import 'package:flutter/material.dart';
+// Portions adapted from Isar Community Inspector.
+// Copyright 2022 Simon Leier. Licensed under Apache-2.0.
+// See the package NOTICE and LICENSES/Apache-2.0.txt files.
 
-import '../connect_client.dart';
+import 'dart:convert';
+
+import 'package:flutter/material.dart';
 
 class DataGrid extends StatelessWidget {
   const DataGrid({
     super.key,
-    required this.data,
-    required this.schema,
-    required this.onDelete,
+    required this.columns,
+    required this.rows,
+    this.onEdit,
+    this.onDelete,
   });
 
-  final List<Map<String, dynamic>> data;
-  final TableSchema schema;
-  final Function(Map<String, dynamic> row) onDelete;
+  final List<String> columns;
+  final List<List<Object?>> rows;
+  final ValueChanged<int>? onEdit;
+  final ValueChanged<int>? onDelete;
+
+  bool get _hasActions => onEdit != null || onDelete != null;
 
   @override
   Widget build(BuildContext context) {
-    if (data.isEmpty) {
+    if (rows.isEmpty) {
       return const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.inbox, size: 64, color: Colors.grey),
-            SizedBox(height: 16),
-            Text(
-              'No data',
-              style: TextStyle(fontSize: 18, color: Colors.grey),
-            ),
+            Icon(Icons.inbox_outlined, size: 56, color: Colors.grey),
+            SizedBox(height: 12),
+            Text('No rows'),
           ],
         ),
       );
     }
 
-    final columns = schema.columns.map((c) => c.name).toList();
-
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
+    return Scrollbar(
       child: SingleChildScrollView(
-        child: DataTable(
-          columnSpacing: 24,
-          horizontalMargin: 16,
-          columns: [
-            ...columns.map((col) => DataColumn(
+        scrollDirection: Axis.horizontal,
+        child: SingleChildScrollView(
+          child: DataTable(
+            columnSpacing: 24,
+            horizontalMargin: 16,
+            columns: [
+              for (final column in columns)
+                DataColumn(
                   label: Text(
-                    col,
+                    column,
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
-                )),
-            const DataColumn(label: Text('Actions')),
-          ],
-          rows: data.map((row) {
-            return DataRow(
-              cells: [
-                ...columns.map((col) {
-                  final value = row[col];
-                  return DataCell(
-                    Text(
-                      _formatValue(value),
-                      style: TextStyle(
-                        color: value == null ? Colors.grey : null,
-                        fontStyle: value == null ? FontStyle.italic : null,
-                      ),
-                    ),
-                  );
-                }),
-                DataCell(
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.delete, size: 18),
-                        color: Colors.red,
-                        onPressed: () => onDelete(row),
-                        tooltip: 'Delete',
-                      ),
-                    ],
-                  ),
                 ),
-              ],
-            );
-          }).toList(),
+              if (_hasActions) const DataColumn(label: Text('Actions')),
+            ],
+            rows: [
+              for (var rowIndex = 0; rowIndex < rows.length; rowIndex++)
+                DataRow(
+                  cells: [
+                    for (
+                      var columnIndex = 0;
+                      columnIndex < columns.length;
+                      columnIndex++
+                    )
+                      _cell(
+                        context,
+                        columnIndex < rows[rowIndex].length
+                            ? rows[rowIndex][columnIndex]
+                            : null,
+                      ),
+                    if (_hasActions)
+                      DataCell(
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (onEdit != null)
+                              IconButton(
+                                icon: const Icon(Icons.edit_outlined, size: 18),
+                                onPressed: () => onEdit!(rowIndex),
+                                tooltip: 'Edit row',
+                              ),
+                            if (onDelete != null)
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.delete_outline,
+                                  size: 18,
+                                ),
+                                color: Colors.red,
+                                onPressed: () => onDelete!(rowIndex),
+                                tooltip: 'Delete row',
+                              ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  String _formatValue(dynamic value) {
+  DataCell _cell(BuildContext context, Object? value) {
+    return DataCell(
+      ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 320),
+        child: Text(
+          _formatValue(value),
+          maxLines: 3,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            color: value == null ? Colors.grey : null,
+            fontStyle: value == null ? FontStyle.italic : null,
+            fontFamily: value is Map ? 'monospace' : null,
+          ),
+        ),
+      ),
+      onTap: () => _showValue(context, value),
+    );
+  }
+
+  static String _formatValue(Object? value) {
     if (value == null) return 'NULL';
-    if (value is String) {
-      return value.length > 100 ? '${value.substring(0, 100)}...' : value;
+    if (value is Map && value[r'$type'] == 'blob') {
+      return 'BLOB (${value['length']} bytes)';
+    }
+    if (value is Map && value[r'$type'] == 'number') {
+      return value['value'].toString();
     }
     return value.toString();
+  }
+
+  static Future<void> _showValue(BuildContext context, Object? value) {
+    final text = value is Map || value is List
+        ? const JsonEncoder.withIndent('  ').convert(value)
+        : _formatValue(value);
+    return showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Cell value'),
+        content: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 640, maxHeight: 480),
+          child: SingleChildScrollView(child: SelectableText(text)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
   }
 }

@@ -11,7 +11,7 @@ class AnalyzeCommand {
   AnalyzeCommand(this.verbose);
 
   Future<void> execute() async {
-    print('🔍 Analyzing table definitions...\n');
+    print('Analyzing table definitions...\n');
 
     final issues = <AnalysisIssue>[];
 
@@ -40,7 +40,7 @@ class AnalyzeCommand {
         .where((i) => i.type != IssueType.tableInfo)
         .toList();
 
-    print('📊 Analysis complete:');
+    print('Analysis complete:');
     print('   Files analyzed: ${files.length}');
     print('   Tables found: $tablesFound');
     print('');
@@ -109,7 +109,7 @@ class AnalyzeCommand {
       }
     } catch (e) {
       if (verbose) {
-        print('⚠️  Error analyzing ${file.path}: $e');
+        print('Error analyzing ${file.path}: $e');
       }
     }
 
@@ -307,9 +307,9 @@ class AnalyzeCommand {
 
   void _printReport(List<AnalysisIssue> issues) {
     if (issues.isEmpty) {
-      print('✅ No issues found!');
+      print('No issues found!');
       print('');
-      print('Your table definitions look great! 🎉');
+      print('Your table definitions look great! ');
       return;
     }
 
@@ -331,7 +331,7 @@ class AnalyzeCommand {
 
     // Print errors first
     if (errors.isNotEmpty) {
-      print('❌ Errors:');
+      print('Errors:');
       for (final issue in errors) {
         _printIssue(issue);
       }
@@ -340,7 +340,7 @@ class AnalyzeCommand {
 
     // Then warnings
     if (warnings.isNotEmpty) {
-      print('⚠️  Warnings:');
+      print('Warnings:');
       for (final issue in warnings) {
         _printIssue(issue);
       }
@@ -349,7 +349,7 @@ class AnalyzeCommand {
 
     // Then suggestions
     if (infos.isNotEmpty) {
-      print('ℹ️  Suggestions:');
+      print('Suggestions:');
       for (final issue in infos) {
         _printIssue(issue);
       }
@@ -358,9 +358,9 @@ class AnalyzeCommand {
 
     // Summary
     if (errors.isNotEmpty) {
-      print('⚠️  Found ${errors.length} error(s) that should be fixed');
+      print('Found ${errors.length} error(s) that should be fixed');
     } else {
-      print('✅ No critical errors found');
+      print('No critical errors found');
     }
   }
 
@@ -370,7 +370,7 @@ class AnalyzeCommand {
     print('    at $relativePath');
 
     if (issue.suggestion != null) {
-      print('    💡 ${issue.suggestion}');
+      print('    ${issue.suggestion}');
     }
   }
 }

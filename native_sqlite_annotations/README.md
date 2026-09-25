@@ -14,7 +14,7 @@ You typically do **not** need to import this package directly — it is re-expor
 | [`@PrimaryKey`](#primarykey) | Field | Mark field as primary key |
 | [`@DbColumn`](#dbcolumn) | Field | Customise column mapping |
 | [`@ForeignKey`](#foreignkey) | Field | Define foreign key relationship |
-| [`@Index`](#index) | Field | Create an index on a column |
+| [`@Index`](#index) | Class | Create a named or unique index |
 | [`@EnumField`](#enumfield) | Field | Control enum storage strategy |
 | [`@UseConverter`](#useconverter) | Field | Attach a custom type converter |
 | [`@JsonField`](#jsonfield) | Field | Store field as JSON text |
@@ -44,8 +44,8 @@ class Order { ... }
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `name` | `String?` | Class name → snake_case | SQL table name |
-| `database` | `String?` | `build.yaml` `default_database` | Database file this table lives in |
-| `indexes` | `List<List<String>>?` | `null` | Table-level indexes; each inner list is a column list for one index |
+| `database` | `String?` | `build.yaml` `default_database` | Logical database name, without a file extension |
+| `indexes` | `List<List<String>>?` | `null` | Non-unique indexes using Dart field or SQL column names |
 | `auto` | `bool` | `true` | When `true` the generator includes this table in `DatabaseManager` |
 
 > **Note:** Set `auto: false` if you want to manage this table's schema manually (e.g. a system table that is created by native code).
@@ -63,7 +63,7 @@ final int? id;
 
 // UUID string primary key (generated on insert by the repository)
 @PrimaryKey(useLocalUuid: true)
-final String id;
+final String? id;
 
 // Manual integer key (you supply the value on insert)
 @PrimaryKey()
@@ -75,7 +75,7 @@ final int id;
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `autoIncrement` | `bool` | `false` | Add `AUTOINCREMENT` to the column. Only valid for `int?` fields. |
-| `useLocalUuid` | `bool` | `false` | Let the repository generate a UUID string before inserting. Only valid for `String` fields. |
+| `useLocalUuid` | `bool` | `false` | Let generated helpers create a UUID before inserting. Only valid for nullable `String?` fields. |
 
 > Do not combine `autoIncrement: true` and `useLocalUuid: true`.
 
@@ -124,7 +124,8 @@ final String email;
 
 ## `@ForeignKey`
 
-Defines a foreign key relationship. Must be combined with `@DbColumn`.
+Defines a foreign key relationship. `@DbColumn` is optional and is only
+needed when you also want to customise the column.
 
 ```dart
 @ForeignKey(
@@ -146,7 +147,9 @@ final int userId;
 | `onDelete` | `String?` | No | `'CASCADE'`, `'SET NULL'`, `'SET DEFAULT'`, `'RESTRICT'`, `'NO ACTION'` |
 | `onUpdate` | `String?` | No | Same options as `onDelete` |
 
-> **Tip:** Foreign keys require `enableForeignKeys: true` in `DatabaseConfig` (the default). Consider adding an `@Index` on the FK field for better query performance — the `analyze` CLI command will warn you if it is missing.
+> **Tip:** Foreign keys require `enableForeignKeys: true` in `DatabaseConfig`
+> (the default). For better query performance, add a class-level `@Index`
+> whose `columns` include the foreign-key field.
 
 ---
 
@@ -155,21 +158,23 @@ final int userId;
 Creates a dedicated index on one or more columns. Useful for columns frequently used in `WHERE` or `ORDER BY` clauses.
 
 ```dart
-@Index(columns: ['email'], unique: true)
-@DbColumn(nullable: false)
-final String email;
-
-// Multi-column index on a field
 @Index(columns: ['last_name', 'first_name'], name: 'idx_full_name')
-@DbColumn()
-final String lastName;
+@DbTable()
+class Person {
+  @PrimaryKey(autoIncrement: true)
+  final int? id;
+  final String firstName;
+  final String lastName;
+
+  const Person({this.id, required this.firstName, required this.lastName});
+}
 ```
 
 **Parameters:**
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `columns` | `List<String>` | required | Column names to include in the index |
+| `columns` | `List<String>` | required | Dart field names or SQL column names to index |
 | `name` | `String?` | Auto-generated: `idx_<table>_<columns>` | Custom index name |
 | `unique` | `bool` | `false` | Unique index (enforces uniqueness across the column combination) |
 
@@ -182,24 +187,17 @@ final String lastName;
 
 ## `@EnumField`
 
-Controls how an enum field is serialised for storage. Must be combined with `@DbColumn`.
+Controls how an enum field is serialised for storage. `@DbColumn` is optional.
 
 ```dart
 enum UserStatus { active, inactive, suspended }
 
 // Store as integer index (0=active, 1=inactive, 2=suspended) — default
 @EnumField(type: EnumType.ordinal)
-@DbColumn()
 final UserStatus status;
 
 // Store as string name ('active', 'inactive', ...)
 @EnumField(type: EnumType.name)
-@DbColumn()
-final UserStatus status;
-
-// Store as custom value (requires @EnumValue on each enum member)
-@EnumField(type: EnumType.value)
-@DbColumn()
 final UserStatus status;
 ```
 
@@ -209,17 +207,10 @@ final UserStatus status;
 |-------|---------|---------|
 | `EnumType.ordinal` | `INTEGER` | `UserStatus.inactive` → `1` |
 | `EnumType.name` | `TEXT` | `UserStatus.inactive` → `'inactive'` |
-| `EnumType.value` | Depends on `@EnumValue` | `UserStatus.inactive` → your custom value |
+| `EnumType.value` | Reserved; not yet supported by the generator | — |
 
-**`@EnumValue` (for `EnumType.value` only):**
-
-```dart
-enum Priority {
-  @EnumValue('LOW')    low,
-  @EnumValue('MEDIUM') medium,
-  @EnumValue('HIGH')   high,
-}
-```
+`@EnumValue` is reserved for future `EnumType.value` support. Do not use it
+until that generator feature is implemented.
 
 ---
 
@@ -233,7 +224,7 @@ class ColorConverter extends TypeConverter<Color, int> {
   const ColorConverter();
 
   @override
-  int toSql(Color value) => value.value;
+  int toSql(Color value) => value.toARGB32();
 
   @override
   Color fromSql(int sqlValue) => Color(sqlValue);
@@ -241,7 +232,6 @@ class ColorConverter extends TypeConverter<Color, int> {
 
 // 2. Use it on the field
 @UseConverter(ColorConverter())
-@DbColumn(type: 'INTEGER')
 final Color backgroundColor;
 ```
 
@@ -254,26 +244,34 @@ final Color backgroundColor;
 
 `SqlType` must be one of: `int`, `double`, `String`, or `Uint8List`.
 
+The converter passed to `@UseConverter` must be a compile-time constant, as
+required for all annotation arguments. Generic converters, named constructors,
+positional arguments, named arguments, and import prefixes are preserved in
+generated code. The SQLite column type is inferred from `SqlType`; an explicit
+`@DbColumn(type: ...)` is optional and must agree with that inferred type.
+Nullable fields are checked by generated code, so converter methods receive
+only non-null values. A converter backed by `Uint8List` does not require the
+model library to import `dart:typed_data`.
+
 ---
 
 ## `@JsonField`
 
-Stores a field as a JSON-encoded `TEXT` column. The generator emits `jsonEncode`/`jsonDecode` calls in the repository's `_fromMap` and `insert`/`update` methods.
+Stores a field as a JSON-encoded `TEXT` column. Generated repositories route
+encoding through `NativeSqliteCodec`, so the model library does not need a
+`dart:convert` import solely for generated code.
 
 ```dart
 // Map
 @JsonField()
-@DbColumn(type: 'TEXT')
 final Map<String, dynamic> metadata;
 
 // List
 @JsonField()
-@DbColumn(type: 'TEXT')
 final List<String> tags;
 
 // Custom class (must have toJson() and a fromJson() named constructor/factory)
 @JsonField()
-@DbColumn(type: 'TEXT')
 final Address? billingAddress;
 ```
 

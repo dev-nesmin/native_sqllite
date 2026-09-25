@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 import 'models/database_config.dart';
 import 'models/query_result.dart';
@@ -9,6 +11,7 @@ import 'models/query_result.dart';
 /// the subclass will get the default implementation, while platform implementations that `implements`
 /// this interface will be broken by newly added methods.
 abstract class NativeSqlitePlatform extends PlatformInterface {
+  /// Creates a token-verified native_sqlite platform implementation.
   NativeSqlitePlatform() : super(token: _token);
 
   static final Object _token = Object();
@@ -53,6 +56,15 @@ abstract class NativeSqlitePlatform extends PlatformInterface {
     List<Object?>? arguments,
   ) {
     throw UnimplementedError('execute() has not been implemented.');
+  }
+
+  /// Executes a raw INSERT and returns its SQLite row ID.
+  Future<int> executeInsert(
+    String databaseName,
+    String sql,
+    List<Object?>? arguments,
+  ) {
+    throw UnimplementedError('executeInsert() has not been implemented.');
   }
 
   /// Executes a SELECT query and returns the results.
@@ -100,20 +112,118 @@ abstract class NativeSqlitePlatform extends PlatformInterface {
     throw UnimplementedError('delete() has not been implemented.');
   }
 
-  /// Executes multiple SQL statements in a transaction.
-  ///
-  /// Returns true if the transaction was successful.
-  Future<bool> transaction(String databaseName, List<String> sqlStatements) {
-    throw UnimplementedError('transaction() has not been implemented.');
+  /// Begins an interactive transaction identified by [transactionId].
+  Future<void> beginTransaction(String databaseName, String transactionId) {
+    throw UnimplementedError('beginTransaction() has not been implemented.');
+  }
+
+  /// Commits or rolls back an interactive transaction.
+  Future<void> endTransaction(
+    String databaseName,
+    String transactionId, {
+    required bool commit,
+  }) {
+    throw UnimplementedError('endTransaction() has not been implemented.');
+  }
+
+  /// Executes SQL inside an interactive transaction.
+  Future<int> transactionExecute(
+    String databaseName,
+    String transactionId,
+    String sql,
+    List<Object?>? arguments,
+  ) {
+    throw UnimplementedError('transactionExecute() has not been implemented.');
+  }
+
+  /// Queries inside an interactive transaction.
+  Future<QueryResult> transactionQuery(
+    String databaseName,
+    String transactionId,
+    String sql,
+    List<Object?>? arguments,
+  ) {
+    throw UnimplementedError('transactionQuery() has not been implemented.');
+  }
+
+  /// Inserts inside an interactive transaction.
+  Future<int> transactionInsert(
+    String databaseName,
+    String transactionId,
+    String table,
+    Map<String, Object?> values,
+  ) {
+    throw UnimplementedError('transactionInsert() has not been implemented.');
+  }
+
+  /// Updates inside an interactive transaction.
+  Future<int> transactionUpdate(
+    String databaseName,
+    String transactionId,
+    String table,
+    Map<String, Object?> values, {
+    String? where,
+    List<Object?>? whereArgs,
+  }) {
+    throw UnimplementedError('transactionUpdate() has not been implemented.');
+  }
+
+  /// Deletes inside an interactive transaction.
+  Future<int> transactionDelete(
+    String databaseName,
+    String transactionId,
+    String table, {
+    String? where,
+    List<Object?>? whereArgs,
+  }) {
+    throw UnimplementedError('transactionDelete() has not been implemented.');
+  }
+
+  /// Executes a serialized batch in one platform call and transaction.
+  Future<List<Object?>> executeBatch(
+    String databaseName,
+    List<Map<String, Object?>> operations,
+  ) {
+    throw UnimplementedError('executeBatch() has not been implemented.');
   }
 
   /// Gets the database path for a given database name.
-  Future<String?> getDatabasePath(String databaseName) {
+  Future<String> getDatabasePath(
+    String databaseName, {
+    String? directory,
+    String? iosAppGroup,
+  }) {
     throw UnimplementedError('getDatabasePath() has not been implemented.');
   }
 
+  /// Whether a database file exists at the configured location.
+  Future<bool> databaseExists(
+    String databaseName, {
+    String? directory,
+    String? iosAppGroup,
+  }) {
+    throw UnimplementedError('databaseExists() has not been implemented.');
+  }
+
+  /// Writes a complete SQLite database file at the configured location.
+  ///
+  /// Implementations must reject importing over an open connection.
+  Future<void> importDatabase(
+    String databaseName,
+    Uint8List bytes, {
+    String? directory,
+    String? iosAppGroup,
+    bool overwrite = false,
+  }) {
+    throw UnimplementedError('importDatabase() has not been implemented.');
+  }
+
   /// Deletes the database file.
-  Future<void> deleteDatabase(String databaseName) {
+  Future<void> deleteDatabase(
+    String databaseName, {
+    String? directory,
+    String? iosAppGroup,
+  }) {
     throw UnimplementedError('deleteDatabase() has not been implemented.');
   }
 }

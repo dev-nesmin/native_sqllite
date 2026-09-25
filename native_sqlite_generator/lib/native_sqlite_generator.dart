@@ -1,6 +1,7 @@
-/// Code generator for native_sqlite.
+/// Build-runner entrypoints for native_sqlite code generation.
 ///
-/// Generates table schemas and repository classes from annotated model classes.
-library native_sqlite_generator;
+/// Applications normally configure these builders through `build.yaml`
+/// instead of importing this library directly.
+library;
 
-export 'src/table_generator.dart';
+export 'builder.dart';

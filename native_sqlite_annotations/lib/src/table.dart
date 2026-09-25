@@ -5,7 +5,7 @@
 ///
 /// Example:
 /// ```dart
-/// @DbTable(name: 'users', database: 'app.db')
+/// @DbTable(name: 'users', database: 'app')
 /// class User {
 ///   @PrimaryKey(autoIncrement: true)
 ///   final int? id;
@@ -25,22 +25,24 @@ class DbTable {
   final String? name;
 
   /// Indexes to create for this table.
-  /// Each index is defined as a list of column names.
+  /// Each index is defined as a list of Dart field names or SQL column names.
+  /// Use a class-level `@Index` annotation for named or unique indexes.
   final List<List<String>>? indexes;
 
   /// The default database name for this table.
-  /// When specified, the generated repository will use this as the default database.
-  /// You can still override it by passing a different database name to the repository constructor.
+  /// Use a logical name without a file extension.
+  /// This legacy selector is recorded in generated table metadata and native
+  /// helpers. Dart repositories always receive an open database handle.
   final String? database;
 
   /// Whether to automatically manage schema creation and migrations for this table.
   ///
   /// When `true` (default), the table will be included in the auto-generated
-  /// `DatabaseSchemaRegistry` and `DatabaseInitializer`, eliminating the need
-  /// for manual `onCreate` and `onUpgrade` configuration.
+  /// `DatabaseManager`, eliminating the need for manual table setup.
   ///
   /// Set to `false` if you want to manually manage this table's schema.
   final bool auto;
 
+  /// Creates a table annotation.
   const DbTable({this.name, this.indexes, this.database, this.auto = true});
 }

@@ -1,204 +1,128 @@
+// Portions adapted from Isar Community Inspector.
+// Copyright 2022 Simon Leier. Licensed under Apache-2.0.
+// See the package NOTICE and LICENSES/Apache-2.0.txt files.
+
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:native_sqlite/inspector_protocol.dart';
 
 import '../connect_client.dart';
 import 'connected_layout.dart';
 
 class ConnectionScreen extends StatefulWidget {
-  const ConnectionScreen({
-    super.key,
-    required this.port,
-    required this.secret,
-  });
-
-  final String port;
-  final String secret;
+  const ConnectionScreen({super.key});
 
   @override
   State<ConnectionScreen> createState() => _ConnectionScreenState();
 }
 
 class _ConnectionScreenState extends State<ConnectionScreen> {
-  late Future<ConnectClient> clientFuture;
-  // Add a key to force rebuild/retry
-  int _retryKey = 0;
+  late Future<_Connection> _connection;
+  ConnectClient? _client;
 
   @override
   void initState() {
     super.initState();
-    _loadClient();
+    _connect();
   }
 
-  void _loadClient() {
-    setState(() {
-      clientFuture = ConnectClient.connect(widget.port, widget.secret);
-    });
+  void _connect() {
+    _connection = _load();
   }
 
-  void _retry() {
-    setState(() {
-      _retryKey++;
-      _loadClient();
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return FutureBuilder<ConnectClient>(
-      key: ValueKey(_retryKey),
-      future: clientFuture,
-      builder: (context, snapshot) {
-        if (snapshot.hasData) {
-          return _SchemaLoader(client: snapshot.data!);
-        } else if (snapshot.hasError) {
-          return ErrorScreen(
-            error: snapshot.error.toString(),
-            onRetry: _retry,
-            port: widget.port,
-            secret: widget.secret,
-          );
-        } else {
-          return const Loading();
-        }
-      },
-    );
-  }
-}
-
-class _SchemaLoader extends StatefulWidget {
-  const _SchemaLoader({required this.client});
-
-  final ConnectClient client;
-
-  @override
-  State<_SchemaLoader> createState() => _SchemaLoaderState();
-}
-
-class _SchemaLoaderState extends State<_SchemaLoader> {
-  late Future<List<DatabaseInfo>> databasesFuture;
-
-  @override
-  void initState() {
-    databasesFuture = widget.client.listDatabases();
-    super.initState();
-  }
-
-  @override
-  void didUpdateWidget(covariant _SchemaLoader oldWidget) {
-    databasesFuture = widget.client.listDatabases();
-    super.didUpdateWidget(oldWidget);
+  Future<_Connection> _load() async {
+    final client = await ConnectClient.connect();
+    _client = client;
+    return _Connection(client, await client.listDatabases());
   }
 
   @override
   void dispose() {
+    unawaited(_client?.dispose());
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<List<DatabaseInfo>>(
-      future: databasesFuture,
+    return FutureBuilder<_Connection>(
+      future: _connection,
       builder: (context, snapshot) {
         if (snapshot.hasData) {
-          if (snapshot.data!.isEmpty) {
-            return const Center(
-              child: Text('No databases found'),
-            );
-          }
           return ConnectedLayout(
-            client: widget.client,
-            databases: snapshot.data!,
+            client: snapshot.data!.client,
+            databases: snapshot.data!.databases,
           );
-        } else if (snapshot.hasError) {
-          return ErrorScreen(
-            error: snapshot.error.toString(),
-            onRetry: () {
-              setState(() {
-                databasesFuture = widget.client.listDatabases();
-              });
-            },
-          );
-        } else {
-          return const Loading();
         }
+        if (snapshot.hasError) {
+          return _ErrorScreen(
+            error: snapshot.error.toString(),
+            onRetry: () => setState(_connect),
+          );
+        }
+        return const _Loading();
       },
     );
   }
 }
 
-class Loading extends StatelessWidget {
-  const Loading({super.key});
+final class _Connection {
+  const _Connection(this.client, this.databases);
+
+  final ConnectClient client;
+  final List<InspectorDatabaseInfo> databases;
+}
+
+class _Loading extends StatelessWidget {
+  const _Loading();
 
   @override
   Widget build(BuildContext context) {
-    return Center(
+    return const Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           CircularProgressIndicator(),
-          const SizedBox(height: 16),
-          const Text('Connecting to app...'),
-          const SizedBox(height: 8),
-          Text(
-            'v1.0.1',
-            style: TextStyle(
-              color: Colors.grey[400],
-              fontSize: 12,
-            ),
-          ),
+          SizedBox(height: 16),
+          Text('Connecting through Flutter DevTools…'),
         ],
       ),
     );
   }
 }
 
-class ErrorScreen extends StatelessWidget {
-  const ErrorScreen({
-    super.key,
-    required this.error,
-    required this.onRetry,
-    this.port,
-    this.secret,
-  });
+class _ErrorScreen extends StatelessWidget {
+  const _ErrorScreen({required this.error, required this.onRetry});
 
   final String error;
   final VoidCallback onRetry;
-  final String? port;
-  final String? secret;
 
   @override
   Widget build(BuildContext context) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(32.0),
+        padding: const EdgeInsets.all(32),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.error_outline, size: 64, color: Colors.red),
+            const Icon(Icons.link_off, size: 64, color: Colors.orange),
             const SizedBox(height: 16),
-            const Text(
-              'Connection Error',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            Text(
+              'native_sqlite is unavailable',
+              style: Theme.of(context).textTheme.headlineSmall,
             ),
             const SizedBox(height: 8),
-            Text(
-              error,
+            Text(error, textAlign: TextAlign.center),
+            const SizedBox(height: 12),
+            const Text(
+              'Run a debug build that opens a native_sqlite database, then retry.',
               textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.red),
             ),
-            if (port != null) ...[
-              const SizedBox(height: 16),
-              Text(
-                'Target: $port',
-                style: const TextStyle(fontFamily: 'monospace'),
-              ),
-            ],
             const SizedBox(height: 24),
-            ElevatedButton.icon(
+            FilledButton.icon(
               onPressed: onRetry,
               icon: const Icon(Icons.refresh),
-              label: const Text('Retry Connection'),
+              label: const Text('Retry'),
             ),
           ],
         ),

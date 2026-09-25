@@ -1,5 +1,6 @@
 import 'package:native_sqlite_generator/src/models/schema_snapshot.dart';
 import 'package:native_sqlite_generator/src/sql/schema_sql.dart';
+import 'package:native_sqlite_generator/src/sql/sql_identifier.dart';
 
 /// SQL that migrates one table between two schema versions.
 class TableMigration {
@@ -77,7 +78,8 @@ class MigrationSqlGenerator {
     ];
 
     final summary = <String>[
-      if (added.isNotEmpty) 'Added columns: ${added.map((c) => c.name).join(', ')}',
+      if (added.isNotEmpty)
+        'Added columns: ${added.map((c) => c.name).join(', ')}',
       if (removed.isNotEmpty) 'Removed columns: ${removed.join(', ')}',
       if (modified.isNotEmpty) 'Changed columns: ${modified.join(', ')}',
     ];
@@ -149,9 +151,14 @@ class MigrationSqlGenerator {
   }
 
   static String _addColumn(String table, ColumnSchemaSnapshot column) {
-    final parts = ['ALTER TABLE $table ADD COLUMN ${column.name} ${column.type}'];
+    final parts = [
+      'ALTER TABLE ${quoteSqlIdentifier(table)} ADD COLUMN '
+          '${quoteSqlIdentifier(column.name)} ${column.type}',
+    ];
     if (!column.nullable) parts.add('NOT NULL');
-    if (column.defaultValue != null) parts.add('DEFAULT ${column.defaultValue}');
+    if (column.defaultValue != null) {
+      parts.add('DEFAULT ${column.defaultValue}');
+    }
     return parts.join(' ');
   }
 
@@ -166,14 +173,16 @@ class MigrationSqlGenerator {
     final temp = '${table}_new';
     final shared = [
       for (final c in current.columns)
-        if (previousColumnNames.contains(c.name)) c.name,
+        if (previousColumnNames.contains(c.name)) quoteSqlIdentifier(c.name),
     ].join(', ');
     return [
       SchemaSql.createTable(current, name: temp),
       if (shared.isNotEmpty)
-        'INSERT INTO $temp ($shared) SELECT $shared FROM $table',
-      'DROP TABLE $table',
-      'ALTER TABLE $temp RENAME TO $table',
+        'INSERT INTO ${quoteSqlIdentifier(temp)} ($shared) '
+            'SELECT $shared FROM ${quoteSqlIdentifier(table)}',
+      'DROP TABLE ${quoteSqlIdentifier(table)}',
+      'ALTER TABLE ${quoteSqlIdentifier(temp)} '
+          'RENAME TO ${quoteSqlIdentifier(table)}',
       ...SchemaSql.createIndexes(current),
     ];
   }
@@ -198,7 +207,7 @@ class MigrationSqlGenerator {
     for (final MapEntry(key: name, value: index) in before.entries) {
       final replacement = after[name];
       if (replacement == null || signature(replacement) != signature(index)) {
-        sql.add('DROP INDEX IF EXISTS $name');
+        sql.add('DROP INDEX IF EXISTS ${quoteSqlIdentifier(name)}');
         summary.add('Dropped index $name');
       }
     }

@@ -109,10 +109,10 @@ run_build_runner() {
     echo "=== Build Runner Started: $(date) ===" > "$log_file"
     echo "Project: $project_name" >> "$log_file"
     echo "Directory: $project_dir" >> "$log_file"
-    echo "Command: dart run build_runner build --delete-conflicting-outputs" >> "$log_file"
+    echo "Command: flutter pub run build_runner build" >> "$log_file"
     echo "============================================" >> "$log_file"
     
-    if (cd "$project_dir" && dart run build_runner build --delete-conflicting-outputs > "$temp_log" 2>&1); then
+    if (cd "$project_dir" && flutter pub run build_runner build > "$temp_log" 2>&1); then
         # Success - show output and optionally remove log
         cat "$temp_log"
         cat "$temp_log" >> "$log_file"

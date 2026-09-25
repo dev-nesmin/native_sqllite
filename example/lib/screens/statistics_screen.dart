@@ -1,11 +1,11 @@
-import 'package:flutter/material.dart';
-import 'package:native_sqlite/native_sqlite.dart';
+import 'dart:async';
 
-import '../models/category.dart';
-import '../models/order.dart';
-import '../models/product.dart';
-import '../models/user.dart';
+import 'package:flutter/material.dart';
+
+import '../generated/database_manager.dart';
+import '../services/database_maintenance_service.dart';
 import '../widgets/glass_app_bar.dart';
+import '../widgets/ui_feedback.dart';
 
 class StatisticsScreen extends StatefulWidget {
   const StatisticsScreen({super.key});
@@ -15,552 +15,231 @@ class StatisticsScreen extends StatefulWidget {
 }
 
 class _StatisticsScreenState extends State<StatisticsScreen> {
-  // No need to specify database name! Using defaults from @Table annotations
-  final _userRepository = UserRepository();
-  final _categoryRepository = CategoryRepository();
-  final _productRepository = ProductRepository();
-  final _orderRepository = OrderRepository();
-
-  int _userCount = 0;
-  int _categoryCount = 0;
-  int _productCount = 0;
-  int _orderCount = 0;
-  String _dbPath = '';
-  bool _isLoading = true;
+  Map<String, int> _counts = const {};
+  List<Map<String, Object?>> _schema = const [];
+  String _path = '';
+  String _sqliteVersion = '';
+  bool _loading = true;
 
   @override
   void initState() {
     super.initState();
-    _loadStatistics();
+    unawaited(_load());
   }
 
-  Future<void> _loadStatistics() async {
-    setState(() => _isLoading = true);
-
+  Future<void> _load() async {
+    if (mounted) setState(() => _loading = true);
     try {
-      final results = await Future.wait([
-        _userRepository.count(),
-        _categoryRepository.count(),
-        _productRepository.count(),
-        _orderRepository.count(),
-        NativeSqlite.getDatabasePath('example_app'),
-      ]);
-
+      final database = DatabaseManager.currentDatabase;
+      final counts = <String, int>{};
+      for (final table in DatabaseManager.tableNames) {
+        final result = await database.query(
+          'SELECT COUNT(*) AS count FROM "$table"',
+        );
+        counts[table] = result.toMapList().single['count'] as int;
+      }
+      final schema = await database.query(
+        "SELECT name, sql FROM sqlite_master WHERE type = 'table' "
+        "AND name NOT LIKE 'sqlite_%' ORDER BY name",
+      );
+      final version = await database.query(
+        'SELECT sqlite_version() AS sqlite_version',
+      );
+      if (!mounted) return;
       setState(() {
-        _userCount = results[0] as int;
-        _categoryCount = results[1] as int;
-        _productCount = results[2] as int;
-        _orderCount = results[3] as int;
-        _dbPath = results[4] as String;
-        _isLoading = false;
+        _counts = counts;
+        _schema = schema.toMapList();
+        _path = database.path;
+        _sqliteVersion = version.toMapList().single['sqlite_version'] as String;
+        _loading = false;
       });
-    } catch (e) {
-      setState(() => _isLoading = false);
-      _showError('Error loading statistics: $e');
+    } on Object catch (error) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+      UiFeedback.showMessage(context, error.toString(), error: true);
     }
   }
 
-  Future<void> _clearAllData() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Clear All Data?'),
-        content: const Text(
-          'This will delete ALL data from ALL tables. This action cannot be undone.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Clear All', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true) {
-      try {
-        await _orderRepository.deleteAll();
-        await _productRepository.deleteAll();
-        await _categoryRepository.deleteAll();
-        await _userRepository.deleteAll();
-
-        _showSuccess('All data cleared successfully');
-        _loadStatistics();
-      } catch (e) {
-        _showError('Error clearing data: $e');
-      }
-    }
-  }
-
-  Future<void> _generateSampleData() async {
+  Future<void> _generateSamples() async {
+    setState(() => _loading = true);
     try {
-      // Create categories
-      final electronicsId = await _categoryRepository.insert(
-        Category(name: 'Electronics', description: 'Electronic devices'),
+      final inserted = await DatabaseMaintenanceService(
+        DatabaseManager.currentDatabase,
+      ).generateSampleData();
+      if (!mounted) return;
+      UiFeedback.showMessage(
+        context,
+        'Committed ${inserted.values.fold(0, (sum, value) => sum + value)} '
+        'rows across ${inserted.length} tables.',
       );
-      final clothingId = await _categoryRepository.insert(
-        Category(name: 'Clothing', description: 'Apparel and accessories'),
-      );
-      final booksId = await _categoryRepository.insert(
-        Category(name: 'Books', description: 'Books and magazines'),
-      );
-
-      if (electronicsId == null || clothingId == null || booksId == null) {
-        throw Exception('Failed to insert categories');
-      }
-
-      // Create users
-      final user1Id = await _userRepository.insert(
-        User(name: 'Alice Johnson', email: 'alice@example.com', age: 28),
-      );
-      final user2Id = await _userRepository.insert(
-        User(name: 'Bob Smith', email: 'bob@example.com', age: 35),
-      );
-      final user3Id = await _userRepository.insert(
-        User(name: 'Carol Davis', email: 'carol@example.com', age: 42),
-      );
-
-      if (user1Id == null || user2Id == null || user3Id == null) {
-        throw Exception('Failed to insert users');
-      }
-
-      // Create products
-      final laptop = await _productRepository.insert(
-        Product(
-          name: 'Gaming Laptop',
-          description: 'High-performance laptop',
-          price: 1299.99,
-          stock: 5,
-          categoryId: electronicsId,
-        ),
-      );
-      final phone = await _productRepository.insert(
-        Product(
-          name: 'Smartphone',
-          description: 'Latest model',
-          price: 899.99,
-          stock: 10,
-          categoryId: electronicsId,
-        ),
-      );
-      final shirt = await _productRepository.insert(
-        Product(
-          name: 'T-Shirt',
-          description: 'Cotton t-shirt',
-          price: 19.99,
-          stock: 50,
-          categoryId: clothingId,
-        ),
-      );
-      final book = await _productRepository.insert(
-        Product(
-          name: 'Programming Book',
-          description: 'Learn Flutter',
-          price: 39.99,
-          stock: 20,
-          categoryId: booksId,
-        ),
-      );
-
-      if (laptop == null || phone == null || shirt == null || book == null) {
-        throw Exception('Failed to insert products');
-      }
-
-      // Create orders
-      await _orderRepository.insert(
-        Order(
-          userId: user1Id,
-          productId: laptop,
-          quantity: 1,
-          totalPrice: 1299.99,
-          status: 'delivered',
-        ),
-      );
-      await _orderRepository.insert(
-        Order(
-          userId: user2Id,
-          productId: phone,
-          quantity: 2,
-          totalPrice: 1799.98,
-          status: 'processing',
-        ),
-      );
-      await _orderRepository.insert(
-        Order(
-          userId: user3Id,
-          productId: shirt,
-          quantity: 3,
-          totalPrice: 59.97,
-          status: 'pending',
-        ),
-      );
-      await _orderRepository.insert(
-        Order(
-          userId: user1Id,
-          productId: book,
-          quantity: 1,
-          totalPrice: 39.99,
-          status: 'delivered',
-        ),
-      );
-
-      _showSuccess('Sample data generated successfully');
-      _loadStatistics();
-    } catch (e) {
-      _showError('Error generating sample data: $e');
+      await _load();
+    } on Object catch (error) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+      UiFeedback.showMessage(context, error.toString(), error: true);
     }
   }
 
-  void _showSuccess(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.green),
+  Future<void> _reset() async {
+    final confirmed = await UiFeedback.confirm(
+      context,
+      title: 'Reset database?',
+      message:
+          'The current database file will be closed and deleted, then a fresh '
+          'schema will be created. All rows will be lost.',
+      confirmLabel: 'Reset database',
     );
-  }
+    if (!confirmed || !mounted) return;
 
-  void _showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.red),
-    );
+    setState(() => _loading = true);
+    try {
+      await DatabaseMaintenanceService.resetDatabase();
+      if (!mounted) return;
+      UiFeedback.showMessage(context, 'Fresh database created.');
+      await _load();
+    } on Object catch (error) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+      UiFeedback.showMessage(context, error.toString(), error: true);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      extendBodyBehindAppBar: true,
       appBar: GlassAppBar(
         title: 'Database Statistics',
         actions: [
           IconButton(
+            onPressed: _loading ? null : _load,
             icon: const Icon(Icons.refresh),
-            onPressed: _loadStatistics,
+            tooltip: 'Refresh',
           ),
         ],
       ),
-      body: _isLoading
+      body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(
-                16,
-                kToolbarHeight + 16,
-                16,
-                16,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+          : ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                _databaseCard(context),
+                const SizedBox(height: 16),
+                Text(
+                  'Every generated table',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: 8),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final width = constraints.maxWidth >= 700
+                        ? (constraints.maxWidth - 24) / 3
+                        : (constraints.maxWidth - 8) / 2;
+                    return Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final table in DatabaseManager.tableNames)
+                          SizedBox(
+                            width: width,
+                            child: _CountCard(
+                              table: table,
+                              count: _counts[table] ?? 0,
+                            ),
+                          ),
+                      ],
+                    );
+                  },
+                ),
+                const SizedBox(height: 16),
+                FilledButton.icon(
+                  onPressed: _generateSamples,
+                  icon: const Icon(Icons.add_circle_outline),
+                  label: const Text('Generate sample data in one transaction'),
+                ),
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  onPressed: _reset,
+                  icon: const Icon(Icons.restart_alt),
+                  label: const Text('Reset database'),
+                ),
+                const SizedBox(height: 16),
+                _schemaCard(context),
+              ],
+            ),
+    );
+  }
+
+  Widget _databaseCard(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Generated database',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 8),
+            Text('Name: ${DatabaseManager.currentDatabaseName}'),
+            Text('Schema version: ${DatabaseManager.schemaVersion}'),
+            Text('SQLite engine: $_sqliteVersion'),
+            SelectableText('Path: $_path'),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _schemaCard(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'SQLite schema',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 8),
+            for (final table in _schema)
+              ExpansionTile(
+                title: Text(table['name'] as String),
                 children: [
-                  _buildDatabaseInfoCard(),
-                  const SizedBox(height: 16),
-                  _buildStatisticsGrid(),
-                  const SizedBox(height: 16),
-                  _buildActionButtons(),
-                  const SizedBox(height: 16),
-                  _buildSchemaInfo(),
+                  Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: SelectableText(
+                      table['sql'] as String? ?? 'Schema unavailable',
+                    ),
+                  ),
                 ],
               ),
-            ),
+          ],
+        ),
+      ),
     );
   }
+}
 
-  Widget _buildDatabaseInfoCard() {
+class _CountCard extends StatelessWidget {
+  const _CountCard({required this.table, required this.count});
+
+  final String table;
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Row(
-              children: [
-                Icon(Icons.storage, color: Colors.blue),
-                SizedBox(width: 8),
-                Text(
-                  'Database Information',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            _buildInfoRow('Database Name', 'example_app'),
-            _buildInfoRow('Version', '1'),
-            _buildInfoRow('Path', _dbPath, isPath: true),
-            _buildInfoRow('WAL Mode', 'Enabled'),
-            _buildInfoRow('Foreign Keys', 'Enabled'),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildInfoRow(String label, String value, {bool isPath = false}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 120,
-            child: Text(
-              label,
-              style: TextStyle(
-                fontWeight: FontWeight.w500,
-                color: Colors.grey[700],
-              ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: TextStyle(
-                fontFamily: isPath ? 'monospace' : null,
-                fontSize: isPath ? 11 : 14,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatisticsGrid() {
-    return Column(
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: _buildStatCard(
-                'Users',
-                _userCount,
-                Icons.person,
-                Colors.blue,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildStatCard(
-                'Categories',
-                _categoryCount,
-                Icons.category,
-                Colors.green,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: _buildStatCard(
-                'Products',
-                _productCount,
-                Icons.shopping_bag,
-                Colors.orange,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildStatCard(
-                'Orders',
-                _orderCount,
-                Icons.receipt,
-                Colors.purple,
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildStatCard(String label, int count, IconData icon, Color color) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(12),
         child: Column(
           children: [
-            Icon(icon, size: 40, color: color),
-            const SizedBox(height: 8),
-            Text(
-              '$count',
-              style: TextStyle(
-                fontSize: 32,
-                fontWeight: FontWeight.bold,
-                color: color,
-              ),
-            ),
-            Text(
-              label,
-              style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-            ),
+            Text('$count', style: Theme.of(context).textTheme.headlineMedium),
+            Text(table, textAlign: TextAlign.center),
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildActionButtons() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        ElevatedButton.icon(
-          onPressed: _generateSampleData,
-          icon: const Icon(Icons.add_circle),
-          label: const Text('Generate Sample Data'),
-          style: ElevatedButton.styleFrom(
-            padding: const EdgeInsets.symmetric(vertical: 12),
-          ),
-        ),
-        const SizedBox(height: 8),
-        OutlinedButton.icon(
-          onPressed: _clearAllData,
-          icon: const Icon(Icons.delete_sweep, color: Colors.red),
-          label: const Text(
-            'Clear All Data',
-            style: TextStyle(color: Colors.red),
-          ),
-          style: OutlinedButton.styleFrom(
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            side: const BorderSide(color: Colors.red),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSchemaInfo() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Row(
-              children: [
-                Icon(Icons.schema, color: Colors.purple),
-                SizedBox(width: 8),
-                Text(
-                  'Database Schema',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            _buildTableInfo(
-              'users',
-              [
-                'id (PRIMARY KEY, AUTO INCREMENT)',
-                'name (TEXT, NOT NULL)',
-                'email (TEXT, UNIQUE, NOT NULL)',
-                'phoneNumber (TEXT)',
-                'address (TEXT)',
-                'age (INTEGER, DEFAULT 1)',
-                'isActive (INTEGER, DEFAULT 1)',
-                'createdAt (INTEGER, NOT NULL)',
-                'updatedAt (INTEGER)',
-              ],
-              ['INDEX: email', 'INDEX: createdAt'],
-            ),
-            const Divider(),
-            _buildTableInfo('categories', [
-              'id (PRIMARY KEY, AUTO INCREMENT)',
-              'name (TEXT, UNIQUE, NOT NULL)',
-              'description (TEXT)',
-              'createdAt (INTEGER, NOT NULL)',
-            ]),
-            const Divider(),
-            _buildTableInfo(
-              'products',
-              [
-                'id (PRIMARY KEY, AUTO INCREMENT)',
-                'name (TEXT, NOT NULL)',
-                'description (TEXT)',
-                'price (REAL, NOT NULL)',
-                'stock (INTEGER, DEFAULT 0)',
-                'isAvailable (INTEGER, DEFAULT 1)',
-                'categoryId (INTEGER, NOT NULL, FK → categories.id)',
-                'imageUrl (TEXT)',
-                'createdAt (INTEGER, NOT NULL)',
-                'updatedAt (INTEGER)',
-              ],
-              [
-                'INDEX: categoryId, price',
-                'INDEX: name',
-                'FOREIGN KEY: categoryId → categories(id) ON DELETE CASCADE',
-              ],
-            ),
-            const Divider(),
-            _buildTableInfo(
-              'orders',
-              [
-                'id (PRIMARY KEY, AUTO INCREMENT)',
-                'userId (INTEGER, NOT NULL, FK → users.id)',
-                'productId (INTEGER, NOT NULL, FK → products.id)',
-                'quantity (INTEGER, NOT NULL)',
-                'totalPrice (REAL, NOT NULL)',
-                'status (TEXT, DEFAULT "pending")',
-                'notes (TEXT)',
-                'createdAt (INTEGER, NOT NULL)',
-                'updatedAt (INTEGER)',
-                'deliveredAt (INTEGER)',
-              ],
-              [
-                'INDEX: userId, createdAt',
-                'INDEX: status',
-                'FOREIGN KEY: userId → users(id) ON DELETE CASCADE',
-                'FOREIGN KEY: productId → products(id) ON DELETE CASCADE',
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTableInfo(
-    String tableName,
-    List<String> columns, [
-    List<String>? indexes,
-  ]) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          tableName,
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            fontFamily: 'monospace',
-          ),
-        ),
-        const SizedBox(height: 8),
-        ...columns.map(
-          (col) => Padding(
-            padding: const EdgeInsets.only(left: 16, top: 2),
-            child: Text(
-              '• $col',
-              style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
-            ),
-          ),
-        ),
-        if (indexes != null && indexes.isNotEmpty) ...[
-          const SizedBox(height: 4),
-          ...indexes.map(
-            (idx) => Padding(
-              padding: const EdgeInsets.only(left: 16, top: 2),
-              child: Text(
-                '• $idx',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontFamily: 'monospace',
-                  color: Colors.blue[700],
-                ),
-              ),
-            ),
-          ),
-        ],
-      ],
     );
   }
 }

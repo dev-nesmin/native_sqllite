@@ -1,0 +1,281 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FLUTTER_VERSION: 3.47.5
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - name: Analyze every package
+        run: |
+          flutter pub run melos exec --fail-fast -- "flutter analyze --fatal-infos"
+      - name: Check non-generated Dart formatting
+        run: |
+          git ls-files '*.dart' \
+            ':!:**/*.g.dart' ':!:**/*.freezed.dart' ':!:**/*.table.dart' \
+            ':!:example/lib/generated/**' \
+            | xargs dart format --output=none --set-exit-if-changed
+      - name: Check package and podspec versions
+        run: dart tool/check_package_versions.dart
+
+  test-dart:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter test
+        working-directory: native_sqlite/native_sqlite
+      - run: flutter test
+        working-directory: example
+      - run: ./tool/test_generator.sh
+
+  generator-standalone:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - name: Test outside the workspace at direct and lower-bound versions
+        run: |
+          temp_dir="$(mktemp -d)"
+          cp -R native_sqlite_generator "$temp_dir/generator"
+          cp -R native_sqlite_annotations "$temp_dir/annotations"
+          sed -i '/^resolution: workspace$/d' "$temp_dir/generator/pubspec.yaml" "$temp_dir/annotations/pubspec.yaml"
+          sed -i 's#native_sqlite_annotations: any#native_sqlite_annotations:\n    path: ../annotations#' "$temp_dir/generator/pubspec.yaml"
+          cd "$temp_dir/generator"
+          dart pub get
+          dart test
+          dart pub downgrade
+          dart analyze --fatal-infos
+
+  codegen-up-to-date:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter pub run build_runner build
+        working-directory: example
+      - run: git diff --exit-code -- example/lib example/android/app/src/main/kotlin/com/example/native_sqlite_example/generated example/ios/Runner/Generated
+
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter build apk --debug
+        working-directory: example
+      - run: ./gradlew :native_sqlite_android:testDebugUnitTest
+        working-directory: example/android
+
+  desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - name: Exercise the Dart-only desktop implementation
+        run: flutter test test/native_sqlite_desktop_test.dart
+        working-directory: native_sqlite/native_sqlite
+
+  android-integration:
+    strategy:
+      fail-fast: false
+      matrix:
+        api-level: [26, 36]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - uses: reactivecircus/android-emulator-runner@c9c93e6ba9c4194322e114c40970d5983d9a07cc
+        with:
+          api-level: ${{ matrix.api-level }}
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          script: cd example && flutter test integration_test -d emulator-5554
+
+  ios:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter build ios --simulator --debug --no-codesign
+        working-directory: example
+      - name: Compile XCTest target
+        working-directory: example/ios
+        run: xcodebuild -workspace Runner.xcworkspace -scheme Runner -sdk iphonesimulator -configuration Debug build-for-testing CODE_SIGNING_ALLOWED=NO
+      - name: Build with Swift Package Manager enabled
+        working-directory: example
+        run: |
+          flutter config --enable-swift-package-manager
+          flutter build ios --simulator --debug --no-codesign
+
+  ios-integration:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - name: Boot simulator and run integration suite
+        run: |
+          udid="$(xcrun simctl list devices available -j | jq -r '[.devices[][] | select(.name | startswith("iPhone"))][0].udid')"
+          xcrun simctl boot "$udid" || true
+          open -a Simulator
+          xcrun simctl bootstatus "$udid" -b
+          cd example
+          flutter test integration_test -d "$udid"
+
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: dart run tool/check_web_wasm.dart
+      - run: flutter build web
+        working-directory: example
+      - name: Run browser integration tests
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y chromium-chromedriver
+          chromedriver --port=4444 &
+          cd example
+          flutter drive -d web-server --browser-name=chrome --headless --driver=test_driver/integration_test.dart --target=integration_test/database_test.dart
+
+  devtools-extension:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - name: Test extension contracts and widgets
+        run: flutter test
+        working-directory: native_sqlite_inspector
+      - name: Rebuild the committed extension
+        run: |
+          flutter pub run devtools_extensions build_and_copy \
+            --source=. \
+            --dest=../native_sqlite/native_sqlite/extension/devtools
+        working-directory: native_sqlite_inspector
+      - name: Normalize Flutter's randomized service-worker token
+        run: dart tool/normalize_devtools_build.dart
+      - name: Fail when committed extension assets are stale
+        run: git diff --exit-code -- native_sqlite/native_sqlite/extension/devtools
+      - name: Validate the published extension layout
+        run: |
+          flutter pub run devtools_extensions validate \
+            --package=../native_sqlite/native_sqlite
+        working-directory: native_sqlite_inspector
+
+  publish-dry-run:
+    strategy:
+      fail-fast: false
+      matrix:
+        package:
+          - native_sqlite/native_sqlite_platform_interface
+          - native_sqlite/native_sqlite_android
+          - native_sqlite/native_sqlite_ios
+          - native_sqlite/native_sqlite_web
+          - native_sqlite/native_sqlite
+          - native_sqlite_annotations
+          - native_sqlite_generator
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter pub publish --dry-run
+        working-directory: ${{ matrix.package }}
+
+  pana-leaf:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: dart pub global activate pana
+      - run: pana --exit-code-threshold 0.80 native_sqlite_annotations

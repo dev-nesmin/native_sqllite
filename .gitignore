@@ -1,4 +1,5 @@
-/.DS_Store
+.DS_Store
+graphify-out/
 
 # Melos
 .melos_tool/
@@ -14,6 +15,10 @@
 .pub/
 build/
 pubspec.lock
+
+# The native_sqlite DevTools extension is a published, reproducible artifact.
+!native_sqlite/native_sqlite/extension/devtools/build/
+!native_sqlite/native_sqlite/extension/devtools/build/**
 
 # Track the example app's lockfile so its dependencies are reproducible.
 !example/pubspec.lock

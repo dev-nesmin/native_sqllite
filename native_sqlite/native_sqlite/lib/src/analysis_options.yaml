@@ -1,0 +1,14 @@
+include: package:flutter_lints/flutter.yaml
+
+# lib/src contains implementation details. Public entrypoints and the shared
+# inspector protocol remain covered by public_member_api_docs at package root.
+analyzer:
+  language:
+    strict-casts: true
+    strict-inference: true
+    strict-raw-types: true
+
+linter:
+  rules:
+    unawaited_futures: true
+    discarded_futures: true

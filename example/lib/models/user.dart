@@ -2,7 +2,8 @@ import 'package:native_sqlite/native_sqlite.dart';
 
 part 'user.table.dart';
 
-// Force rebuild 4
+const Object _unset = Object();
+
 /// User model demonstrating:
 /// - Primary key with auto-increment
 /// - Unique constraints
@@ -10,11 +11,12 @@ part 'user.table.dart';
 /// - DateTime handling
 /// - Indexes for performance
 /// - Default values
+@Index(columns: ['phone_number'], name: 'idx_users_phone', unique: true)
 @DbTable(
   name: 'users',
   indexes: [
     ['email'], // Single column index for email lookups
-    ['createdAt'], // Index for sorting by creation date
+    ['created_at'], // SQL column name for sorting by creation date
   ],
 )
 class User {
@@ -33,7 +35,7 @@ class User {
   @DbColumn(nullable: true)
   final String? address;
 
-  @DbColumn(nullable: false, defaultValue: '1')
+  @DbColumn(nullable: false, defaultValue: '18')
   final int age;
 
   @DbColumn(nullable: false, defaultValue: '1')
@@ -66,25 +68,31 @@ class User {
     int? id,
     String? name,
     String? email,
-    String? phoneNumber,
-    String? address,
+    Object? phoneNumber = _unset,
+    Object? address = _unset,
     int? age,
     bool? isActive,
     DateTime? createdAt,
-    DateTime? updatedAt,
-    String? tempPassword,
+    Object? updatedAt = _unset,
+    Object? tempPassword = _unset,
   }) {
     return User(
       id: id ?? this.id,
       name: name ?? this.name,
       email: email ?? this.email,
-      phoneNumber: phoneNumber ?? this.phoneNumber,
-      address: address ?? this.address,
+      phoneNumber: identical(phoneNumber, _unset)
+          ? this.phoneNumber
+          : phoneNumber as String?,
+      address: identical(address, _unset) ? this.address : address as String?,
       age: age ?? this.age,
       isActive: isActive ?? this.isActive,
       createdAt: createdAt ?? this.createdAt,
-      updatedAt: updatedAt ?? this.updatedAt,
-      tempPassword: tempPassword ?? this.tempPassword,
+      updatedAt: identical(updatedAt, _unset)
+          ? this.updatedAt
+          : updatedAt as DateTime?,
+      tempPassword: identical(tempPassword, _unset)
+          ? this.tempPassword
+          : tempPassword as String?,
     );
   }
 

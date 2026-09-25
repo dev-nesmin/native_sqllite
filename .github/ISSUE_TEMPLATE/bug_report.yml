@@ -1,0 +1,37 @@
+name: Bug report
+description: Report a reproducible native_sqlite problem
+title: "fix: "
+labels: [bug]
+body:
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options: [Android, iOS, Web, Host tests, Generator]
+    validations:
+      required: true
+  - type: input
+    id: flutter
+    attributes:
+      label: Flutter and Dart versions
+      placeholder: Output of flutter --version
+    validations:
+      required: true
+  - type: input
+    id: packages
+    attributes:
+      label: native_sqlite package versions
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Include schema, code, observed result, and expected result.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or exception
+      render: shell

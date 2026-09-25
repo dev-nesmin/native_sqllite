@@ -1,12 +1,8 @@
 import 'package:native_sqlite/native_sqlite.dart';
 
+import 'demo_enums.dart';
+
 part 'advanced.table.dart';
-
-/// User status enum
-enum UserStatus { active, inactive, suspended }
-
-/// Priority enum
-enum Priority { low, medium, high, urgent }
 
 /// Advanced table demonstrating Phase 2 features:
 /// - Duration type support
@@ -19,26 +15,26 @@ class AdvancedUser {
   final int? id;
 
   @DbColumn()
-  final String name; // Changed back from fullname for testing
+  final String name;
 
   @DbColumn()
-  final String? phoneNumber; // NEW COLUMN for migration testing
-
-  // REMOVED email field - testing table recreation migration
+  final String? phoneNumber;
 
   @DbColumn()
-  final String? address; // Yet another test column
+  final String? address;
 
   @DbColumn()
-  final String? country; // NEW: Testing versioned schema generation
+  final String? country;
 
   @DbColumn()
-  final String? zipCode; // NEW: Testing v3 generation
+  final String? zipCode;
 
   @DbColumn()
-  final int? age; // Age for migration testing
+  final int? age;
+
   @DbColumn()
-  final String? city; // City for testing static migrations
+  final String? city;
+
   // Duration type - stored as milliseconds INTEGER
   @DbColumn()
   final Duration? loginDuration;

@@ -1,54 +1,32 @@
+// Portions adapted from Isar Community Inspector.
+// Copyright 2022 Simon Leier. Licensed under Apache-2.0.
+// See the package NOTICE and LICENSES/Apache-2.0.txt files.
+
+import 'package:devtools_extensions/devtools_extensions.dart';
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 
 import 'screens/connection_screen.dart';
-import 'screens/welcome_screen.dart';
 
 void main() {
-  runApp(const SQLiteInspectorApp());
+  runApp(const NativeSqliteDevToolsExtension());
 }
 
-final _router = GoRouter(
-  routes: <GoRoute>[
-    GoRoute(
-      path: '/',
-      builder: (BuildContext context, GoRouterState state) {
-        return const WelcomeScreen();
-      },
-    ),
-    GoRoute(
-      path: '/:port/:secret',
-      builder: (BuildContext context, GoRouterState state) {
-        final port = state.pathParameters['port']!;
-        final secret = state.pathParameters['secret']!;
-        return GestureDetector(
-          onTap: () {
-            FocusScope.of(context).requestFocus(FocusNode());
-          },
-          child: Scaffold(
-            body: Material(
-              child: ConnectionScreen(
-                port: port,
-                secret: secret,
-              ),
-            ),
-          ),
-        );
-      },
-    ),
-  ],
-);
+class NativeSqliteDevToolsExtension extends StatelessWidget {
+  const NativeSqliteDevToolsExtension({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const DevToolsExtension(child: SQLiteInspectorApp());
+  }
+}
 
 class SQLiteInspectorApp extends StatelessWidget {
   const SQLiteInspectorApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp.router(
-      title: 'SQLite Inspector',
-      routeInformationProvider: _router.routeInformationProvider,
-      routeInformationParser: _router.routeInformationParser,
-      routerDelegate: _router.routerDelegate,
+    return MaterialApp(
+      title: 'native_sqlite',
       debugShowCheckedModeBanner: false,
       theme: ThemeData.from(
         colorScheme: ColorScheme.fromSeed(
@@ -57,6 +35,7 @@ class SQLiteInspectorApp extends StatelessWidget {
         ),
         useMaterial3: true,
       ),
+      home: const Scaffold(body: ConnectionScreen()),
     );
   }
 }

@@ -1,9 +1,37 @@
-import 'package:flutter/material.dart';
+import 'dart:async';
 
+import 'package:flutter/material.dart';
+import 'package:native_sqlite/native_sqlite.dart';
+
+import '../generated/database_manager.dart';
 import '../models/category.dart';
+import '../models/order.dart';
 import '../models/product.dart';
 import '../models/user.dart';
 import '../widgets/glass_app_bar.dart';
+import '../widgets/ui_feedback.dart';
+
+void _showDatabaseError(BuildContext context, String action, Object error) {
+  if (error is NativeSqliteException) {
+    if (error.isUniqueViolation) {
+      UiFeedback.showMessage(
+        context,
+        'That value is already in use. Choose a different one.',
+        error: true,
+      );
+      return;
+    }
+    if (error.isForeignKeyViolation) {
+      UiFeedback.showMessage(
+        context,
+        'This item is still referenced by related data.',
+        error: true,
+      );
+      return;
+    }
+  }
+  UiFeedback.showMessage(context, '$action: $error', error: true);
+}
 
 class CrudDemoScreen extends StatefulWidget {
   const CrudDemoScreen({super.key});
@@ -31,13 +59,11 @@ class _CrudDemoScreenState extends State<CrudDemoScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      extendBodyBehindAppBar: true,
       appBar: GlassAppBar(title: 'CRUD Operations', actions: const []),
       body: Column(
         children: [
-          const SizedBox(height: kToolbarHeight),
           Material(
-            color: Colors.transparent,
+            color: Theme.of(context).colorScheme.surface.withValues(alpha: 0),
             child: TabBar(
               controller: _tabController,
               tabs: const [
@@ -72,25 +98,52 @@ class UserCrudTab extends StatefulWidget {
 }
 
 class _UserCrudTabState extends State<UserCrudTab> {
-  final _userRepository = UserRepository();
+  final _userRepository = UserRepository(DatabaseManager.currentDatabase);
+  final _searchController = TextEditingController();
+  static const _pageSize = 20;
   List<User> _users = [];
   bool _isLoading = false;
+  int _offset = 0;
+  int _matchingCount = 0;
 
   @override
   void initState() {
     super.initState();
-    _loadUsers();
+    unawaited(_loadUsers());
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  UserQueryBuilder _userQuery() {
+    final query = UserQueryBuilder(DatabaseManager.currentDatabase);
+    final search = _searchController.text.trim();
+    return search.isEmpty ? query : query.nameContains(search);
   }
 
   Future<void> _loadUsers() async {
     setState(() => _isLoading = true);
     try {
-      final users = await _userRepository.findAll();
+      final matchingCount = await _userQuery().count();
+      if (_offset >= matchingCount && _offset > 0) {
+        _offset = ((matchingCount - 1) ~/ _pageSize) * _pageSize;
+      }
+      final users = await _userQuery()
+          .sortByNameAsc()
+          .limit(_pageSize)
+          .offset(_offset)
+          .findAll();
+      if (!mounted) return;
       setState(() {
         _users = users;
+        _matchingCount = matchingCount;
         _isLoading = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() => _isLoading = false);
       _showError('Error loading users: $e');
     }
@@ -112,10 +165,12 @@ class _UserCrudTabState extends State<UserCrudTab> {
         );
 
         await _userRepository.insert(user);
+        if (!mounted) return;
         _showSuccess('User added successfully');
-        _loadUsers();
+        await _loadUsers();
       } catch (e) {
-        _showError('Error adding user: $e');
+        if (!mounted) return;
+        _showDatabaseError(context, 'Could not add user', e);
       }
     }
   }
@@ -137,38 +192,35 @@ class _UserCrudTabState extends State<UserCrudTab> {
         );
 
         await _userRepository.update(updatedUser);
+        if (!mounted) return;
         _showSuccess('User updated successfully');
-        _loadUsers();
+        await _loadUsers();
       } catch (e) {
-        _showError('Error updating user: $e');
+        if (!mounted) return;
+        _showDatabaseError(context, 'Could not update user', e);
       }
     }
   }
 
   Future<void> _deleteUser(int id) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Confirm Delete'),
-        content: const Text('Are you sure you want to delete this user?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
+    final dependentOrders = await OrderQueryBuilder(
+      DatabaseManager.currentDatabase,
+    ).userIdEqualTo(id).count();
+    if (!mounted) return;
+    final confirmed = await UiFeedback.confirm(
+      context,
+      title: 'Confirm delete',
+      message: dependentOrders == 0
+          ? 'Are you sure you want to delete this user?'
+          : 'Deleting this user will also delete $dependentOrders order(s).',
+      confirmLabel: 'Delete',
     );
 
-    if (confirmed == true) {
+    if (confirmed) {
       try {
         await _userRepository.delete(id);
         _showSuccess('User deleted successfully');
-        _loadUsers();
+        await _loadUsers();
       } catch (e) {
         _showError('Error deleting user: $e');
       }
@@ -176,15 +228,11 @@ class _UserCrudTabState extends State<UserCrudTab> {
   }
 
   void _showSuccess(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.green),
-    );
+    UiFeedback.showMessage(context, message);
   }
 
   void _showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.red),
-    );
+    UiFeedback.showMessage(context, message, error: true);
   }
 
   @override
@@ -193,20 +241,51 @@ class _UserCrudTabState extends State<UserCrudTab> {
       children: [
         Padding(
           padding: const EdgeInsets.all(16),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          child: Column(
             children: [
-              Text(
-                'Total Users: ${_users.length}',
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
+              TextField(
+                controller: _searchController,
+                decoration: InputDecoration(
+                  labelText: 'Search users by name',
+                  prefixIcon: const Icon(Icons.search),
+                  suffixIcon: _searchController.text.isEmpty
+                      ? null
+                      : IconButton(
+                          tooltip: 'Clear search',
+                          onPressed: () {
+                            _searchController.clear();
+                            _offset = 0;
+                            unawaited(_loadUsers());
+                          },
+                          icon: const Icon(Icons.clear),
+                        ),
                 ),
+                textInputAction: TextInputAction.search,
+                onChanged: (_) => setState(() {}),
+                onSubmitted: (_) {
+                  _offset = 0;
+                  unawaited(_loadUsers());
+                },
               ),
-              ElevatedButton.icon(
-                onPressed: _addUser,
-                icon: const Icon(Icons.add),
-                label: const Text('Add User'),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Users ${_matchingCount == 0 ? 0 : _offset + 1}-'
+                    '${(_offset + _users.length).clamp(0, _matchingCount)} '
+                    'of $_matchingCount',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  ElevatedButton.icon(
+                    onPressed: _addUser,
+                    icon: const Icon(Icons.add),
+                    label: const Text('Add User'),
+                  ),
+                ],
               ),
             ],
           ),
@@ -253,19 +332,23 @@ class _UserCrudTabState extends State<UserCrudTab> {
                                 ],
                               ),
                             ),
-                            const PopupMenuItem(
+                            PopupMenuItem(
                               value: 'delete',
                               child: Row(
                                 children: [
                                   Icon(
                                     Icons.delete,
                                     size: 20,
-                                    color: Colors.red,
+                                    color: Theme.of(context).colorScheme.error,
                                   ),
-                                  SizedBox(width: 8),
+                                  const SizedBox(width: 8),
                                   Text(
                                     'Delete',
-                                    style: TextStyle(color: Colors.red),
+                                    style: TextStyle(
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.error,
+                                    ),
                                   ),
                                 ],
                               ),
@@ -273,9 +356,9 @@ class _UserCrudTabState extends State<UserCrudTab> {
                           ],
                           onSelected: (value) {
                             if (value == 'edit') {
-                              _updateUser(user);
+                              unawaited(_updateUser(user));
                             } else if (value == 'delete' && user.id != null) {
-                              _deleteUser(user.id!);
+                              unawaited(_deleteUser(user.id!));
                             }
                           },
                         ),
@@ -284,6 +367,36 @@ class _UserCrudTabState extends State<UserCrudTab> {
                   },
                 ),
         ),
+        if (_matchingCount > _pageSize)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                OutlinedButton(
+                  onPressed: _offset == 0
+                      ? null
+                      : () {
+                          _offset = (_offset - _pageSize)
+                              .clamp(0, _matchingCount)
+                              .toInt();
+                          unawaited(_loadUsers());
+                        },
+                  child: const Text('Previous'),
+                ),
+                const SizedBox(width: 12),
+                OutlinedButton(
+                  onPressed: _offset + _pageSize >= _matchingCount
+                      ? null
+                      : () {
+                          _offset += _pageSize;
+                          unawaited(_loadUsers());
+                        },
+                  child: const Text('Next'),
+                ),
+              ],
+            ),
+          ),
       ],
     );
   }
@@ -410,25 +523,29 @@ class CategoryCrudTab extends StatefulWidget {
 }
 
 class _CategoryCrudTabState extends State<CategoryCrudTab> {
-  final _categoryRepository = CategoryRepository();
+  final _categoryRepository = CategoryRepository(
+    DatabaseManager.currentDatabase,
+  );
   List<Category> _categories = [];
   bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
-    _loadCategories();
+    unawaited(_loadCategories());
   }
 
   Future<void> _loadCategories() async {
     setState(() => _isLoading = true);
     try {
       final categories = await _categoryRepository.findAll();
+      if (!mounted) return;
       setState(() {
         _categories = categories;
         _isLoading = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() => _isLoading = false);
       _showError('Error loading categories: $e');
     }
@@ -448,10 +565,12 @@ class _CategoryCrudTabState extends State<CategoryCrudTab> {
         );
 
         await _categoryRepository.insert(category);
+        if (!mounted) return;
         _showSuccess('Category added successfully');
-        _loadCategories();
+        await _loadCategories();
       } catch (e) {
-        _showError('Error adding category: $e');
+        if (!mounted) return;
+        _showDatabaseError(context, 'Could not add category', e);
       }
     }
   }
@@ -469,40 +588,41 @@ class _CategoryCrudTabState extends State<CategoryCrudTab> {
           description: result['description'] as String?,
         );
         await _categoryRepository.update(updated);
+        if (!mounted) return;
         _showSuccess('Category updated successfully');
-        _loadCategories();
+        await _loadCategories();
       } catch (e) {
-        _showError('Error updating category: $e');
+        if (!mounted) return;
+        _showDatabaseError(context, 'Could not update category', e);
       }
     }
   }
 
   Future<void> _deleteCategory(int id) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Confirm Delete'),
-        content: const Text(
-          'Deleting this category will also delete all associated products.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
+    final products = await ProductQueryBuilder(
+      DatabaseManager.currentDatabase,
+    ).categoryIdEqualTo(id).findAll();
+    var dependentOrders = 0;
+    for (final product in products) {
+      dependentOrders += await OrderQueryBuilder(
+        DatabaseManager.currentDatabase,
+      ).productIdEqualTo(product.id!).count();
+    }
+    if (!mounted) return;
+    final confirmed = await UiFeedback.confirm(
+      context,
+      title: 'Confirm delete',
+      message:
+          'Deleting this category will also delete ${products.length} '
+          'product(s) and $dependentOrders order(s).',
+      confirmLabel: 'Delete',
     );
 
-    if (confirmed == true) {
+    if (confirmed) {
       try {
         await _categoryRepository.delete(id);
         _showSuccess('Category deleted successfully');
-        _loadCategories();
+        await _loadCategories();
       } catch (e) {
         _showError('Error deleting category: $e');
       }
@@ -510,15 +630,11 @@ class _CategoryCrudTabState extends State<CategoryCrudTab> {
   }
 
   void _showSuccess(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.green),
-    );
+    UiFeedback.showMessage(context, message);
   }
 
   void _showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.red),
-    );
+    UiFeedback.showMessage(context, message, error: true);
   }
 
   @override
@@ -567,19 +683,30 @@ class _CategoryCrudTabState extends State<CategoryCrudTab> {
                         leading: Container(
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
-                            color: Colors.purple.withValues(alpha: 0.1),
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.tertiaryContainer,
                             shape: BoxShape.circle,
                           ),
-                          child: const Icon(Icons.category,
-                              color: Colors.purple),
+                          child: Icon(
+                            Icons.category,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onTertiaryContainer,
+                          ),
                         ),
                         title: Text(category.name),
                         subtitle: category.description != null
                             ? Text(category.description!)
-                            : const Text('No description',
+                            : Text(
+                                'No description',
                                 style: TextStyle(
-                                    fontStyle: FontStyle.italic,
-                                    color: Colors.grey)),
+                                  fontStyle: FontStyle.italic,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
+                                ),
+                              ),
                         trailing: PopupMenuButton(
                           itemBuilder: (context) => [
                             const PopupMenuItem(
@@ -592,25 +719,34 @@ class _CategoryCrudTabState extends State<CategoryCrudTab> {
                                 ],
                               ),
                             ),
-                            const PopupMenuItem(
+                            PopupMenuItem(
                               value: 'delete',
                               child: Row(
                                 children: [
-                                  Icon(Icons.delete,
-                                      size: 20, color: Colors.red),
-                                  SizedBox(width: 8),
-                                  Text('Delete',
-                                      style: TextStyle(color: Colors.red)),
+                                  Icon(
+                                    Icons.delete,
+                                    size: 20,
+                                    color: Theme.of(context).colorScheme.error,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'Delete',
+                                    style: TextStyle(
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.error,
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),
                           ],
                           onSelected: (value) {
                             if (value == 'edit') {
-                              _updateCategory(category);
+                              unawaited(_updateCategory(category));
                             } else if (value == 'delete' &&
                                 category.id != null) {
-                              _deleteCategory(category.id!);
+                              unawaited(_deleteCategory(category.id!));
                             }
                           },
                         ),
@@ -643,8 +779,9 @@ class _CategoryFormDialogState extends State<CategoryFormDialog> {
   void initState() {
     super.initState();
     _nameController = TextEditingController(text: widget.category?.name);
-    _descriptionController =
-        TextEditingController(text: widget.category?.description);
+    _descriptionController = TextEditingController(
+      text: widget.category?.description,
+    );
   }
 
   @override
@@ -712,8 +849,10 @@ class ProductCrudTab extends StatefulWidget {
 }
 
 class _ProductCrudTabState extends State<ProductCrudTab> {
-  final _productRepository = ProductRepository();
-  final _categoryRepository = CategoryRepository();
+  final _productRepository = ProductRepository(DatabaseManager.currentDatabase);
+  final _categoryRepository = CategoryRepository(
+    DatabaseManager.currentDatabase,
+  );
   List<Product> _products = [];
   List<Category> _categories = [];
   bool _isLoading = false;
@@ -721,7 +860,7 @@ class _ProductCrudTabState extends State<ProductCrudTab> {
   @override
   void initState() {
     super.initState();
-    _loadData();
+    unawaited(_loadData());
   }
 
   Future<void> _loadData() async {
@@ -729,12 +868,14 @@ class _ProductCrudTabState extends State<ProductCrudTab> {
     try {
       final products = await _productRepository.findAll();
       final categories = await _categoryRepository.findAll();
+      if (!mounted) return;
       setState(() {
         _products = products;
         _categories = categories;
         _isLoading = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() => _isLoading = false);
       _showError('Error loading data: $e');
     }
@@ -763,10 +904,12 @@ class _ProductCrudTabState extends State<ProductCrudTab> {
         );
 
         await _productRepository.insert(product);
+        if (!mounted) return;
         _showSuccess('Product added successfully');
-        _loadData();
+        await _loadData();
       } catch (e) {
-        _showError('Error adding product: $e');
+        if (!mounted) return;
+        _showDatabaseError(context, 'Could not add product', e);
       }
     }
   }
@@ -795,38 +938,35 @@ class _ProductCrudTabState extends State<ProductCrudTab> {
           updatedAt: DateTime.now(),
         );
         await _productRepository.update(updated);
+        if (!mounted) return;
         _showSuccess('Product updated successfully');
-        _loadData();
+        await _loadData();
       } catch (e) {
-        _showError('Error updating product: $e');
+        if (!mounted) return;
+        _showDatabaseError(context, 'Could not update product', e);
       }
     }
   }
 
   Future<void> _deleteProduct(int id) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Confirm Delete'),
-        content: const Text('Are you sure you want to delete this product?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
+    final dependentOrders = await OrderQueryBuilder(
+      DatabaseManager.currentDatabase,
+    ).productIdEqualTo(id).count();
+    if (!mounted) return;
+    final confirmed = await UiFeedback.confirm(
+      context,
+      title: 'Confirm delete',
+      message: dependentOrders == 0
+          ? 'Are you sure you want to delete this product?'
+          : 'Deleting this product will also delete $dependentOrders order(s).',
+      confirmLabel: 'Delete',
     );
 
-    if (confirmed == true) {
+    if (confirmed) {
       try {
         await _productRepository.delete(id);
         _showSuccess('Product deleted successfully');
-        _loadData();
+        await _loadData();
       } catch (e) {
         _showError('Error deleting product: $e');
       }
@@ -834,15 +974,11 @@ class _ProductCrudTabState extends State<ProductCrudTab> {
   }
 
   void _showSuccess(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.green),
-    );
+    UiFeedback.showMessage(context, message);
   }
 
   void _showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.red),
-    );
+    UiFeedback.showMessage(context, message, error: true);
   }
 
   String _getCategoryName(int categoryId) {
@@ -897,15 +1033,17 @@ class _ProductCrudTabState extends State<ProductCrudTab> {
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
                             color: product.isAvailable
-                                ? Colors.green.withValues(alpha: 0.1)
-                                : Colors.grey.withValues(alpha: 0.1),
+                                ? Theme.of(context).colorScheme.primaryContainer
+                                : Theme.of(
+                                    context,
+                                  ).colorScheme.surfaceContainerHighest,
                             shape: BoxShape.circle,
                           ),
                           child: Icon(
                             Icons.shopping_bag,
                             color: product.isAvailable
-                                ? Colors.green
-                                : Colors.grey,
+                                ? Theme.of(context).colorScheme.primary
+                                : Theme.of(context).colorScheme.outline,
                           ),
                         ),
                         title: Text(product.name),
@@ -920,13 +1058,11 @@ class _ProductCrudTabState extends State<ProductCrudTab> {
                               'Category: ${_getCategoryName(product.categoryId)}',
                             ),
                             Text(
-                              product.isAvailable
-                                  ? 'Available'
-                                  : 'Unavailable',
+                              product.isAvailable ? 'Available' : 'Unavailable',
                               style: TextStyle(
                                 color: product.isAvailable
-                                    ? Colors.green
-                                    : Colors.red,
+                                    ? Theme.of(context).colorScheme.primary
+                                    : Theme.of(context).colorScheme.error,
                                 fontSize: 12,
                               ),
                             ),
@@ -945,25 +1081,34 @@ class _ProductCrudTabState extends State<ProductCrudTab> {
                                 ],
                               ),
                             ),
-                            const PopupMenuItem(
+                            PopupMenuItem(
                               value: 'delete',
                               child: Row(
                                 children: [
-                                  Icon(Icons.delete,
-                                      size: 20, color: Colors.red),
-                                  SizedBox(width: 8),
-                                  Text('Delete',
-                                      style: TextStyle(color: Colors.red)),
+                                  Icon(
+                                    Icons.delete,
+                                    size: 20,
+                                    color: Theme.of(context).colorScheme.error,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'Delete',
+                                    style: TextStyle(
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.error,
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),
                           ],
                           onSelected: (value) {
                             if (value == 'edit') {
-                              _updateProduct(product);
+                              unawaited(_updateProduct(product));
                             } else if (value == 'delete' &&
                                 product.id != null) {
-                              _deleteProduct(product.id!);
+                              unawaited(_deleteProduct(product.id!));
                             }
                           },
                         ),
@@ -982,11 +1127,7 @@ class ProductFormDialog extends StatefulWidget {
   final List<Category> categories;
   final Product? product;
 
-  const ProductFormDialog({
-    super.key,
-    required this.categories,
-    this.product,
-  });
+  const ProductFormDialog({super.key, required this.categories, this.product});
 
   @override
   State<ProductFormDialog> createState() => _ProductFormDialogState();
@@ -1007,10 +1148,8 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
     final p = widget.product;
     _nameController = TextEditingController(text: p?.name);
     _descriptionController = TextEditingController(text: p?.description);
-    _priceController =
-        TextEditingController(text: p?.price.toString() ?? '');
-    _stockController =
-        TextEditingController(text: p?.stock.toString() ?? '0');
+    _priceController = TextEditingController(text: p?.price.toString() ?? '');
+    _stockController = TextEditingController(text: p?.stock.toString() ?? '0');
     _selectedCategoryId = p?.categoryId ?? widget.categories.first.id;
     _isAvailable = p?.isAvailable ?? true;
   }
@@ -1051,7 +1190,9 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
               TextFormField(
                 controller: _priceController,
                 decoration: const InputDecoration(labelText: 'Price'),
-                keyboardType: TextInputType.number,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
                 validator: (value) {
                   if (value?.isEmpty ?? true) return 'Please enter price';
                   final price = double.tryParse(value!);

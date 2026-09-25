@@ -8,26 +8,10 @@ class ColorConverter extends TypeConverter<Color, int> {
   const ColorConverter();
 
   @override
-  int toSql(Color value) =>
-      (value.a * 255).toInt() << 24 |
-      (value.r * 255).toInt() << 16 |
-      (value.g * 255).toInt() << 8 |
-      (value.b * 255).toInt();
+  int toSql(Color value) => value.toARGB32();
 
   @override
   Color fromSql(int sqlValue) => Color(sqlValue);
-}
-
-/// Custom type converter for `List<String>` (storing as comma-separated TEXT)
-class StringListConverter extends TypeConverter<List<String>, String> {
-  const StringListConverter();
-
-  @override
-  String toSql(List<String> value) => value.join(',');
-
-  @override
-  List<String> fromSql(String sqlValue) =>
-      sqlValue.isEmpty ? [] : sqlValue.split(',');
 }
 
 /// Table demonstrating custom type converters
@@ -40,18 +24,15 @@ class StyledItem {
   final String name;
 
   // Custom converter for Color type
-  @DbColumn(type: 'INTEGER')
   @UseConverter(ColorConverter())
   final Color backgroundColor;
 
   // Custom converter for nullable Color
-  @DbColumn(type: 'INTEGER')
   @UseConverter(ColorConverter())
   final Color? textColor;
 
-  // Custom converter for List<String>
-  @DbColumn(type: 'TEXT')
-  @UseConverter(StringListConverter())
+  // JSON preserves values that contain commas, separators, or whitespace.
+  @JsonField()
   final List<String> tags;
 
   @DbColumn()

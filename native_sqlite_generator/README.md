@@ -13,7 +13,7 @@ The `build_runner` code generator for the `native_sqlite` plugin. Processes `@Db
 
 ```yaml
 dev_dependencies:
-  native_sqlite_generator: ^1.0.0
+  native_sqlite_generator: ^0.0.1
   build_runner: ^2.4.0
 ```
 
@@ -25,10 +25,10 @@ dev_dependencies:
 
 ```bash
 # One-time build
-dart run build_runner build --delete-conflicting-outputs
+flutter pub run build_runner build
 
 # Watch mode (re-runs on file save)
-dart run build_runner watch --delete-conflicting-outputs
+flutter pub run build_runner watch
 ```
 
 ### Native Kotlin/Swift generation
@@ -49,34 +49,22 @@ targets:
   $default:
     builders:
       native_sqlite_generator:table:
-        options:
-          # Default database name for all tables.
-          # Override per-table with @DbTable(database: 'other_db')
-          default_database: 'my_app'
-
-          # Format generated code with dart format (default: false)
-          format: true
-
-          # Generate helper extension methods (default: true)
-          generate_helpers: true
-
-          # Cache builds to skip unchanged tables (default: true)
-          enable_cached_builds: true
-
-          # Table name casing strategy (default: 'snake')
-          # Options: 'snake', 'camel', 'pascal', 'none'
+        options: &native_sqlite_options
           table_name_case: 'snake'
-
-          # Column name casing strategy (default: 'snake')
           column_name_case: 'snake'
-
-          # Verbose logging during generation (default: false)
           verbose: false
+      native_sqlite_generator:migration:
+        options: *native_sqlite_options
+      native_sqlite_generator:schema_registry:
+        options: *native_sqlite_options
 ```
 
-> `table_name_case` / `column_name_case` must be identical for the `:table`,
-> `:migration` and `:schema_registry` builders (the defaults already are). The
-> build fails if the schema snapshot and the generated tables disagree.
+Use this single YAML anchor for every builder that analyzes models. This keeps
+`table_name_case` and `column_name_case` identical; generation fails rather
+than producing a mismatched schema if they diverge. Supported values for both
+are `snake`, `camel`, `pascal`, and `none`. Unknown options and invalid values
+are build errors. The database name and native output settings belong only in
+`native_sqlite_config.yaml`.
 
 ---
 
@@ -136,32 +124,32 @@ The repository handles:
 
 ```dart
 class UserQueryBuilder {
-  UserQueryBuilder(String databaseName);
+  UserQueryBuilder(NativeSqliteDatabase database);
 
   // Filter methods — generated per column, per type
-  UserQueryBuilder whereIdEquals(int value);
-  UserQueryBuilder whereNameContains(String value);
-  UserQueryBuilder whereNameStartsWith(String value);
-  UserQueryBuilder whereEmailEquals(String value);
-  UserQueryBuilder whereIsActiveEquals(bool value);
-  UserQueryBuilder whereCreatedAtGreaterThan(DateTime value);
-  UserQueryBuilder whereCreatedAtBetween(DateTime from, DateTime to);
+  UserQueryBuilder idEqualTo(int value);
+  UserQueryBuilder nameContains(String value);
+  UserQueryBuilder nameStartsWith(String value);
+  UserQueryBuilder emailEqualTo(String value);
+  UserQueryBuilder isActiveIsTrue();
+  UserQueryBuilder createdAtAfter(DateTime value);
+  UserQueryBuilder createdAtBetween(DateTime from, DateTime to);
 
   // Sorting
-  UserQueryBuilder orderByIdAscending();
-  UserQueryBuilder orderByIdDescending();
-  UserQueryBuilder orderByNameAscending();
-  UserQueryBuilder orderByCreatedAtDescending();
+  UserQueryBuilder sortByIdAsc();
+  UserQueryBuilder sortByIdDesc();
+  UserQueryBuilder sortByNameAsc();
+  UserQueryBuilder thenByCreatedAtDesc();
 
   // Pagination
   UserQueryBuilder limit(int count);
   UserQueryBuilder offset(int count);
 
   // Execution
-  Future<List<User>> find();
-  Future<User?> findOne();
+  Future<List<User>> findAll();
+  Future<User?> findFirst();
   Future<int> count();
-  Future<int> delete();
+  Future<int> deleteAll();
 }
 ```
 
@@ -385,26 +373,6 @@ dart run native_sqlite_generator export \
 
 ---
 
-### `clean-cache`
-
-Clears the generator's build cache. Use this if you see stale generated code.
-
-```bash
-dart run native_sqlite_generator clean-cache
-```
-
----
-
-### `cache-stats`
-
-Shows cache hit/miss statistics from the last build.
-
-```bash
-dart run native_sqlite_generator cache-stats
-```
-
----
-
 ## Native Code Generation (`native_sqlite_config.yaml`)
 
 To generate Kotlin/Swift helpers, add `native_sqlite_config.yaml` to your project root:
@@ -414,9 +382,7 @@ native_sqlite:
   generate_native: true
   database_name: 'my_app'
   include_examples: true    # include usage comments in generated files
-
-  models:
-    - 'lib/models/*.dart'   # glob patterns for model files
+  native_type_prefix: 'App' # optional: AppUser, AppUserHelper, AppUserStatus
 
   android:
     enabled: true
@@ -432,6 +398,10 @@ native_sqlite:
 
 The `native_code` builder regenerates the files on every `build_runner` build;
 `dart run native_sqlite_generator` does the same from the command line.
+`native_type_prefix` defaults to empty and prefixes model-derived native
+types only, avoiding clashes with types already in the Android/iOS app. Each
+output folder contains a manifest; files from the prior manifest that are no
+longer generated are removed only when they retain the generated-code marker.
 
 ### Generated Kotlin files
 
@@ -483,10 +453,6 @@ Your model files (@DbTable classes)
                         ├─► NativeKotlinGenerator → *.kt files
                         └─► NativeSwiftGenerator  → *.swift files
 ```
-
-**Build caching:** The generator caches a fingerprint of each model file. On subsequent builds, unchanged models are skipped. Use `clean-cache` if you need a full rebuild.
-
----
 
 ## Known Limitations
 

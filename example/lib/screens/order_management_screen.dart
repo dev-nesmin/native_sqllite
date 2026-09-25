@@ -1,49 +1,50 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
+import '../generated/database_manager.dart';
 import '../models/order.dart';
 import '../models/product.dart';
 import '../models/user.dart';
+import '../services/order_demo_service.dart';
 import '../widgets/glass_app_bar.dart';
+import '../widgets/ui_feedback.dart';
 
-const List<String> _statusOptions = [
-  'pending',
-  'processing',
-  'shipped',
-  'delivered',
-  'cancelled',
-];
+const List<OrderStatus> _statusOptions = OrderStatus.values;
 
-Color _statusColor(String status) {
+String _statusLabel(OrderStatus status) {
+  final name = status.name;
+  return '${name[0].toUpperCase()}${name.substring(1)}';
+}
+
+Color _statusColor(BuildContext context, OrderStatus status) {
+  final colors = Theme.of(context).colorScheme;
   switch (status) {
-    case 'pending':
-      return Colors.orange;
-    case 'processing':
-      return Colors.blue;
-    case 'shipped':
-      return Colors.indigo;
-    case 'delivered':
-      return Colors.green;
-    case 'cancelled':
-      return Colors.red;
-    default:
-      return Colors.grey;
+    case OrderStatus.pending:
+      return colors.secondary;
+    case OrderStatus.processing:
+      return colors.primary;
+    case OrderStatus.shipped:
+      return colors.tertiary;
+    case OrderStatus.delivered:
+      return colors.primary;
+    case OrderStatus.cancelled:
+      return colors.error;
   }
 }
 
-IconData _statusIcon(String status) {
+IconData _statusIcon(OrderStatus status) {
   switch (status) {
-    case 'pending':
+    case OrderStatus.pending:
       return Icons.schedule;
-    case 'processing':
+    case OrderStatus.processing:
       return Icons.autorenew;
-    case 'shipped':
+    case OrderStatus.shipped:
       return Icons.local_shipping;
-    case 'delivered':
+    case OrderStatus.delivered:
       return Icons.check_circle;
-    case 'cancelled':
+    case OrderStatus.cancelled:
       return Icons.cancel;
-    default:
-      return Icons.help_outline;
   }
 }
 
@@ -55,20 +56,24 @@ class OrderManagementScreen extends StatefulWidget {
 }
 
 class _OrderManagementScreenState extends State<OrderManagementScreen> {
-  final _orderRepository = OrderRepository();
-  final _userRepository = UserRepository();
-  final _productRepository = ProductRepository();
+  final _orderRepository = OrderRepository(DatabaseManager.currentDatabase);
+  final _userRepository = UserRepository(DatabaseManager.currentDatabase);
+  final _productRepository = ProductRepository(DatabaseManager.currentDatabase);
+  final _orderDemo = OrderDemoService(DatabaseManager.currentDatabase);
 
   List<Order> _orders = [];
   List<User> _users = [];
   List<Product> _products = [];
   bool _isLoading = false;
-  String _filterStatus = 'all';
+  OrderStatus? _filterStatus;
+  int _orderCount = 0;
+  double _orderTotal = 0;
+  Map<OrderStatus, int> _statusCounts = const {};
 
   @override
   void initState() {
     super.initState();
-    _loadData();
+    unawaited(_loadData());
   }
 
   Future<void> _loadData() async {
@@ -77,10 +82,28 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
       final orders = await _orderRepository.findAll();
       final users = await _userRepository.findAll();
       final products = await _productRepository.findAll();
+      final summary = await DatabaseManager.currentDatabase.query(
+        'SELECT "${OrderSchema.STATUS}" AS status, COUNT(*) AS count, '
+        'COALESCE(SUM("${OrderSchema.TOTAL_PRICE}"), 0) AS total '
+        'FROM "${OrderSchema.tableName}" GROUP BY "${OrderSchema.STATUS}"',
+      );
+      final statusCounts = <OrderStatus, int>{};
+      var total = 0.0;
+      var count = 0;
+      for (final row in summary.toMapList()) {
+        final status = OrderStatus.values.byName(row['status'] as String);
+        final statusCount = row['count'] as int;
+        statusCounts[status] = statusCount;
+        count += statusCount;
+        total += (row['total'] as num).toDouble();
+      }
       setState(() {
         _orders = orders;
         _users = users;
         _products = products;
+        _orderCount = count;
+        _orderTotal = total;
+        _statusCounts = statusCounts;
         _isLoading = false;
       });
     } catch (e) {
@@ -90,7 +113,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
   }
 
   List<Order> get _filteredOrders {
-    if (_filterStatus == 'all') return _orders;
+    if (_filterStatus == null) return _orders;
     return _orders.where((o) => o.status == _filterStatus).toList();
   }
 
@@ -106,8 +129,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
 
     final result = await showDialog<Map<String, dynamic>>(
       context: context,
-      builder: (context) =>
-          OrderFormDialog(users: _users, products: _products),
+      builder: (context) => OrderFormDialog(users: _users, products: _products),
     );
 
     if (result != null) {
@@ -117,12 +139,19 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
           productId: result['productId'] as int,
           quantity: result['quantity'] as int,
           totalPrice: result['totalPrice'] as double,
-          status: result['status'] as String,
+          status: result['status'] as OrderStatus,
           notes: result['notes'] as String?,
         );
-        await _orderRepository.insert(order);
+        await _orderDemo.placeOrder(
+          userId: order.userId,
+          productId: order.productId,
+          quantity: order.quantity,
+          totalPrice: order.totalPrice,
+          status: order.status,
+          notes: order.notes,
+        );
         _showSuccess('Order created successfully');
-        _loadData();
+        await _loadData();
       } catch (e) {
         _showError('Error creating order: $e');
       }
@@ -132,11 +161,8 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
   Future<void> _updateOrder(Order order) async {
     final result = await showDialog<Map<String, dynamic>>(
       context: context,
-      builder: (context) => OrderFormDialog(
-        users: _users,
-        products: _products,
-        order: order,
-      ),
+      builder: (context) =>
+          OrderFormDialog(users: _users, products: _products, order: order),
     );
 
     if (result != null) {
@@ -146,61 +172,52 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
           productId: result['productId'] as int,
           quantity: result['quantity'] as int,
           totalPrice: result['totalPrice'] as double,
-          status: result['status'] as String,
+          status: result['status'] as OrderStatus,
           notes: result['notes'] as String?,
           updatedAt: DateTime.now(),
-          deliveredAt: result['status'] == 'delivered'
+          deliveredAt: result['status'] == OrderStatus.delivered
               ? (order.deliveredAt ?? DateTime.now())
               : order.deliveredAt,
         );
         await _orderRepository.update(updated);
         _showSuccess('Order updated successfully');
-        _loadData();
+        await _loadData();
       } catch (e) {
         _showError('Error updating order: $e');
       }
     }
   }
 
-  Future<void> _updateStatus(Order order, String newStatus) async {
+  Future<void> _updateStatus(Order order, OrderStatus newStatus) async {
     try {
       final updated = order.copyWith(
         status: newStatus,
         updatedAt: DateTime.now(),
-        deliveredAt: newStatus == 'delivered' ? DateTime.now() : order.deliveredAt,
+        deliveredAt: newStatus == OrderStatus.delivered
+            ? DateTime.now()
+            : order.deliveredAt,
       );
       await _orderRepository.update(updated);
-      _showSuccess('Status updated to "$newStatus"');
-      _loadData();
+      _showSuccess('Status updated to "${newStatus.name}"');
+      await _loadData();
     } catch (e) {
       _showError('Error updating status: $e');
     }
   }
 
   Future<void> _deleteOrder(int id) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Confirm Delete'),
-        content: const Text('Are you sure you want to delete this order?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
+    final confirmed = await UiFeedback.confirm(
+      context,
+      title: 'Confirm delete',
+      message: 'Are you sure you want to delete this order?',
+      confirmLabel: 'Delete',
     );
 
-    if (confirmed == true) {
+    if (confirmed) {
       try {
         await _orderRepository.delete(id);
         _showSuccess('Order deleted');
-        _loadData();
+        await _loadData();
       } catch (e) {
         _showError('Error deleting order: $e');
       }
@@ -208,15 +225,11 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
   }
 
   void _showSuccess(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.green),
-    );
+    UiFeedback.showMessage(context, message);
   }
 
   void _showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.red),
-    );
+    UiFeedback.showMessage(context, message, error: true);
   }
 
   String _userName(int userId) =>
@@ -229,7 +242,6 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      extendBodyBehindAppBar: true,
       appBar: GlassAppBar(
         title: 'Order Management',
         actions: [
@@ -242,7 +254,6 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
       ),
       body: Column(
         children: [
-          const SizedBox(height: kToolbarHeight),
           _buildSummaryBar(),
           _buildStatusFilter(),
           Expanded(
@@ -253,13 +264,16 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.receipt_long,
-                            size: 64, color: Colors.grey[400]),
+                        Icon(
+                          Icons.receipt_long,
+                          size: 64,
+                          color: Theme.of(context).colorScheme.outline,
+                        ),
                         const SizedBox(height: 16),
                         Text(
-                          _filterStatus == 'all'
+                          _filterStatus == null
                               ? 'No orders yet.\nTap + to create one.'
-                              : 'No "$_filterStatus" orders.',
+                              : 'No "${_statusLabel(_filterStatus!)}" orders.',
                           textAlign: TextAlign.center,
                           style: const TextStyle(fontSize: 16),
                         ),
@@ -285,13 +299,6 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
   }
 
   Widget _buildSummaryBar() {
-    final counts = <String, int>{};
-    for (final s in _statusOptions) {
-      counts[s] = _orders.where((o) => o.status == s).length;
-    }
-    final total =
-        _orders.fold<double>(0, (sum, o) => sum + o.totalPrice);
-
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
@@ -300,25 +307,48 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('${_orders.length} Orders',
-                    style: const TextStyle(
-                        fontWeight: FontWeight.bold, fontSize: 16)),
-                Text('\$${total.toStringAsFixed(2)} total',
-                    style: TextStyle(color: Colors.grey[600], fontSize: 13)),
+                Text(
+                  '$_orderCount Orders',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+                Text(
+                  '\$${_orderTotal.toStringAsFixed(2)} total',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    fontSize: 13,
+                  ),
+                ),
               ],
             ),
           ),
-          ...['pending', 'processing', 'delivered'].map((s) => Padding(
-                padding: const EdgeInsets.only(left: 8),
-                child: Chip(
-                  avatar: Icon(_statusIcon(s),
-                      size: 14, color: _statusColor(s)),
-                  label: Text('${counts[s]}',
-                      style: const TextStyle(fontSize: 12)),
-                  visualDensity: VisualDensity.compact,
-                  backgroundColor: _statusColor(s).withValues(alpha: 0.1),
+          ...[
+            OrderStatus.pending,
+            OrderStatus.processing,
+            OrderStatus.delivered,
+          ].map(
+            (s) => Padding(
+              padding: const EdgeInsets.only(left: 8),
+              child: Chip(
+                avatar: Icon(
+                  _statusIcon(s),
+                  size: 14,
+                  color: _statusColor(context, s),
                 ),
-              )),
+                label: Text(
+                  '${_statusCounts[s] ?? 0}',
+                  style: const TextStyle(fontSize: 12),
+                ),
+                visualDensity: VisualDensity.compact,
+                backgroundColor: _statusColor(
+                  context,
+                  s,
+                ).withValues(alpha: 0.1),
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -331,14 +361,16 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16),
         children: [
-          _filterChip('all', 'All'),
-          ..._statusOptions.map((s) => _filterChip(s, _capitalize(s))),
+          _filterChip(null, 'All'),
+          ..._statusOptions.map(
+            (status) => _filterChip(status, _statusLabel(status)),
+          ),
         ],
       ),
     );
   }
 
-  Widget _filterChip(String value, String label) {
+  Widget _filterChip(OrderStatus? value, String label) {
     final isSelected = _filterStatus == value;
     return Padding(
       padding: const EdgeInsets.only(right: 8),
@@ -352,7 +384,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
   }
 
   Widget _buildOrderCard(Order order) {
-    final color = _statusColor(order.status);
+    final color = _statusColor(context, order.status);
     final icon = _statusIcon(order.status);
 
     return Card(
@@ -370,22 +402,27 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
             ),
             title: Row(
               children: [
-                Text('Order #${order.id}',
-                    style: const TextStyle(fontWeight: FontWeight.bold)),
+                Text(
+                  'Order #${order.id}',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
                 const SizedBox(width: 8),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
                     color: color.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
-                    _capitalize(order.status),
+                    _statusLabel(order.status),
                     style: TextStyle(
-                        color: color,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600),
+                      color: color,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ],
@@ -393,12 +430,13 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
             subtitle: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                    '${_productName(order.productId)} × ${order.quantity}'),
+                Text('${_productName(order.productId)} × ${order.quantity}'),
                 Text('Customer: ${_userName(order.userId)}'),
                 if (order.notes != null && order.notes!.isNotEmpty)
-                  Text('Note: ${order.notes}',
-                      style: const TextStyle(fontStyle: FontStyle.italic)),
+                  Text(
+                    'Note: ${order.notes}',
+                    style: const TextStyle(fontStyle: FontStyle.italic),
+                  ),
               ],
             ),
             isThreeLine: true,
@@ -409,11 +447,16 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
                 Text(
                   '\$${order.totalPrice.toStringAsFixed(2)}',
                   style: const TextStyle(
-                      fontWeight: FontWeight.bold, fontSize: 15),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                  ),
                 ),
                 Text(
                   _formatDate(order.createdAt),
-                  style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
                 ),
               ],
             ),
@@ -432,33 +475,43 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       child: Row(
         children: [
-          ...nextStatuses.map((s) => Padding(
-                padding: const EdgeInsets.only(right: 4),
-                child: TextButton.icon(
-                  onPressed: () => _updateStatus(order, s),
-                  icon: Icon(_statusIcon(s), size: 14),
-                  label: Text(_capitalize(s),
-                      style: const TextStyle(fontSize: 12)),
-                  style: TextButton.styleFrom(
-                    foregroundColor: _statusColor(s),
-                    visualDensity: VisualDensity.compact,
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          ...nextStatuses.map(
+            (s) => Padding(
+              padding: const EdgeInsets.only(right: 4),
+              child: TextButton.icon(
+                onPressed: () => _updateStatus(order, s),
+                icon: Icon(_statusIcon(s), size: 14),
+                label: Text(
+                  _statusLabel(s),
+                  style: const TextStyle(fontSize: 12),
+                ),
+                style: TextButton.styleFrom(
+                  foregroundColor: _statusColor(context, s),
+                  visualDensity: VisualDensity.compact,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
                   ),
                 ),
-              )),
+              ),
+            ),
+          ),
           const Spacer(),
           IconButton(
             icon: const Icon(Icons.edit, size: 18),
             tooltip: 'Edit',
-            onPressed: () => _updateOrder(order),
+            onPressed: () => unawaited(_updateOrder(order)),
             visualDensity: VisualDensity.compact,
           ),
           IconButton(
-            icon: const Icon(Icons.delete, size: 18, color: Colors.red),
+            icon: Icon(
+              Icons.delete,
+              size: 18,
+              color: Theme.of(context).colorScheme.error,
+            ),
             tooltip: 'Delete',
             onPressed: () {
-              if (order.id != null) _deleteOrder(order.id!);
+              if (order.id != null) unawaited(_deleteOrder(order.id!));
             },
             visualDensity: VisualDensity.compact,
           ),
@@ -467,21 +520,19 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
     );
   }
 
-  List<String> _nextStatuses(String current) {
+  List<OrderStatus> _nextStatuses(OrderStatus current) {
     switch (current) {
-      case 'pending':
-        return ['processing', 'cancelled'];
-      case 'processing':
-        return ['shipped', 'cancelled'];
-      case 'shipped':
-        return ['delivered'];
-      default:
+      case OrderStatus.pending:
+        return [OrderStatus.processing, OrderStatus.cancelled];
+      case OrderStatus.processing:
+        return [OrderStatus.shipped, OrderStatus.cancelled];
+      case OrderStatus.shipped:
+        return [OrderStatus.delivered];
+      case OrderStatus.delivered:
+      case OrderStatus.cancelled:
         return [];
     }
   }
-
-  String _capitalize(String s) =>
-      s.isEmpty ? s : s[0].toUpperCase() + s.substring(1);
 
   String _formatDate(DateTime dt) =>
       '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
@@ -509,13 +560,16 @@ class _OrderFormDialogState extends State<OrderFormDialog> {
   int? _selectedProductId;
   late TextEditingController _quantityController;
   late TextEditingController _notesController;
-  String _selectedStatus = 'pending';
+  OrderStatus _selectedStatus = OrderStatus.pending;
+  bool _recalculateTotal = false;
   final _formKey = GlobalKey<FormState>();
 
   Product? get _selectedProduct =>
       widget.products.where((p) => p.id == _selectedProductId).firstOrNull;
 
   double get _computedTotal {
+    final existing = widget.order;
+    if (existing != null && !_recalculateTotal) return existing.totalPrice;
     final qty = int.tryParse(_quantityController.text) ?? 0;
     return (_selectedProduct?.price ?? 0) * qty;
   }
@@ -524,12 +578,21 @@ class _OrderFormDialogState extends State<OrderFormDialog> {
   void initState() {
     super.initState();
     final o = widget.order;
-    _selectedUserId = o?.userId ?? widget.users.first.id;
-    _selectedProductId = o?.productId ?? widget.products.first.id;
-    _quantityController =
-        TextEditingController(text: o?.quantity.toString() ?? '1');
+    _selectedUserId = o == null
+        ? widget.users.firstOrNull?.id
+        : widget.users.any((user) => user.id == o.userId)
+        ? o.userId
+        : null;
+    _selectedProductId = o == null
+        ? widget.products.firstOrNull?.id
+        : widget.products.any((product) => product.id == o.productId)
+        ? o.productId
+        : null;
+    _quantityController = TextEditingController(
+      text: o?.quantity.toString() ?? '1',
+    );
     _notesController = TextEditingController(text: o?.notes);
-    _selectedStatus = o?.status ?? 'pending';
+    _selectedStatus = o?.status ?? OrderStatus.pending;
   }
 
   @override
@@ -553,7 +616,9 @@ class _OrderFormDialogState extends State<OrderFormDialog> {
               DropdownButtonFormField<int>(
                 initialValue: _selectedUserId,
                 decoration: const InputDecoration(
-                    labelText: 'Customer', prefixIcon: Icon(Icons.person)),
+                  labelText: 'Customer',
+                  prefixIcon: Icon(Icons.person),
+                ),
                 items: widget.users.map((u) {
                   return DropdownMenuItem(value: u.id, child: Text(u.name));
                 }).toList(),
@@ -564,23 +629,22 @@ class _OrderFormDialogState extends State<OrderFormDialog> {
               DropdownButtonFormField<int>(
                 initialValue: _selectedProductId,
                 decoration: const InputDecoration(
-                    labelText: 'Product',
-                    prefixIcon: Icon(Icons.shopping_bag)),
+                  labelText: 'Product',
+                  prefixIcon: Icon(Icons.shopping_bag),
+                ),
                 items: widget.products.map((p) {
                   return DropdownMenuItem(
                     value: p.id,
                     child: Text('${p.name} (\$${p.price.toStringAsFixed(2)})'),
                   );
                 }).toList(),
-                onChanged: (v) =>
-                    setState(() => _selectedProductId = v),
+                onChanged: (v) => setState(() => _selectedProductId = v),
                 validator: (v) => v == null ? 'Select a product' : null,
               ),
               const SizedBox(height: 8),
               TextFormField(
                 controller: _quantityController,
-                decoration:
-                    const InputDecoration(labelText: 'Quantity'),
+                decoration: const InputDecoration(labelText: 'Quantity'),
                 keyboardType: TextInputType.number,
                 onChanged: (_) => setState(() {}),
                 validator: (v) {
@@ -600,17 +664,28 @@ class _OrderFormDialogState extends State<OrderFormDialog> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('Total Price'),
+                    Text(
+                      isEdit && !_recalculateTotal
+                          ? 'Stored Total Price'
+                          : 'Total Price',
+                    ),
                     Text(
                       '\$${_computedTotal.toStringAsFixed(2)}',
                       style: const TextStyle(
-                          fontWeight: FontWeight.bold, fontSize: 16),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
                     ),
                   ],
                 ),
               ),
+              if (isEdit)
+                TextButton(
+                  onPressed: () => setState(() => _recalculateTotal = true),
+                  child: const Text('Recalculate from current product price'),
+                ),
               const SizedBox(height: 8),
-              DropdownButtonFormField<String>(
+              DropdownButtonFormField<OrderStatus>(
                 initialValue: _selectedStatus,
                 decoration: const InputDecoration(labelText: 'Status'),
                 items: _statusOptions.map((s) {
@@ -618,16 +693,19 @@ class _OrderFormDialogState extends State<OrderFormDialog> {
                     value: s,
                     child: Row(
                       children: [
-                        Icon(_statusIcon(s),
-                            size: 16, color: _statusColor(s)),
+                        Icon(
+                          _statusIcon(s),
+                          size: 16,
+                          color: _statusColor(context, s),
+                        ),
                         const SizedBox(width: 8),
-                        Text(s[0].toUpperCase() + s.substring(1)),
+                        Text(_statusLabel(s)),
                       ],
                     ),
                   );
                 }).toList(),
                 onChanged: (v) =>
-                    setState(() => _selectedStatus = v ?? 'pending'),
+                    setState(() => _selectedStatus = v ?? OrderStatus.pending),
               ),
               const SizedBox(height: 8),
               TextFormField(

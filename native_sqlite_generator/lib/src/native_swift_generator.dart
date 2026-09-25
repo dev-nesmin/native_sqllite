@@ -1,4 +1,5 @@
 import 'package:native_sqlite_generator/src/models/schema_snapshot.dart';
+import 'package:native_sqlite_generator/src/helpers/naming_conventions.dart';
 import 'package:native_sqlite_generator/src/native/native_column.dart';
 import 'package:native_sqlite_generator/src/native/native_database_spec.dart';
 import 'package:native_sqlite_generator/src/sql/schema_sql.dart';
@@ -14,6 +15,7 @@ class NativeSwiftGenerator {
   });
 
   String generateSchema(TableSchemaSnapshot model) {
+    _validateSchemaMembers(model);
     final buffer = StringBuffer();
 
     buffer.writeln('import Foundation');
@@ -22,7 +24,7 @@ class NativeSwiftGenerator {
     buffer.writeln(' * Schema constants for ${model.className} table.');
     buffer.writeln(' * AUTO-GENERATED from Dart - DO NOT EDIT MANUALLY');
     buffer.writeln(
-      ' * Generated from: lib/models/${_toSnakeCase(model.className)}.dart',
+      ' * Generated from: ${model.sourcePath ?? 'unknown Dart source'}',
     );
     buffer.writeln(' */');
     buffer.writeln('public enum ${model.className}Schema {');
@@ -33,14 +35,18 @@ class NativeSwiftGenerator {
     buffer.writeln('    // Column names');
 
     for (final field in model.columns) {
-      final constantName = _swiftIdentifier(_toCamelCase(field.dartName));
+      final constantName = _swiftIdentifier(
+        NamingConventions.toCamelCase(field.dartName),
+      );
       buffer.writeln(
         '    public static let $constantName = ${_swiftString(field.name)}',
       );
     }
 
     buffer.writeln();
-    buffer.writeln('    // Same statements as the Dart ${model.className}Schema');
+    buffer.writeln(
+      '    // Same statements as the Dart ${model.className}Schema',
+    );
     buffer.writeln(
       '    public static let createTableSql = ${_swiftString(SchemaSql.createTable(model))}',
     );
@@ -65,14 +71,14 @@ class NativeSwiftGenerator {
     buffer.writeln(' * Mirrors the Dart enum ${nativeEnum.name}.');
     buffer.writeln(' * AUTO-GENERATED from Dart - DO NOT EDIT MANUALLY');
     buffer.writeln(' */');
-    buffer.writeln(
-      'public enum ${nativeEnum.name}: String, CaseIterable {',
-    );
+    buffer.writeln('public enum ${nativeEnum.name}: String, CaseIterable {');
     for (final value in nativeEnum.values) {
       buffer.writeln('    case ${_swiftIdentifier(value)}');
     }
     buffer.writeln();
-    buffer.writeln('    /// Index of this case, equal to the Dart enum\'s `index`.');
+    buffer.writeln(
+      '    /// Index of this case, equal to the Dart enum\'s `index`.',
+    );
     buffer.writeln('    public var ordinal: Int64 {');
     buffer.writeln('        Int64(Self.allCases.firstIndex(of: self)!)');
     buffer.writeln('    }');
@@ -187,10 +193,16 @@ enum GeneratedValue {
 
   String generateHelper(TableSchemaSnapshot model) {
     final buffer = StringBuffer();
-    final primaryKey = model.columns.firstWhere(
-      (f) => f.primaryKey,
-      orElse: () => model.columns.first,
-    );
+    final primaryKeys = model.columns
+        .where((field) => field.primaryKey)
+        .toList();
+    if (primaryKeys.length != 1) {
+      throw ArgumentError(
+        'Native helper generation for ${model.className} requires exactly '
+        'one primary key; found ${primaryKeys.length}.',
+      );
+    }
+    final primaryKey = primaryKeys.single;
 
     final columns = model.columns.map(NativeColumn.of).toList();
 
@@ -236,110 +248,22 @@ enum GeneratedValue {
     buffer.writeln('/**');
     buffer.writeln(' * Helper class for ${model.className} CRUD operations.');
     buffer.writeln(' * AUTO-GENERATED from Dart - DO NOT EDIT MANUALLY');
-    buffer.writeln(' * Thread-safe for multi-isolate access.');
+    buffer.writeln(' * Create an instance for each native caller/database.');
     if (includeExamples) {
       buffer.writeln(' *');
       buffer.writeln(' * Example usage (single isolate):');
       buffer.writeln(' * ```');
       buffer.writeln(
-        ' * let helper = ${model.className}Helper(databaseName: \"$databaseName\")',
+        ' * let helper = ${model.className}Helper(databaseName: "$databaseName")',
       );
       buffer.writeln(' * let id = try helper.insert(${model.className}(...))');
       buffer.writeln(' * let item = try helper.findById(id)');
-      buffer.writeln(' * ```');
-      buffer.writeln(' *');
-      buffer.writeln(' * Example usage (multi-isolate safe):');
-      buffer.writeln(' * ```');
-      buffer.writeln(' * // In BGTaskScheduler or background isolate');
-      buffer.writeln(' * let isolateId = Int64(pthread_self())');
-      buffer.writeln(
-        ' * let helper = ${model.className}Helper.getInstance(databaseName: \"$databaseName\", isolateId: isolateId)',
-      );
-      buffer.writeln(' * let users = try helper.findAll()');
-      buffer.writeln(' * // When done, cleanup:');
-      buffer.writeln(
-        ' * ${model.className}Helper.cleanupIsolate(isolateId: isolateId)',
-      );
       buffer.writeln(' * ```');
     }
     buffer.writeln(' */');
     buffer.writeln('public class ${model.className}Helper {');
     buffer.writeln('    private let databaseName: String');
     buffer.writeln('    private let manager = NativeSqliteManager.shared');
-    buffer.writeln();
-
-    // Add static instance management for isolate safety
-    buffer.writeln(
-      '    // Track helper instances per isolate for thread safety',
-    );
-    buffer.writeln(
-      '    private static var isolateInstances = [Int64: ${model.className}Helper]()',
-    );
-    buffer.writeln(
-      '    private static let isolateQueue = DispatchQueue(label: \"${model.className}Helper.isolate\")',
-    );
-    buffer.writeln();
-    buffer.writeln('    /**');
-    buffer.writeln(
-      '     * Get or create helper instance for the given isolate.',
-    );
-    buffer.writeln(
-      '     * Safe to call from different Dart isolates or native threads.',
-    );
-    buffer.writeln('     *');
-    buffer.writeln('     * - Parameters:');
-    buffer.writeln('     *   - databaseName: Name of the database');
-    buffer.writeln(
-      '     *   - isolateId: Unique identifier for the isolate/thread',
-    );
-    buffer.writeln('     * - Returns: Helper instance for this isolate');
-    buffer.writeln('     */');
-    buffer.writeln(
-      '    public static func getInstance(databaseName: String, isolateId: Int64) -> ${model.className}Helper {',
-    );
-    buffer.writeln('        return isolateQueue.sync {');
-    buffer.writeln(
-      '            if let existing = isolateInstances[isolateId] {',
-    );
-    buffer.writeln('                return existing');
-    buffer.writeln('            }');
-    buffer.writeln(
-      '            let helper = ${model.className}Helper(databaseName: databaseName)',
-    );
-    buffer.writeln('            isolateInstances[isolateId] = helper');
-    buffer.writeln('            return helper');
-    buffer.writeln('        }');
-    buffer.writeln('    }');
-    buffer.writeln();
-    buffer.writeln('    /**');
-    buffer.writeln('     * Cleanup resources for a specific isolate.');
-    buffer.writeln('     * Call this when an isolate is being destroyed.');
-    buffer.writeln('     *');
-    buffer.writeln('     * - Parameter isolateId: The isolate ID to cleanup');
-    buffer.writeln('     */');
-    buffer.writeln('    public static func cleanupIsolate(isolateId: Int64) {');
-    buffer.writeln('        isolateQueue.sync {');
-    buffer.writeln(
-      '            _ = isolateInstances.removeValue(forKey: isolateId)',
-    );
-    buffer.writeln('        }');
-    buffer.writeln('    }');
-    buffer.writeln();
-    buffer.writeln('    /**');
-    buffer.writeln(
-      '     * Get all active isolate IDs currently using this helper.',
-    );
-    buffer.writeln('     * Useful for debugging.');
-    buffer.writeln('     *');
-    buffer.writeln('     * - Returns: Set of active isolate IDs');
-    buffer.writeln('     */');
-    buffer.writeln(
-      '    public static func getActiveIsolates() -> Set<Int64> {',
-    );
-    buffer.writeln('        return isolateQueue.sync {');
-    buffer.writeln('            return Set(isolateInstances.keys)');
-    buffer.writeln('        }');
-    buffer.writeln('    }');
     buffer.writeln();
 
     buffer.writeln('    public init(databaseName: String) {');
@@ -350,17 +274,33 @@ enum GeneratedValue {
     // Insert method
     final pkColumn = NativeColumn.of(primaryKey);
     final pkSwiftType = _getSwiftType(pkColumn).replaceAll('?', '');
+    final insertReturnType = primaryKey.useLocalUuid ? 'String' : 'Int64';
     buffer.writeln(
-      '    public func insert(_ entity: ${model.className}) throws -> Int64 {',
+      '    public func insert(_ entity: ${model.className}) throws -> $insertReturnType {',
     );
+    if (primaryKey.useLocalUuid) {
+      buffer.writeln(
+        '        let primaryKeyValue = entity.${_swiftIdentifier(primaryKey.dartName)} ?? UUID().uuidString',
+      );
+    }
     _writeValues(
       buffer,
       model,
       columns.where((c) => !(c.column.primaryKey && c.column.autoIncrement)),
+      valueOverrides: primaryKey.useLocalUuid
+          ? {primaryKey.dartName: 'primaryKeyValue'}
+          : const {},
     );
-    buffer.writeln(
-      '        return try manager.insert(name: databaseName, table: ${model.className}Schema.tableName, values: values)',
-    );
+    if (primaryKey.useLocalUuid) {
+      buffer.writeln(
+        '        _ = try manager.insert(name: databaseName, table: ${model.className}Schema.tableName, values: values)',
+      );
+      buffer.writeln('        return primaryKeyValue');
+    } else {
+      buffer.writeln(
+        '        return try manager.insert(name: databaseName, table: ${model.className}Schema.tableName, values: values)',
+      );
+    }
     buffer.writeln('    }');
     buffer.writeln();
 
@@ -371,7 +311,7 @@ enum GeneratedValue {
     buffer.writeln('        let result = try manager.query(');
     buffer.writeln('            name: databaseName,');
     buffer.writeln(
-      '            sql: "SELECT * FROM \\(${model.className}Schema.tableName) WHERE \\(${model.className}Schema.${_toCamelCase(primaryKey.dartName)}) = ? LIMIT 1",',
+      '            sql: "SELECT * FROM \\(NativeSqliteManager.quoteIdentifier(${model.className}Schema.tableName)) WHERE \\(NativeSqliteManager.quoteIdentifier(${model.className}Schema.${NamingConventions.toCamelCase(primaryKey.dartName)})) = ? LIMIT 1",',
     );
     buffer.writeln('            arguments: [id]');
     buffer.writeln('        )');
@@ -398,7 +338,7 @@ enum GeneratedValue {
       '    public func findAll() throws -> [${model.className}] {',
     );
     buffer.writeln(
-      '        let result = try manager.query(name: databaseName, sql: "SELECT * FROM \\(${model.className}Schema.tableName)")',
+      '        let result = try manager.query(name: databaseName, sql: "SELECT * FROM \\(NativeSqliteManager.quoteIdentifier(${model.className}Schema.tableName))")',
     );
     buffer.writeln('        guard let rows = result["rows"] as? [[Any?]],');
     buffer.writeln(
@@ -434,7 +374,7 @@ enum GeneratedValue {
     buffer.writeln('            table: ${model.className}Schema.tableName,');
     buffer.writeln('            values: values,');
     buffer.writeln(
-      '            whereClause: "\\(${model.className}Schema.${_toCamelCase(primaryKey.dartName)}) = ?",',
+      '            whereClause: "\\(${model.className}Schema.${NamingConventions.toCamelCase(primaryKey.dartName)}) = ?",',
     );
     buffer.writeln(
       '            whereArgs: [${_serializeSwift(pkColumn, 'entity.${primaryKey.dartName}')}]',
@@ -462,7 +402,7 @@ enum GeneratedValue {
     buffer.writeln('            table: ${model.className}Schema.tableName,');
     buffer.writeln('            values: updates,');
     buffer.writeln(
-      '            whereClause: "\\(${model.className}Schema.${_toCamelCase(primaryKey.dartName)}) = ?",',
+      '            whereClause: "\\(${model.className}Schema.${NamingConventions.toCamelCase(primaryKey.dartName)}) = ?",',
     );
     buffer.writeln('            whereArgs: [id]');
     buffer.writeln('        )');
@@ -481,7 +421,7 @@ enum GeneratedValue {
     buffer.writeln('            name: databaseName,');
     buffer.writeln('            table: ${model.className}Schema.tableName,');
     buffer.writeln(
-      '            whereClause: "\\(${model.className}Schema.${_toCamelCase(primaryKey.dartName)}) = ?",',
+      '            whereClause: "\\(${model.className}Schema.${NamingConventions.toCamelCase(primaryKey.dartName)}) = ?",',
     );
     buffer.writeln('            whereArgs: [id]');
     buffer.writeln('        )');
@@ -491,6 +431,9 @@ enum GeneratedValue {
     // DeleteWhere method
     buffer.writeln('    /**');
     buffer.writeln('     * Delete entities matching a WHERE clause.');
+    buffer.writeln(
+      '     * Important: `whereClause` is trusted SQL. Never pass user input; use `whereArgs` for values.',
+    );
     buffer.writeln('     * - Parameters:');
     buffer.writeln(
       '     *   - whereClause: SQL WHERE clause (without "WHERE" keyword)',
@@ -519,9 +462,9 @@ enum GeneratedValue {
     buffer.writeln('     * - Throws: Database errors');
     buffer.writeln('     */');
     buffer.writeln(
-      '    public func insertBatch(_ entities: [${model.className}]) throws -> [Int64] {',
+      '    public func insertBatch(_ entities: [${model.className}]) throws -> [$insertReturnType] {',
     );
-    buffer.writeln('        var results: [Int64] = []');
+    buffer.writeln('        var results: [$insertReturnType] = []');
     buffer.writeln('        ');
     buffer.writeln(
       '        _ = try manager.execute(name: databaseName, sql: "BEGIN TRANSACTION")',
@@ -585,7 +528,9 @@ enum GeneratedValue {
     buffer.writeln('     * - Returns: Total number of rows deleted');
     buffer.writeln('     * - Throws: Database errors');
     buffer.writeln('     */');
-    buffer.writeln('    public func deleteBatch(ids: [$pkSwiftType]) throws -> Int {');
+    buffer.writeln(
+      '    public func deleteBatch(ids: [$pkSwiftType]) throws -> Int {',
+    );
     buffer.writeln('        var totalDeleted = 0');
     buffer.writeln('        ');
     buffer.writeln(
@@ -613,6 +558,9 @@ enum GeneratedValue {
     buffer.writeln(
       '     * Find entities matching a WHERE clause with optional ordering and limit.',
     );
+    buffer.writeln(
+      '     * Important: `whereClause` and `orderBy` are trusted SQL. Never pass user input; use `whereArgs` for values.',
+    );
     buffer.writeln('     * - Parameters:');
     buffer.writeln(
       '     *   - whereClause: SQL WHERE clause (without "WHERE" keyword)',
@@ -634,7 +582,7 @@ enum GeneratedValue {
     buffer.writeln('        offset: Int? = nil');
     buffer.writeln('    ) throws -> [${model.className}] {');
     buffer.writeln(
-      '        var sql = "SELECT * FROM \\(${model.className}Schema.tableName)"',
+      '        var sql = "SELECT * FROM \\(NativeSqliteManager.quoteIdentifier(${model.className}Schema.tableName))"',
     );
     buffer.writeln('        if let whereClause = whereClause {');
     buffer.writeln('            sql += " WHERE \\(whereClause)"');
@@ -644,6 +592,8 @@ enum GeneratedValue {
     buffer.writeln('        }');
     buffer.writeln('        if let limit = limit {');
     buffer.writeln('            sql += " LIMIT \\(limit)"');
+    buffer.writeln('        } else if offset != nil {');
+    buffer.writeln('            sql += " LIMIT -1"');
     buffer.writeln('        }');
     buffer.writeln('        if let offset = offset {');
     buffer.writeln('            sql += " OFFSET \\(offset)"');
@@ -670,6 +620,9 @@ enum GeneratedValue {
     // Count method
     buffer.writeln('    /**');
     buffer.writeln('     * Count entities matching a WHERE clause.');
+    buffer.writeln(
+      '     * Important: `whereClause` is trusted SQL. Never pass user input; use `whereArgs` for values.',
+    );
     buffer.writeln('     * - Parameters:');
     buffer.writeln(
       '     *   - whereClause: SQL WHERE clause (without "WHERE" keyword)',
@@ -684,11 +637,11 @@ enum GeneratedValue {
     buffer.writeln('        let sql: String');
     buffer.writeln('        if let whereClause = whereClause {');
     buffer.writeln(
-      '            sql = "SELECT COUNT(*) FROM \\(${model.className}Schema.tableName) WHERE \\(whereClause)"',
+      '            sql = "SELECT COUNT(*) FROM \\(NativeSqliteManager.quoteIdentifier(${model.className}Schema.tableName)) WHERE \\(whereClause)"',
     );
     buffer.writeln('        } else {');
     buffer.writeln(
-      '            sql = "SELECT COUNT(*) FROM \\(${model.className}Schema.tableName)"',
+      '            sql = "SELECT COUNT(*) FROM \\(NativeSqliteManager.quoteIdentifier(${model.className}Schema.tableName))"',
     );
     buffer.writeln('        }');
     buffer.writeln(
@@ -707,6 +660,9 @@ enum GeneratedValue {
     // Aggregation methods
     buffer.writeln('    /**');
     buffer.writeln('     * Get the maximum value of a column.');
+    buffer.writeln(
+      '     * Important: `whereClause` is trusted SQL. Never pass user input; use `whereArgs` for values.',
+    );
     buffer.writeln('     * - Parameters:');
     buffer.writeln('     *   - column: Column name to get max value from');
     buffer.writeln('     *   - whereClause: Optional WHERE clause');
@@ -720,11 +676,11 @@ enum GeneratedValue {
     buffer.writeln('        let sql: String');
     buffer.writeln('        if let whereClause = whereClause {');
     buffer.writeln(
-      '            sql = "SELECT MAX(\\(column)) FROM \\(${model.className}Schema.tableName) WHERE \\(whereClause)"',
+      '            sql = "SELECT MAX(\\(NativeSqliteManager.quoteIdentifier(column))) FROM \\(NativeSqliteManager.quoteIdentifier(${model.className}Schema.tableName)) WHERE \\(whereClause)"',
     );
     buffer.writeln('        } else {');
     buffer.writeln(
-      '            sql = "SELECT MAX(\\(column)) FROM \\(${model.className}Schema.tableName)"',
+      '            sql = "SELECT MAX(\\(NativeSqliteManager.quoteIdentifier(column))) FROM \\(NativeSqliteManager.quoteIdentifier(${model.className}Schema.tableName))"',
     );
     buffer.writeln('        }');
     buffer.writeln(
@@ -739,6 +695,9 @@ enum GeneratedValue {
 
     buffer.writeln('    /**');
     buffer.writeln('     * Get the minimum value of a column.');
+    buffer.writeln(
+      '     * Important: `whereClause` is trusted SQL. Never pass user input; use `whereArgs` for values.',
+    );
     buffer.writeln('     * - Parameters:');
     buffer.writeln('     *   - column: Column name to get min value from');
     buffer.writeln('     *   - whereClause: Optional WHERE clause');
@@ -752,11 +711,11 @@ enum GeneratedValue {
     buffer.writeln('        let sql: String');
     buffer.writeln('        if let whereClause = whereClause {');
     buffer.writeln(
-      '            sql = "SELECT MIN(\\(column)) FROM \\(${model.className}Schema.tableName) WHERE \\(whereClause)"',
+      '            sql = "SELECT MIN(\\(NativeSqliteManager.quoteIdentifier(column))) FROM \\(NativeSqliteManager.quoteIdentifier(${model.className}Schema.tableName)) WHERE \\(whereClause)"',
     );
     buffer.writeln('        } else {');
     buffer.writeln(
-      '            sql = "SELECT MIN(\\(column)) FROM \\(${model.className}Schema.tableName)"',
+      '            sql = "SELECT MIN(\\(NativeSqliteManager.quoteIdentifier(column))) FROM \\(NativeSqliteManager.quoteIdentifier(${model.className}Schema.tableName))"',
     );
     buffer.writeln('        }');
     buffer.writeln(
@@ -771,6 +730,9 @@ enum GeneratedValue {
 
     buffer.writeln('    /**');
     buffer.writeln('     * Get the average value of a column.');
+    buffer.writeln(
+      '     * Important: `whereClause` is trusted SQL. Never pass user input; use `whereArgs` for values.',
+    );
     buffer.writeln('     * - Parameters:');
     buffer.writeln('     *   - column: Column name to get average from');
     buffer.writeln('     *   - whereClause: Optional WHERE clause');
@@ -784,11 +746,11 @@ enum GeneratedValue {
     buffer.writeln('        let sql: String');
     buffer.writeln('        if let whereClause = whereClause {');
     buffer.writeln(
-      '            sql = "SELECT AVG(\\(column)) FROM \\(${model.className}Schema.tableName) WHERE \\(whereClause)"',
+      '            sql = "SELECT AVG(\\(NativeSqliteManager.quoteIdentifier(column))) FROM \\(NativeSqliteManager.quoteIdentifier(${model.className}Schema.tableName)) WHERE \\(whereClause)"',
     );
     buffer.writeln('        } else {');
     buffer.writeln(
-      '            sql = "SELECT AVG(\\(column)) FROM \\(${model.className}Schema.tableName)"',
+      '            sql = "SELECT AVG(\\(NativeSqliteManager.quoteIdentifier(column))) FROM \\(NativeSqliteManager.quoteIdentifier(${model.className}Schema.tableName))"',
     );
     buffer.writeln('        }');
     buffer.writeln(
@@ -803,6 +765,9 @@ enum GeneratedValue {
 
     buffer.writeln('    /**');
     buffer.writeln('     * Get the sum of a column.');
+    buffer.writeln(
+      '     * Important: `whereClause` is trusted SQL. Never pass user input; use `whereArgs` for values.',
+    );
     buffer.writeln('     * - Parameters:');
     buffer.writeln('     *   - column: Column name to sum');
     buffer.writeln('     *   - whereClause: Optional WHERE clause');
@@ -816,11 +781,11 @@ enum GeneratedValue {
     buffer.writeln('        let sql: String');
     buffer.writeln('        if let whereClause = whereClause {');
     buffer.writeln(
-      '            sql = "SELECT SUM(\\(column)) FROM \\(${model.className}Schema.tableName) WHERE \\(whereClause)"',
+      '            sql = "SELECT SUM(\\(NativeSqliteManager.quoteIdentifier(column))) FROM \\(NativeSqliteManager.quoteIdentifier(${model.className}Schema.tableName)) WHERE \\(whereClause)"',
     );
     buffer.writeln('        } else {');
     buffer.writeln(
-      '            sql = "SELECT SUM(\\(column)) FROM \\(${model.className}Schema.tableName)"',
+      '            sql = "SELECT SUM(\\(NativeSqliteManager.quoteIdentifier(column))) FROM \\(NativeSqliteManager.quoteIdentifier(${model.className}Schema.tableName))"',
     );
     buffer.writeln('        }');
     buffer.writeln(
@@ -847,7 +812,7 @@ enum GeneratedValue {
       final field = column.column;
       final value = _deserializeSwift(
         column,
-        '${model.className}Schema.${_swiftIdentifier(_toCamelCase(field.dartName))}',
+        '${model.className}Schema.${_swiftIdentifier(NamingConventions.toCamelCase(field.dartName))}',
       );
       fieldInits.add('            ${_swiftIdentifier(field.dartName)}: $value');
     }
@@ -878,8 +843,9 @@ enum GeneratedValue {
   void _writeValues(
     StringBuffer buffer,
     TableSchemaSnapshot model,
-    Iterable<NativeColumn> columns,
-  ) {
+    Iterable<NativeColumn> columns, {
+    Map<String, String> valueOverrides = const {},
+  }) {
     if (columns.isEmpty) {
       buffer.writeln('        let values: [String: Any?] = [:]');
       return;
@@ -887,12 +853,11 @@ enum GeneratedValue {
     buffer.writeln('        let values: [String: Any?] = [');
     for (final column in columns) {
       final field = column.column;
-      final value = _serializeSwift(
-        column,
-        'entity.${_swiftIdentifier(field.dartName)}',
-      );
+      final value =
+          valueOverrides[field.dartName] ??
+          _serializeSwift(column, 'entity.${_swiftIdentifier(field.dartName)}');
       buffer.writeln(
-        '            ${model.className}Schema.${_swiftIdentifier(_toCamelCase(field.dartName))}: $value,',
+        '            ${model.className}Schema.${_swiftIdentifier(NamingConventions.toCamelCase(field.dartName))}: $value,',
       );
     }
     buffer.writeln('        ]');
@@ -953,13 +918,58 @@ enum GeneratedValue {
       _swiftKeywords.contains(name) ? '`$name`' : name;
 
   static const _swiftKeywords = {
-    'associatedtype', 'class', 'deinit', 'enum', 'extension', 'fileprivate',
-    'func', 'import', 'init', 'inout', 'internal', 'let', 'open', 'operator',
-    'private', 'protocol', 'public', 'rethrows', 'static', 'struct',
-    'subscript', 'typealias', 'var', 'break', 'case', 'continue', 'default',
-    'defer', 'do', 'else', 'fallthrough', 'for', 'guard', 'if', 'in',
-    'repeat', 'return', 'switch', 'where', 'while', 'as', 'catch', 'false',
-    'is', 'nil', 'self', 'Self', 'super', 'throw', 'throws', 'true', 'try',
+    'associatedtype',
+    'class',
+    'deinit',
+    'enum',
+    'extension',
+    'fileprivate',
+    'func',
+    'import',
+    'init',
+    'inout',
+    'internal',
+    'let',
+    'open',
+    'operator',
+    'private',
+    'protocol',
+    'public',
+    'rethrows',
+    'static',
+    'struct',
+    'subscript',
+    'typealias',
+    'var',
+    'break',
+    'case',
+    'continue',
+    'default',
+    'defer',
+    'do',
+    'else',
+    'fallthrough',
+    'for',
+    'guard',
+    'if',
+    'in',
+    'repeat',
+    'return',
+    'switch',
+    'where',
+    'while',
+    'as',
+    'catch',
+    'false',
+    'is',
+    'nil',
+    'self',
+    'Self',
+    'super',
+    'throw',
+    'throws',
+    'true',
+    'try',
   };
 
   /// Swift counterpart of the generated Dart DatabaseManager: it opens the
@@ -973,19 +983,26 @@ enum GeneratedValue {
     buffer.writeln('import native_sqlite_ios');
     buffer.writeln();
     buffer.writeln('/**');
-    buffer.writeln(' * Native database manager, mirroring the generated DatabaseManager.dart.');
+    buffer.writeln(
+      ' * Native database manager, mirroring the generated DatabaseManager.dart.',
+    );
     buffer.writeln(
       ' * Call DatabaseManager.shared.initialize() from native iOS code',
     );
     buffer.writeln(
       ' * (BGTaskScheduler, App Extensions) before using the generated helpers.',
     );
+    buffer.writeln(
+      ' * Generated helpers are synchronous; always call them from a background thread.',
+    );
     buffer.writeln(' * AUTO-GENERATED - DO NOT EDIT MANUALLY');
     buffer.writeln(' */');
     buffer.writeln('public final class DatabaseManager {');
     buffer.writeln('    public static let shared = DatabaseManager()');
     buffer.writeln();
-    buffer.writeln('    public static let schemaVersion = ${spec.schemaVersion}');
+    buffer.writeln(
+      '    public static let schemaVersion = ${spec.schemaVersion}',
+    );
     buffer.writeln(
       '    public static let defaultDatabaseName = ${_swiftString(spec.databaseName)}',
     );
@@ -1007,7 +1024,8 @@ enum GeneratedValue {
       buffer.writeln('    public static let migrations: [Int: [String]] = [:]');
     } else {
       buffer.writeln('    public static let migrations: [Int: [String]] = [');
-      for (final MapEntry(key: version, value: sql) in spec.migrations.entries) {
+      for (final MapEntry(key: version, value: sql)
+          in spec.migrations.entries) {
         buffer.writeln('        $version: [');
         for (final statement in sql) {
           buffer.writeln('            ${_swiftString(statement)},');
@@ -1020,7 +1038,9 @@ enum GeneratedValue {
     buffer.writeln(
       '    /// Run after every upgrade: creates any missing table or index.',
     );
-    buffer.writeln('    public static let ensureSchemaStatements: [String] = [');
+    buffer.writeln(
+      '    public static let ensureSchemaStatements: [String] = [',
+    );
     for (final statement in spec.ensureSchema) {
       buffer.writeln('        ${_swiftString(statement)},');
     }
@@ -1038,10 +1058,14 @@ enum GeneratedValue {
     buffer.writeln('    private init() {}');
     buffer.writeln();
     buffer.writeln('    /**');
-    buffer.writeln('     * Opens the database, creating it or applying pending migrations.');
+    buffer.writeln(
+      '     * Opens the database, creating it or applying pending migrations.',
+    );
     buffer.writeln('     */');
     buffer.writeln('    public func initialize(');
-    buffer.writeln('        name: String = DatabaseManager.defaultDatabaseName,');
+    buffer.writeln(
+      '        name: String = DatabaseManager.defaultDatabaseName,',
+    );
     buffer.writeln('        enableWAL: Bool = true,');
     buffer.writeln('        enableForeignKeys: Bool = true');
     buffer.writeln('    ) throws {');
@@ -1049,16 +1073,26 @@ enum GeneratedValue {
     buffer.writeln('        defer { lock.unlock() }');
     buffer.writeln('        let manager = NativeSqliteManager.shared');
     buffer.writeln(
-      '        // Already opened (e.g. by Dart through the plugin, which shares this',
+      '        // This manager owns one reference. Repeated calls by the same',
     );
     buffer.writeln(
-      '        // manager) with the same generated schema and migrations.',
+      '        // native caller do not acquire additional references.',
     );
-    buffer.writeln('        if manager.isDatabaseOpen(name: name) {');
-    buffer.writeln('            currentDatabaseName = name');
+    buffer.writeln('        if let current = currentDatabaseName {');
+    buffer.writeln('            guard current == name else {');
+    buffer.writeln('                throw NSError(');
+    buffer.writeln('                    domain: "DatabaseManager", code: -1,');
+    buffer.writeln('                    userInfo: [NSLocalizedDescriptionKey:');
+    buffer.writeln(
+      '                        "DatabaseManager is already initialized for \'(current)\'"]',
+    );
+    buffer.writeln('                )');
+    buffer.writeln('            }');
     buffer.writeln('            return');
     buffer.writeln('        }');
-    buffer.writeln('        _ = try manager.openDatabase(config: DatabaseConfig(');
+    buffer.writeln(
+      '        _ = try manager.openDatabase(config: DatabaseConfig(',
+    );
     buffer.writeln('            name: name,');
     buffer.writeln('            version: Self.schemaVersion,');
     buffer.writeln('            onCreate: Self.onCreateStatements,');
@@ -1074,7 +1108,9 @@ enum GeneratedValue {
     buffer.writeln('        lock.lock()');
     buffer.writeln('        defer { lock.unlock() }');
     buffer.writeln('        if let name = currentDatabaseName {');
-    buffer.writeln('            try NativeSqliteManager.shared.closeDatabase(name: name)');
+    buffer.writeln(
+      '            try NativeSqliteManager.shared.closeDatabase(name: name)',
+    );
     buffer.writeln('        }');
     buffer.writeln('        currentDatabaseName = nil');
     buffer.writeln('    }');
@@ -1090,7 +1126,9 @@ enum GeneratedValue {
     buffer.writeln('            lock.lock()');
     buffer.writeln('            defer { lock.unlock() }');
     buffer.writeln('            guard let name = currentDatabaseName else {');
-    buffer.writeln('                throw NSError(domain: "DatabaseManager", code: -1,');
+    buffer.writeln(
+      '                throw NSError(domain: "DatabaseManager", code: -1,',
+    );
     buffer.writeln(
       '                    userInfo: [NSLocalizedDescriptionKey: "Call DatabaseManager.shared.initialize() first"])',
     );
@@ -1103,17 +1141,20 @@ enum GeneratedValue {
     return buffer.toString();
   }
 
-  String _toSnakeCase(String input) {
-    return input
-        .replaceAllMapped(
-          RegExp(r'([A-Z])'),
-          (match) => '_${match.group(1)!.toLowerCase()}',
-        )
-        .replaceFirst(RegExp(r'^_'), '');
-  }
-
-  String _toCamelCase(String input) {
-    if (input.isEmpty) return input;
-    return input[0].toLowerCase() + input.substring(1);
+  void _validateSchemaMembers(TableSchemaSnapshot model) {
+    const reserved = {'tableName', 'createTableSql', 'indexSql'};
+    final seen = <String>{...reserved};
+    for (final column in model.columns) {
+      final member = _swiftIdentifier(
+        NamingConventions.toCamelCase(column.dartName),
+      );
+      if (!seen.add(member)) {
+        throw StateError(
+          'Cannot generate ${model.className}Schema.swift: column '
+          '"${column.dartName}" maps to the duplicate or reserved Swift '
+          'member "$member". Rename the Dart field.',
+        );
+      }
+    }
   }
 }

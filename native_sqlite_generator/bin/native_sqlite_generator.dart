@@ -3,7 +3,6 @@
 import 'dart:io';
 
 import 'package:args/args.dart';
-import 'package:native_sqlite_generator/src/cache/build_cache.dart';
 import 'package:native_sqlite_generator/src/cli/analyze_command.dart';
 import 'package:native_sqlite_generator/src/cli/export_command.dart';
 import 'package:native_sqlite_generator/src/cli/migrate_command.dart';
@@ -19,15 +18,11 @@ import 'package:native_sqlite_generator/src/utils/logger.dart';
 ///   dart run native_sqlite_generator stats        # Show statistics
 ///   dart run native_sqlite_generator migrate      # Generate migration SQL
 ///   dart run native_sqlite_generator export       # Export schemas to JSON
-///   dart run native_sqlite_generator clean-cache  # Clear build cache
-///   dart run native_sqlite_generator cache-stats  # Show cache info
 Future<void> main(List<String> arguments) async {
   final parser = ArgParser()
     ..addFlag('help', abbr: 'h', negatable: false, help: 'Show usage')
     ..addFlag('verbose', abbr: 'v', negatable: false, help: 'Verbose output');
 
-  parser.addCommand('clean-cache');
-  parser.addCommand('cache-stats');
   parser.addCommand('analyze');
   parser.addCommand('stats');
 
@@ -72,12 +67,6 @@ Future<void> main(List<String> arguments) async {
 
     // Handle commands
     switch (results.command?.name) {
-      case 'clean-cache':
-        await _cleanCache(verbose);
-        break;
-      case 'cache-stats':
-        await _cacheStats(verbose);
-        break;
       case 'analyze':
         await _analyze(verbose);
         break;
@@ -101,7 +90,7 @@ Future<void> main(List<String> arguments) async {
     }
   } catch (e, stackTrace) {
     logger.severe('');
-    logger.severe('✗ Error: $e');
+    logger.severe('Error: $e');
     logger.severe('');
     if (arguments.contains('--verbose') || arguments.contains('-v')) {
       logger.severe('Stack trace:');
@@ -125,8 +114,6 @@ COMMANDS:
   stats         Show project statistics
   migrate       Generate SQL migrations between schema versions
   export        Export table schemas to JSON/YAML
-  clean-cache   Clear the build cache
-  cache-stats   Show cache statistics
 
 OPTIONS:
   -h, --help      Show this help message
@@ -150,9 +137,6 @@ EXAMPLES:
 
   # Export schema to YAML
   dart run native_sqlite_generator export --output docs/schema.yaml --format yaml
-
-  # Clear cache
-  dart run native_sqlite_generator clean-cache --verbose
 
 For more information, visit: https://github.com/your_repo/native_sqlite
 ''');
@@ -204,54 +188,6 @@ Future<void> _generateNativeCode(List<String> arguments) async {
   await generator.generate();
 
   logger.info('');
-  logger.info('✓ Native code generation completed successfully!');
+  logger.info('Native code generation completed successfully!');
   logger.info('');
-}
-
-Future<void> _cleanCache(bool verbose) async {
-  logger.info('🧹 Cleaning build cache...\n');
-
-  final cache = BuildCache('.dart_tool/native_sqlite_generator');
-  final stats = cache.getStats();
-
-  if (verbose) {
-    logger.info('Cache location: ${stats.cacheFile}');
-    logger.info('Entries before: ${stats.totalEntries}');
-    logger.info('Size before: ${stats.size} bytes');
-    logger.info('');
-  }
-
-  cache.clear();
-  cache.save();
-
-  logger.info('✅ Cache cleared successfully!');
-
-  if (verbose) {
-    logger.info('');
-    logger.info('Next build will regenerate all files.');
-  }
-}
-
-Future<void> _cacheStats(bool verbose) async {
-  logger.info('📊 Build Cache Statistics\n');
-
-  final cache = BuildCache('.dart_tool/native_sqlite_generator');
-  final stats = cache.getStats();
-
-  logger.info(stats);
-
-  if (verbose && stats.totalEntries > 0) {
-    logger.info('Cached files:');
-    final files = cache.getCachedFiles();
-    for (int i = 0; i < files.length; i++) {
-      logger.info('  ${i + 1}. ${files[i]}');
-    }
-    logger.info('');
-  }
-
-  if (stats.totalEntries == 0) {
-    logger.info(
-      '💡 Tip: Run "dart run build_runner build" to populate the cache.',
-    );
-  }
 }

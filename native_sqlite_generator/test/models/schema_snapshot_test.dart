@@ -8,6 +8,7 @@ ColumnSchemaSnapshot _col({
   bool nullable = false,
   bool primaryKey = true,
   bool autoIncrement = true,
+  bool useLocalUuid = false,
   bool unique = false,
   String? defaultValue,
   String? foreignKey,
@@ -22,6 +23,7 @@ ColumnSchemaSnapshot _col({
     nullable: nullable,
     primaryKey: primaryKey,
     autoIncrement: autoIncrement,
+    useLocalUuid: useLocalUuid,
     unique: unique,
     defaultValue: defaultValue,
     foreignKey: foreignKey,
@@ -83,6 +85,22 @@ void main() {
       final restored = ColumnSchemaSnapshot.fromJson(col.toJson());
       expect(restored.hasConverter, isTrue);
     });
+
+    test('round-trips useLocalUuid without changing legacy defaults', () {
+      final uuid = ColumnSchemaSnapshot.fromJson(
+        _col(
+          type: 'TEXT',
+          dartType: 'String?',
+          nullable: true,
+          autoIncrement: false,
+          useLocalUuid: true,
+        ).toJson(),
+      );
+      expect(uuid.useLocalUuid, isTrue);
+
+      final legacyJson = _col().toJson()..remove('useLocalUuid');
+      expect(ColumnSchemaSnapshot.fromJson(legacyJson).useLocalUuid, isFalse);
+    });
   });
 
   group('IndexSchemaSnapshot.toJson / fromJson', () {
@@ -95,8 +113,10 @@ void main() {
     });
 
     test('round-trips multi-column unique index', () {
-      final idx =
-          IndexSchemaSnapshot(columns: ['first_name', 'last_name'], unique: true);
+      final idx = IndexSchemaSnapshot(
+        columns: ['first_name', 'last_name'],
+        unique: true,
+      );
       final restored = IndexSchemaSnapshot.fromJson(idx.toJson());
 
       expect(restored.columns, ['first_name', 'last_name']);
@@ -120,35 +140,57 @@ void main() {
     });
 
     test('generates non-empty hash', () {
-      final snapshot =
-          TableSchemaSnapshot.fromTableInfo('User', 'users', [], [], 1);
+      final snapshot = TableSchemaSnapshot.fromTableInfo(
+        'User',
+        'users',
+        [],
+        [],
+        1,
+      );
       expect(snapshot.hash, isNotEmpty);
     });
 
     test('same data produces same hash', () {
-      final a =
-          TableSchemaSnapshot.fromTableInfo('User', 'users', [], [], 1);
-      final b =
-          TableSchemaSnapshot.fromTableInfo('User', 'users', [], [], 1);
+      final a = TableSchemaSnapshot.fromTableInfo('User', 'users', [], [], 1);
+      final b = TableSchemaSnapshot.fromTableInfo('User', 'users', [], [], 1);
       expect(a.hash, b.hash);
     });
 
     test('different tableName produces different hash', () {
-      final a =
-          TableSchemaSnapshot.fromTableInfo('User', 'users', [], [], 1);
-      final b =
-          TableSchemaSnapshot.fromTableInfo('User', 'app_users', [], [], 1);
+      final a = TableSchemaSnapshot.fromTableInfo('User', 'users', [], [], 1);
+      final b = TableSchemaSnapshot.fromTableInfo(
+        'User',
+        'app_users',
+        [],
+        [],
+        1,
+      );
       expect(a.hash, isNot(b.hash));
     });
 
     test('different columns produce different hash', () {
       final col1 = _col(name: 'id');
-      final col2 = _col(name: 'email', type: 'TEXT', primaryKey: false,
-          autoIncrement: false, dartType: 'String');
-      final a =
-          TableSchemaSnapshot.fromTableInfo('User', 'users', [col1], [], 1);
-      final b =
-          TableSchemaSnapshot.fromTableInfo('User', 'users', [col2], [], 1);
+      final col2 = _col(
+        name: 'email',
+        type: 'TEXT',
+        primaryKey: false,
+        autoIncrement: false,
+        dartType: 'String',
+      );
+      final a = TableSchemaSnapshot.fromTableInfo(
+        'User',
+        'users',
+        [col1],
+        [],
+        1,
+      );
+      final b = TableSchemaSnapshot.fromTableInfo(
+        'User',
+        'users',
+        [col2],
+        [],
+        1,
+      );
       expect(a.hash, isNot(b.hash));
     });
   });
@@ -158,9 +200,20 @@ void main() {
       final snapshot = TableSchemaSnapshot.fromTableInfo(
         'Post',
         'posts',
-        [_col(name: 'id'), _col(dartName: 'title', name: 'title', type: 'TEXT',
-            primaryKey: false, autoIncrement: false, dartType: 'String')],
-        [IndexSchemaSnapshot(columns: ['title'], unique: false)],
+        [
+          _col(name: 'id'),
+          _col(
+            dartName: 'title',
+            name: 'title',
+            type: 'TEXT',
+            primaryKey: false,
+            autoIncrement: false,
+            dartType: 'String',
+          ),
+        ],
+        [
+          IndexSchemaSnapshot(columns: ['title'], unique: false),
+        ],
         2,
       );
 
@@ -176,8 +229,13 @@ void main() {
 
     test('columns round-trip correctly', () {
       final col = _col(name: 'id', primaryKey: true, autoIncrement: true);
-      final snapshot =
-          TableSchemaSnapshot.fromTableInfo('User', 'users', [col], [], 1);
+      final snapshot = TableSchemaSnapshot.fromTableInfo(
+        'User',
+        'users',
+        [col],
+        [],
+        1,
+      );
 
       final restored = TableSchemaSnapshot.fromJson(snapshot.toJson());
       expect(restored.columns.first.name, 'id');
@@ -185,8 +243,13 @@ void main() {
     });
 
     test('empty columns and indexes serialize correctly', () {
-      final snapshot =
-          TableSchemaSnapshot.fromTableInfo('Tag', 'tags', [], [], 1);
+      final snapshot = TableSchemaSnapshot.fromTableInfo(
+        'Tag',
+        'tags',
+        [],
+        [],
+        1,
+      );
       final restored = TableSchemaSnapshot.fromJson(snapshot.toJson());
 
       expect(restored.columns, isEmpty);
@@ -196,26 +259,26 @@ void main() {
 
   group('TableSchemaSnapshot equality', () {
     test('two snapshots with same data are equal', () {
-      final a =
-          TableSchemaSnapshot.fromTableInfo('User', 'users', [], [], 1);
-      final b =
-          TableSchemaSnapshot.fromTableInfo('User', 'users', [], [], 1);
+      final a = TableSchemaSnapshot.fromTableInfo('User', 'users', [], [], 1);
+      final b = TableSchemaSnapshot.fromTableInfo('User', 'users', [], [], 1);
       expect(a, equals(b));
     });
 
     test('snapshots with different tableName are not equal', () {
-      final a =
-          TableSchemaSnapshot.fromTableInfo('User', 'users', [], [], 1);
-      final b =
-          TableSchemaSnapshot.fromTableInfo('User', 'app_users', [], [], 1);
+      final a = TableSchemaSnapshot.fromTableInfo('User', 'users', [], [], 1);
+      final b = TableSchemaSnapshot.fromTableInfo(
+        'User',
+        'app_users',
+        [],
+        [],
+        1,
+      );
       expect(a, isNot(equals(b)));
     });
 
     test('hashCode matches for equal snapshots', () {
-      final a =
-          TableSchemaSnapshot.fromTableInfo('User', 'users', [], [], 1);
-      final b =
-          TableSchemaSnapshot.fromTableInfo('User', 'users', [], [], 1);
+      final a = TableSchemaSnapshot.fromTableInfo('User', 'users', [], [], 1);
+      final b = TableSchemaSnapshot.fromTableInfo('User', 'users', [], [], 1);
       expect(a.hashCode, b.hashCode);
     });
   });

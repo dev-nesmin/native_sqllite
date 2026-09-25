@@ -83,7 +83,7 @@ class StatisticsGenerator {
   /// Examples:
   /// - "String" -> "String"
   /// - "int?" -> "int"
-  /// - "List<String>" -> "List<String>"
+  /// - `List<String>` -> `List<String>`
   static String _getSimpleTypeName(String fullType) {
     // Remove nullability suffix
     String type = fullType.replaceAll('?', '');
@@ -92,23 +92,5 @@ class StatisticsGenerator {
     type = type.trim();
 
     return type;
-  }
-
-  /// Generates a compact one-line summary for headers.
-  static String generateSummary(TableInfo table) {
-    final parts = <String>[];
-
-    parts.add('${table.columns.length} fields');
-
-    if (table.indexes.isNotEmpty) {
-      parts.add('${table.indexes.length} indexes');
-    }
-
-    final fkCount = table.columns.where((c) => c.hasForeignKey).length;
-    if (fkCount > 0) {
-      parts.add('$fkCount foreign keys');
-    }
-
-    return parts.join(', ');
   }
 }

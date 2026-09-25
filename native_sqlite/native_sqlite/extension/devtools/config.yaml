@@ -1,0 +1,5 @@
+name: native_sqlite
+issueTracker: https://github.com/nesmin/native_sqllite/issues
+version: 0.0.1
+materialIconCodePoint: "0xe1db"
+requiresConnection: true

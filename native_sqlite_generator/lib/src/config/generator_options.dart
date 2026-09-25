@@ -9,24 +9,10 @@ import 'package:build/build.dart';
 ///     builders:
 ///       native_sqlite_generator:table:
 ///         options:
-///           format: true
-///           generate_helpers: true
 ///           table_name_case: snake
 ///           # ... more options
 /// ```
 class GeneratorOptions {
-  /// Whether to format generated code using dart_style
-  final bool format;
-
-  /// Whether to generate helper methods (e.g., copyWith, toString)
-  final bool generateHelpers;
-
-  /// Whether to enable cached builds for improved performance
-  final bool enableCachedBuilds;
-
-  /// Custom output directory for generated files (relative to lib/)
-  final String? outputDirectory;
-
   /// List of lint rules to ignore in generated files
   final List<String> ignoreForFile;
 
@@ -42,33 +28,10 @@ class GeneratorOptions {
   /// Whether to include statistics in generated file comments
   final bool includeStatistics;
 
-  /// Visibility of generated classes: 'public' or 'private'
-  final String classVisibility;
-
-  /// Custom imports to add to all generated files
-  final List<String> customImports;
-
-  /// Whether to generate as part files (.g.dart) instead of separate libraries
-  final bool generateAsPartFile;
-
   /// Whether to include verbose logging during generation
   final bool verbose;
 
-  /// Default database name to use when not specified in @DbTable annotation
-  final String? defaultDatabase;
-
-  /// Output path for generated DatabaseManager and schema files (relative to lib/)
-  final String outputPath;
-
-  /// Path to the generated schema JSON file, used to read the schema version
-  /// at build time. Configurable via `schema_output_path` in build.yaml.
-  final String schemaOutputPath;
-
   const GeneratorOptions({
-    this.format = true,
-    this.generateHelpers = true,
-    this.enableCachedBuilds = true,
-    this.outputDirectory,
     this.ignoreForFile = const [
       'type=lint',
       'prefer_single_quotes',
@@ -79,15 +42,9 @@ class GeneratorOptions {
     ],
     this.tableNameCase = 'snake',
     this.columnNameCase = 'snake',
-    this.includeTimestamp = true,
+    this.includeTimestamp = false,
     this.includeStatistics = false,
-    this.classVisibility = 'public',
-    this.customImports = const [],
-    this.generateAsPartFile = false,
     this.verbose = false,
-    this.defaultDatabase,
-    this.outputPath = '',
-    this.schemaOutputPath = 'lib/generated/native_sqlite_schema.json',
   });
 
   /// Creates a [GeneratorOptions] instance from [BuilderOptions].
@@ -95,12 +52,49 @@ class GeneratorOptions {
   /// This parses the build.yaml configuration and provides sensible defaults.
   factory GeneratorOptions.fromOptions(BuilderOptions options) {
     final config = options.config;
+    const supported = {
+      'ignore_for_file',
+      'table_name_case',
+      'column_name_case',
+      'include_timestamp',
+      'include_statistics',
+      'verbose',
+    };
+    final unknown = config.keys.where((key) => !supported.contains(key));
+    if (unknown.isNotEmpty) {
+      throw ArgumentError(
+        'Unknown native_sqlite_generator option(s): ${unknown.join(', ')}. '
+        'Supported options: ${supported.join(', ')}.',
+      );
+    }
+
+    final tableNameCase = _string(
+      config,
+      'table_name_case',
+      defaultValue: 'snake',
+    );
+    final columnNameCase = _string(
+      config,
+      'column_name_case',
+      defaultValue: 'snake',
+    );
+    const namingCases = {'snake', 'camel', 'pascal', 'none'};
+    if (!namingCases.contains(tableNameCase)) {
+      throw ArgumentError.value(
+        tableNameCase,
+        'table_name_case',
+        'must be one of ${namingCases.join(', ')}',
+      );
+    }
+    if (!namingCases.contains(columnNameCase)) {
+      throw ArgumentError.value(
+        columnNameCase,
+        'column_name_case',
+        'must be one of ${namingCases.join(', ')}',
+      );
+    }
 
     return GeneratorOptions(
-      format: config['format'] as bool? ?? true,
-      generateHelpers: config['generate_helpers'] as bool? ?? true,
-      enableCachedBuilds: config['enable_cached_builds'] as bool? ?? true,
-      outputDirectory: config['output_directory'] as String?,
       ignoreForFile:
           _parseStringList(config['ignore_for_file']) ??
           const [
@@ -111,48 +105,65 @@ class GeneratorOptions {
             'unused_element',
             'unused_import',
           ],
-      tableNameCase: config['table_name_case'] as String? ?? 'snake',
-      columnNameCase: config['column_name_case'] as String? ?? 'snake',
-      includeTimestamp: config['include_timestamp'] as bool? ?? true,
-      includeStatistics: config['include_statistics'] as bool? ?? false,
-      classVisibility: config['class_visibility'] as String? ?? 'public',
-      customImports: _parseStringList(config['custom_imports']) ?? const [],
-      generateAsPartFile: config['generate_as_part_file'] as bool? ?? false,
-      verbose: config['verbose'] as bool? ?? false,
-      defaultDatabase: config['default_database'] as String?,
-      outputPath: config['output_path'] as String? ?? '',
-      schemaOutputPath: config['schema_output_path'] as String? ??
-          'lib/generated/native_sqlite_schema.json',
+      tableNameCase: tableNameCase,
+      columnNameCase: columnNameCase,
+      includeTimestamp: _boolean(
+        config,
+        'include_timestamp',
+        defaultValue: false,
+      ),
+      includeStatistics: _boolean(
+        config,
+        'include_statistics',
+        defaultValue: false,
+      ),
+      verbose: _boolean(config, 'verbose', defaultValue: false),
     );
   }
 
   /// Helper to parse list of strings from config
   static List<String>? _parseStringList(dynamic value) {
     if (value == null) return null;
-    if (value is List) {
+    if (value is List && value.every((item) => item is String)) {
       return value.cast<String>();
     }
-    return null;
+    throw ArgumentError.value(
+      value,
+      'ignore_for_file',
+      'must be a list of strings',
+    );
+  }
+
+  static bool _boolean(
+    Map<String, dynamic> config,
+    String key, {
+    required bool defaultValue,
+  }) {
+    final value = config[key];
+    if (value == null) return defaultValue;
+    if (value is bool) return value;
+    throw ArgumentError.value(value, key, 'must be a boolean');
+  }
+
+  static String _string(
+    Map<String, dynamic> config,
+    String key, {
+    required String defaultValue,
+  }) {
+    final value = config[key];
+    if (value == null) return defaultValue;
+    if (value is String) return value;
+    throw ArgumentError.value(value, key, 'must be a string');
   }
 
   /// Converts options to JSON for debugging/logging
   Map<String, dynamic> toJson() => {
-    'format': format,
-    'generate_helpers': generateHelpers,
-    'enable_cached_builds': enableCachedBuilds,
-    'output_directory': outputDirectory,
     'ignore_for_file': ignoreForFile,
     'table_name_case': tableNameCase,
     'column_name_case': columnNameCase,
     'include_timestamp': includeTimestamp,
     'include_statistics': includeStatistics,
-    'class_visibility': classVisibility,
-    'custom_imports': customImports,
-    'generate_as_part_file': generateAsPartFile,
     'verbose': verbose,
-    'default_database': defaultDatabase,
-    'output_path': outputPath,
-    'schema_output_path': schemaOutputPath,
   };
 
   @override

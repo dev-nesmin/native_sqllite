@@ -11,7 +11,8 @@ You do **not** depend on this package directly in your app — it is used intern
 This package follows the [federated plugin](https://docs.flutter.dev/packages-and-plugins/developing-packages#federated-plugins) pattern. It contains:
 
 - `NativeSqlitePlatform` — the abstract base class all platform implementations extend
-- Shared method signatures for `open`, `execute`, `query`, `transaction`, `deleteDatabase`, and schema inspection
+- Shared method signatures for open/close, CRUD, interactive transaction
+  operations, one-call batches, database deletion, and schema inspection
 
 ---
 
@@ -26,10 +27,14 @@ class MyPlatformSqlite extends NativeSqlitePlatform {
   }
 
   @override
-  Future<void> open(DatabaseConfig config) async { ... }
+  Future<String> openDatabase(DatabaseConfig config) async { ... }
 
   @override
-  Future<List<Map<String, dynamic>>> query(String dbName, String sql, [List<Object?> args = const []]) async { ... }
+  Future<QueryResult> query(
+    String databaseName,
+    String sql,
+    List<Object?>? arguments,
+  ) async { ... }
 
   // implement remaining methods ...
 }

@@ -11,7 +11,7 @@ void main() {
       await testBuilder(
         tableBuilder(BuilderOptions({})),
         {
-          ...mockAnnotationsPackage,
+          ...realAnnotationsPackage,
           'a|lib/test_user.dart': '''
 import 'package:native_sqlite_annotations/native_sqlite_annotations.dart';
 
@@ -34,6 +34,7 @@ class TestUser {
           'a|lib/test_user.table.dart': decodedMatches(
             allOf(
               contains('class TestUserQueryBuilder'),
+              contains('TestUserQueryBuilder idEqualTo(int? value)'),
               contains('TestUserQueryBuilder nameEqualTo(String value)'),
               contains('TestUserQueryBuilder ageGreaterThan(int value)'),
             ),
@@ -42,13 +43,14 @@ class TestUser {
       );
     });
 
-    test('generates string filter methods (contains, startsWith, endsWith)',
-        () async {
-      await testBuilder(
-        tableBuilder(BuilderOptions({})),
-        {
-          ...mockAnnotationsPackage,
-          'a|lib/test_post.dart': '''
+    test(
+      'generates string filter methods (contains, startsWith, endsWith)',
+      () async {
+        await testBuilder(
+          tableBuilder(BuilderOptions({})),
+          {
+            ...realAnnotationsPackage,
+            'a|lib/test_post.dart': '''
 import 'package:native_sqlite_annotations/native_sqlite_annotations.dart';
 
 @DbTable()
@@ -62,26 +64,30 @@ class TestPost {
   const TestPost({this.id, required this.title});
 }
 ''',
-        },
-        outputs: {
-          'a|lib/test_post.table.dart': decodedMatches(
-            allOf(
-              contains('titleContains(String value)'),
-              contains('titleStartsWith(String value)'),
-              contains('titleEndsWith(String value)'),
+          },
+          outputs: {
+            'a|lib/test_post.table.dart': decodedMatches(
+              allOf(
+                contains('titleContains(String value)'),
+                contains('titleStartsWith(String value)'),
+                contains('titleEndsWith(String value)'),
+                contains("LIKE ? ESCAPE"),
+                contains('_escapeLike(value)'),
+              ),
             ),
-          ),
-        },
-      );
-    });
+          },
+        );
+      },
+    );
 
-    test('generates numeric range filter methods (between, lessThan, etc.)',
-        () async {
-      await testBuilder(
-        tableBuilder(BuilderOptions({})),
-        {
-          ...mockAnnotationsPackage,
-          'a|lib/test_product.dart': '''
+    test(
+      'generates numeric range filter methods (between, lessThan, etc.)',
+      () async {
+        await testBuilder(
+          tableBuilder(BuilderOptions({})),
+          {
+            ...realAnnotationsPackage,
+            'a|lib/test_product.dart': '''
 import 'package:native_sqlite_annotations/native_sqlite_annotations.dart';
 
 @DbTable()
@@ -95,24 +101,25 @@ class TestProduct {
   const TestProduct({this.id, required this.price});
 }
 ''',
-        },
-        outputs: {
-          'a|lib/test_product.table.dart': decodedMatches(
-            allOf(
-              contains('priceLessThan(double value)'),
-              contains('priceGreaterThan(double value)'),
-              contains('priceBetween(double min, double max)'),
+          },
+          outputs: {
+            'a|lib/test_product.table.dart': decodedMatches(
+              allOf(
+                contains('priceLessThan(double value)'),
+                contains('priceGreaterThan(double value)'),
+                contains('priceBetween(double min, double max)'),
+              ),
             ),
-          ),
-        },
-      );
-    });
+          },
+        );
+      },
+    );
 
     test('generates sort methods for columns', () async {
       await testBuilder(
         tableBuilder(BuilderOptions({})),
         {
-          ...mockAnnotationsPackage,
+          ...realAnnotationsPackage,
           'a|lib/test_article.dart': '''
 import 'package:native_sqlite_annotations/native_sqlite_annotations.dart';
 
@@ -133,6 +140,8 @@ class TestArticle {
             allOf(
               contains('sortByTitleAsc()'),
               contains('sortByTitleDesc()'),
+              contains('thenByTitleAsc()'),
+              contains('thenByTitleDesc()'),
             ),
           ),
         },
@@ -143,7 +152,7 @@ class TestArticle {
       await testBuilder(
         tableBuilder(BuilderOptions({})),
         {
-          ...mockAnnotationsPackage,
+          ...realAnnotationsPackage,
           'a|lib/test_comment.dart': '''
 import 'package:native_sqlite_annotations/native_sqlite_annotations.dart';
 
@@ -164,6 +173,7 @@ class TestComment {
             allOf(
               contains('limit(int value)'),
               contains('offset(int value)'),
+              contains("' LIMIT -1'"),
             ),
           ),
         },
@@ -174,7 +184,7 @@ class TestComment {
       await testBuilder(
         tableBuilder(BuilderOptions({})),
         {
-          ...mockAnnotationsPackage,
+          ...realAnnotationsPackage,
           'a|lib/test_tag.dart': '''
 import 'package:native_sqlite_annotations/native_sqlite_annotations.dart';
 
@@ -194,7 +204,40 @@ class TestTag {
           'a|lib/test_tag.table.dart': decodedMatches(
             allOf(
               contains('Future<List<TestTag>> findAll()'),
+              contains('Future<TestTag?> findFirst()'),
               contains('Future<int> count()'),
+              contains('String toSql()'),
+              contains('String get debugSql'),
+              contains('_buildQuery(limitOverride: 1)'),
+            ),
+          ),
+        },
+      );
+    });
+
+    test('nullable equality uses IS NULL without binding null', () async {
+      await testBuilder(
+        tableBuilder(BuilderOptions({})),
+        {
+          ...realAnnotationsPackage,
+          'a|lib/test_profile.dart': '''
+import 'package:native_sqlite_annotations/native_sqlite_annotations.dart';
+
+@DbTable()
+class TestProfile {
+  @PrimaryKey(autoIncrement: true)
+  final int? id;
+  final String? nickname;
+  const TestProfile({this.id, this.nickname});
+}
+''',
+        },
+        outputs: {
+          'a|lib/test_profile.table.dart': decodedMatches(
+            allOf(
+              contains('nicknameEqualTo(String? value)'),
+              contains('if (value == null)'),
+              contains('"nickname" IS NULL'),
             ),
           ),
         },

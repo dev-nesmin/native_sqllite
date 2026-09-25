@@ -17,8 +17,10 @@ void main() {
 
     test('handles acronyms correctly', () {
       expect(NamingConventions.toSnakeCase('userID'), equals('user_id'));
-      expect(NamingConventions.toSnakeCase('HTTPResponse'),
-          equals('http_response'));
+      expect(
+        NamingConventions.toSnakeCase('HTTPResponse'),
+        equals('http_response'),
+      );
       expect(NamingConventions.toSnakeCase('parseHTML'), equals('parse_html'));
     });
 
@@ -108,16 +110,24 @@ void main() {
   group('NamingConventions.format', () {
     test('formats to specified convention', () {
       expect(
-          NamingConventions.format('userName', 'snake'), equals('user_name'));
+        NamingConventions.format('userName', 'snake'),
+        equals('user_name'),
+      );
       expect(
-          NamingConventions.format('user_name', 'camel'), equals('userName'));
+        NamingConventions.format('user_name', 'camel'),
+        equals('userName'),
+      );
       expect(
-          NamingConventions.format('user_name', 'pascal'), equals('UserName'));
+        NamingConventions.format('user_name', 'pascal'),
+        equals('UserName'),
+      );
     });
 
     test('returns original for unknown convention', () {
       expect(
-          NamingConventions.format('userName', 'unknown'), equals('userName'));
+        NamingConventions.format('userName', 'unknown'),
+        equals('userName'),
+      );
     });
   });
 }

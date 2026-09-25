@@ -37,6 +37,10 @@ flutter {
     source = "../.."
 }
 
+dependencies {
+    implementation("androidx.work:work-runtime-ktx:2.11.2")
+}
+
 kotlin {
     compilerOptions {
         jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17

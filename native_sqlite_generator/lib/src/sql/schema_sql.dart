@@ -1,5 +1,6 @@
 import 'package:native_sqlite_generator/src/helpers/naming_conventions.dart';
 import 'package:native_sqlite_generator/src/models/schema_snapshot.dart';
+import 'package:native_sqlite_generator/src/sql/sql_identifier.dart';
 
 /// Builds schema SQL from a [TableSchemaSnapshot].
 ///
@@ -22,7 +23,8 @@ class SchemaSql {
         if (column.foreignKey != null) _foreignKey(column),
     ];
     return 'CREATE TABLE ${ifNotExists ? 'IF NOT EXISTS ' : ''}'
-        '${name ?? table.tableName} (${definitions.join(', ')})';
+        '${quoteSqlIdentifier(name ?? table.tableName)} '
+        '(${definitions.join(', ')})';
   }
 
   static List<String> createIndexes(
@@ -42,8 +44,9 @@ class SchemaSql {
   }) {
     return 'CREATE ${index.unique ? 'UNIQUE ' : ''}INDEX '
         '${ifNotExists ? 'IF NOT EXISTS ' : ''}'
-        '${indexName(tableName, index)} '
-        'ON $tableName (${index.columns.join(', ')})';
+        '${quoteSqlIdentifier(indexName(tableName, index))} '
+        'ON ${quoteSqlIdentifier(tableName)} '
+        '(${index.columns.map(quoteSqlIdentifier).join(', ')})';
   }
 
   /// The index's name; snapshots written before names were recorded fall
@@ -52,14 +55,19 @@ class SchemaSql {
       index.name ?? _defaultIndexName(tableName, index.columns);
 
   static String _columnDefinition(ColumnSchemaSnapshot column) {
-    final parts = <String>[column.name, column.type];
+    final parts = <String>[quoteSqlIdentifier(column.name), column.type];
     if (column.primaryKey) {
       parts.add('PRIMARY KEY');
       if (column.autoIncrement) parts.add('AUTOINCREMENT');
     }
-    if (!column.nullable && !column.primaryKey) parts.add('NOT NULL');
+    if ((!column.nullable && !column.primaryKey) ||
+        (column.primaryKey && column.type.toUpperCase() != 'INTEGER')) {
+      parts.add('NOT NULL');
+    }
     if (column.unique && !column.primaryKey) parts.add('UNIQUE');
-    if (column.defaultValue != null) parts.add('DEFAULT ${column.defaultValue}');
+    if (column.defaultValue != null) {
+      parts.add('DEFAULT ${column.defaultValue}');
+    }
     return parts.join(' ');
   }
 
@@ -67,8 +75,9 @@ class SchemaSql {
     final reference = column.foreignKey!;
     final dot = reference.indexOf('.');
     final parts = <String>[
-      'FOREIGN KEY (${column.name})',
-      'REFERENCES ${reference.substring(0, dot)}(${reference.substring(dot + 1)})',
+      'FOREIGN KEY (${quoteSqlIdentifier(column.name)})',
+      'REFERENCES ${quoteSqlIdentifier(reference.substring(0, dot))}'
+          '(${quoteSqlIdentifier(reference.substring(dot + 1))})',
     ];
     if (column.foreignKeyOnDelete != null) {
       parts.add('ON DELETE ${column.foreignKeyOnDelete}');

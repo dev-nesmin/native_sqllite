@@ -1,4 +1,3 @@
-
 /// Annotation to define a foreign key relationship.
 class ForeignKey {
   /// The table this foreign key references.
@@ -15,6 +14,7 @@ class ForeignKey {
   /// Examples: 'CASCADE', 'SET NULL', 'RESTRICT', 'NO ACTION'
   final String? onUpdate;
 
+  /// Creates a foreign-key annotation.
   const ForeignKey({
     required this.table,
     required this.column,

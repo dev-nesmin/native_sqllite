@@ -4,6 +4,9 @@ import 'package:crypto/crypto.dart';
 
 /// Represents a snapshot of a table schema for migration tracking.
 class TableSchemaSnapshot {
+  /// Package-relative path of the Dart library that declares this table.
+  final String? sourcePath;
+
   /// The Dart class name
   final String className;
 
@@ -23,6 +26,7 @@ class TableSchemaSnapshot {
   final String hash;
 
   const TableSchemaSnapshot({
+    this.sourcePath,
     required this.className,
     required this.tableName,
     required this.columns,
@@ -37,10 +41,12 @@ class TableSchemaSnapshot {
     String tableName,
     List<ColumnSchemaSnapshot> columns,
     List<IndexSchemaSnapshot> indexes,
-    int version,
-  ) {
+    int version, {
+    String? sourcePath,
+  }) {
     final hash = computeHash(tableName, columns, indexes);
     return TableSchemaSnapshot(
+      sourcePath: sourcePath,
       className: className,
       tableName: tableName,
       columns: columns,
@@ -53,6 +59,7 @@ class TableSchemaSnapshot {
   /// Converts to JSON for storage
   Map<String, dynamic> toJson() {
     return {
+      if (sourcePath != null) 'sourcePath': sourcePath,
       'className': className,
       'tableName': tableName,
       'columns': columns.map((c) => c.toJson()).toList(),
@@ -65,6 +72,7 @@ class TableSchemaSnapshot {
   /// Creates from JSON
   factory TableSchemaSnapshot.fromJson(Map<String, dynamic> json) {
     return TableSchemaSnapshot(
+      sourcePath: json['sourcePath'] as String?,
       className: json['className'] as String,
       tableName: json['tableName'] as String,
       columns: (json['columns'] as List)
@@ -75,6 +83,23 @@ class TableSchemaSnapshot {
           .toList(),
       version: json['version'] as int,
       hash: json['hash'] as String,
+    );
+  }
+
+  /// Returns a copy with native-facing type metadata changed, without
+  /// changing the SQL schema or its hash.
+  TableSchemaSnapshot copyWith({
+    String? className,
+    List<ColumnSchemaSnapshot>? columns,
+  }) {
+    return TableSchemaSnapshot(
+      sourcePath: sourcePath,
+      className: className ?? this.className,
+      tableName: tableName,
+      columns: columns ?? this.columns,
+      indexes: indexes,
+      version: version,
+      hash: hash,
     );
   }
 
@@ -137,6 +162,9 @@ class ColumnSchemaSnapshot {
   /// Whether primary key is auto-increment
   final bool autoIncrement;
 
+  /// Whether generated helpers create a UUID when this primary key is null.
+  final bool useLocalUuid;
+
   /// Whether the column has a unique constraint
   final bool unique;
 
@@ -174,6 +202,7 @@ class ColumnSchemaSnapshot {
     required this.nullable,
     required this.primaryKey,
     required this.autoIncrement,
+    this.useLocalUuid = false,
     required this.unique,
     this.defaultValue,
     this.foreignKey,
@@ -198,6 +227,7 @@ class ColumnSchemaSnapshot {
       'nullable': nullable,
       'primaryKey': primaryKey,
       'autoIncrement': autoIncrement,
+      if (useLocalUuid) 'useLocalUuid': true,
       'unique': unique,
       if (defaultValue != null) 'defaultValue': defaultValue,
       if (foreignKey != null) 'foreignKey': foreignKey,
@@ -220,6 +250,7 @@ class ColumnSchemaSnapshot {
       nullable: json['nullable'] as bool,
       primaryKey: json['primaryKey'] as bool,
       autoIncrement: json['autoIncrement'] as bool,
+      useLocalUuid: json['useLocalUuid'] as bool? ?? false,
       unique: json['unique'] as bool,
       defaultValue: json['defaultValue'] as String?,
       foreignKey: json['foreignKey'] as String?,
@@ -230,6 +261,30 @@ class ColumnSchemaSnapshot {
       dartType: json['dartType'] as String,
       enumType: json['enumType'] as String?,
       enumValues: (json['enumValues'] as List?)?.cast<String>(),
+    );
+  }
+
+  /// Returns a copy with a different Dart type name. This is used only to
+  /// namespace generated native enum types; SQLite metadata is unchanged.
+  ColumnSchemaSnapshot copyWithDartType(String dartType) {
+    return ColumnSchemaSnapshot(
+      dartName: dartName,
+      name: name,
+      type: type,
+      nullable: nullable,
+      primaryKey: primaryKey,
+      autoIncrement: autoIncrement,
+      useLocalUuid: useLocalUuid,
+      unique: unique,
+      defaultValue: defaultValue,
+      foreignKey: foreignKey,
+      foreignKeyOnDelete: foreignKeyOnDelete,
+      foreignKeyOnUpdate: foreignKeyOnUpdate,
+      isJsonField: isJsonField,
+      hasConverter: hasConverter,
+      dartType: dartType,
+      enumType: enumType,
+      enumValues: enumValues,
     );
   }
 }
@@ -253,7 +308,11 @@ class IndexSchemaSnapshot {
 
   /// Converts to JSON
   Map<String, dynamic> toJson() {
-    return {'columns': columns, 'unique': unique, if (name != null) 'name': name};
+    return {
+      'columns': columns,
+      'unique': unique,
+      if (name != null) 'name': name,
+    };
   }
 
   /// Creates from JSON

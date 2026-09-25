@@ -1,15 +1,11 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:native_sqlite/native_sqlite.dart';
 
+import 'demo_enums.dart';
+
 part 'freezed_advanced.freezed.dart';
 part 'freezed_advanced.g.dart';
 part 'freezed_advanced.table.dart';
-
-/// User status enum
-enum UserStatus { active, inactive, suspended }
-
-/// Priority enum
-enum Priority { low, medium, high, urgent }
 
 /// Advanced table demonstrating Phase 2 features:
 /// - Duration type support

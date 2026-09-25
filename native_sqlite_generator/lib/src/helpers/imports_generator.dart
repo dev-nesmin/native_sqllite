@@ -12,22 +12,13 @@ class ImportsGenerator {
   ///
   /// [options] - Generator configuration options
   /// [libraryName] - The library name for the part-of directive (e.g., 'user.dart')
-  /// [tableInfo] - Table information to check for required imports
+  /// [tableInfo] - Table information for the generated file
   static String generate(
     GeneratorOptions options,
     String libraryName,
     TableInfo tableInfo,
   ) {
     final buffer = StringBuffer();
-
-    // Add warning comment if JSON fields are present
-    if (tableInfo.hasJsonFields) {
-      buffer.writeln('// IMPORTANT: This file uses jsonEncode/jsonDecode.');
-      buffer.writeln(
-        "// Add 'import \"dart:convert\";' to your $libraryName file.",
-      );
-      buffer.writeln();
-    }
 
     // Add part-of directive (required for all generated .table.dart files)
     // Part files cannot have imports - all imports must be in the parent library

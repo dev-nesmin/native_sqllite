@@ -1,27 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:go_router/go_router.dart';
 
 import '../widgets/glass_app_bar.dart';
-import 'advanced_features_screen.dart';
-import 'crud_demo_screen.dart';
-import 'json_fields_demo_screen.dart';
-import 'manual_api_screen.dart';
-import 'native_integration_screen.dart';
-import 'order_management_screen.dart';
-import 'query_builder_demo_screen.dart';
-import 'statistics_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     return Scaffold(
-      extendBodyBehindAppBar: true,
       appBar: const GlassAppBar(title: 'Native SQLite Example'),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, kToolbarHeight + 16, 16, 16),
+        padding: const EdgeInsets.all(16),
         children: [
-          _buildHeader(),
+          _buildHeader(context),
           const SizedBox(height: 24),
           _buildSectionLabel('Core Features'),
           const SizedBox(height: 12),
@@ -31,11 +25,8 @@ class HomeScreen extends StatelessWidget {
             description:
                 'Create, Read, Update, Delete for Users, Categories & Products',
             icon: Icons.edit_note,
-            color: Colors.blue,
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const CrudDemoScreen()),
-            ),
+            color: colors.primary,
+            onTap: () => context.push('/crud'),
           ),
           const SizedBox(height: 12),
           _buildFeatureCard(
@@ -44,12 +35,8 @@ class HomeScreen extends StatelessWidget {
             description:
                 'Full order lifecycle with status tracking and filtering',
             icon: Icons.receipt_long,
-            color: Colors.deepPurple,
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                  builder: (_) => const OrderManagementScreen()),
-            ),
+            color: colors.tertiary,
+            onTap: () => context.push('/orders'),
           ),
           const SizedBox(height: 12),
           _buildFeatureCard(
@@ -58,12 +45,8 @@ class HomeScreen extends StatelessWidget {
             description:
                 'Type-safe queries with filters, sorting, and pagination',
             icon: Icons.search,
-            color: Colors.indigo,
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                  builder: (_) => const QueryBuilderDemoScreen()),
-            ),
+            color: colors.secondary,
+            onTap: () => context.push('/query'),
           ),
           const SizedBox(height: 24),
           _buildSectionLabel('Advanced Features'),
@@ -74,38 +57,38 @@ class HomeScreen extends StatelessWidget {
             description:
                 'Transactions, foreign keys, indexes, and complex queries',
             icon: Icons.code,
-            color: Colors.purple,
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const AdvancedFeaturesScreen()),
-            ),
+            color: colors.tertiary,
+            onTap: () => context.push('/advanced'),
           ),
           const SizedBox(height: 12),
           _buildFeatureCard(
             context,
-            title: 'JSON & Custom Types',
+            title: 'Background Sync',
             description:
-                'JSON fields, custom converters, nested objects & lists',
+                'WorkManager and BackgroundTasks write through native helpers',
+            icon: Icons.sync,
+            color: colors.primary,
+            onTap: () => context.push('/background'),
+          ),
+          const SizedBox(height: 12),
+          _buildFeatureCard(
+            context,
+            title: 'Model Gallery',
+            description:
+                'Round-trip every supported type, annotation, and converter',
             icon: Icons.data_object,
-            color: Colors.deepOrange,
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                  builder: (_) => const JsonFieldsDemoScreen()),
-            ),
+            color: colors.error,
+            onTap: () => context.push('/models'),
           ),
           const SizedBox(height: 12),
           _buildFeatureCard(
             context,
-            title: 'Manual API Demo',
+            title: 'Raw API & Errors',
             description:
-                'Use the raw SQLite API directly without code generation',
+                'Every low-level method plus typed SQLite error contracts',
             icon: Icons.api,
-            color: Colors.orange,
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const ManualApiScreen()),
-            ),
+            color: colors.secondary,
+            onTap: () => context.push('/raw'),
           ),
           const SizedBox(height: 24),
           _buildSectionLabel('Platform & Diagnostics'),
@@ -113,15 +96,11 @@ class HomeScreen extends StatelessWidget {
           _buildFeatureCard(
             context,
             title: 'Native Code Integration',
-            description: 'Access the database from Kotlin/Swift without Flutter',
+            description:
+                'Access the database from Kotlin/Swift without Flutter',
             icon: Icons.integration_instructions,
-            color: Colors.teal,
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => const NativeIntegrationScreen(),
-              ),
-            ),
+            color: colors.primary,
+            onTap: () => context.push('/native'),
           ),
           const SizedBox(height: 12),
           _buildFeatureCard(
@@ -130,26 +109,59 @@ class HomeScreen extends StatelessWidget {
             description:
                 'Table counts, schema info, and sample data generation',
             icon: Icons.analytics,
-            color: Colors.green,
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const StatisticsScreen()),
-            ),
+            color: colors.tertiary,
+            onTap: () => context.push('/statistics'),
           ),
+          if (kIsWeb) ...[
+            const SizedBox(height: 12),
+            _buildFeatureCard(
+              context,
+              title: 'Web Persistence',
+              description:
+                  'IndexedDB persistence, reload counter, and one-tab guard',
+              icon: Icons.public,
+              color: colors.primary,
+              onTap: () => context.push('/web'),
+            ),
+          ],
+          if (kDebugMode) ...[
+            const SizedBox(height: 12),
+            _buildFeatureCard(
+              context,
+              title: 'Database Inspector',
+              description: 'Open the bundled extension in Flutter DevTools',
+              icon: Icons.developer_mode,
+              color: colors.secondary,
+              onTap: () => context.push('/inspector'),
+            ),
+          ],
+          if (!kReleaseMode) ...[
+            const SizedBox(height: 12),
+            _buildFeatureCard(
+              context,
+              title: 'SQLite Benchmarks',
+              description:
+                  'Compare loop, transaction, native batch, and query plans',
+              icon: Icons.speed,
+              color: colors.tertiary,
+              onTap: () => context.push('/benchmarks'),
+            ),
+          ],
           const SizedBox(height: 24),
-          _buildInfoSection(),
+          _buildInfoSection(context),
         ],
       ),
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
-            const Icon(Icons.storage, size: 60, color: Colors.blue),
+            Icon(Icons.storage, size: 60, color: colors.primary),
             const SizedBox(height: 16),
             const Text(
               'Native SQLite Plugin',
@@ -159,7 +171,7 @@ class HomeScreen extends StatelessWidget {
             Text(
               'A comprehensive example demonstrating all features',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+              style: TextStyle(fontSize: 14, color: colors.onSurfaceVariant),
             ),
           ],
         ),
@@ -168,15 +180,17 @@ class HomeScreen extends StatelessWidget {
   }
 
   Widget _buildSectionLabel(String label) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 4),
-      child: Text(
-        label.toUpperCase(),
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w700,
-          color: Colors.grey[500],
-          letterSpacing: 1.2,
+    return Builder(
+      builder: (context) => Padding(
+        padding: const EdgeInsets.only(left: 4),
+        child: Text(
+          label.toUpperCase(),
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+            letterSpacing: 1.2,
+          ),
         ),
       ),
     );
@@ -190,6 +204,7 @@ class HomeScreen extends StatelessWidget {
     required Color color,
     required VoidCallback onTap,
   }) {
+    final colors = Theme.of(context).colorScheme;
     return Card(
       child: InkWell(
         onTap: onTap,
@@ -221,12 +236,19 @@ class HomeScreen extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       description,
-                      style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: colors.onSurfaceVariant,
+                      ),
                     ),
                   ],
                 ),
               ),
-              Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey[400]),
+              Icon(
+                Icons.arrow_forward_ios,
+                size: 14,
+                color: colors.onSurfaceVariant,
+              ),
             ],
           ),
         ),
@@ -234,9 +256,10 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildInfoSection() {
+  Widget _buildInfoSection(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     return Card(
-      color: Colors.blue.shade50,
+      color: colors.primaryContainer,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -244,37 +267,38 @@ class HomeScreen extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(Icons.info_outline, color: Colors.blue.shade700),
+                Icon(Icons.info_outline, color: colors.onPrimaryContainer),
                 const SizedBox(width: 8),
                 Text(
                   'Key Features',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
-                    color: Colors.blue.shade700,
+                    color: colors.onPrimaryContainer,
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 12),
-            _buildFeatureItem('Cross-platform: Android, iOS, and Web'),
-            _buildFeatureItem('Type-safe with code generation'),
-            _buildFeatureItem('Native code access (Kotlin/Swift)'),
-            _buildFeatureItem('Foreign keys, indexes & migrations'),
-            _buildFeatureItem('Transactions and WAL mode'),
-            _buildFeatureItem('JSON fields & custom type converters'),
+            _buildFeatureItem(context, 'Cross-platform: Android, iOS, and Web'),
+            _buildFeatureItem(context, 'Type-safe with code generation'),
+            _buildFeatureItem(context, 'Native code access (Kotlin/Swift)'),
+            _buildFeatureItem(context, 'Foreign keys, indexes & migrations'),
+            _buildFeatureItem(context, 'Transactions and WAL mode'),
+            _buildFeatureItem(context, 'JSON fields & custom type converters'),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildFeatureItem(String text) {
+  Widget _buildFeatureItem(BuildContext context, String text) {
+    final colors = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         children: [
-          Icon(Icons.check_circle, size: 16, color: Colors.blue.shade700),
+          Icon(Icons.check_circle, size: 16, color: colors.onPrimaryContainer),
           const SizedBox(width: 8),
           Expanded(child: Text(text, style: const TextStyle(fontSize: 14))),
         ],

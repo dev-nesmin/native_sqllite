@@ -69,25 +69,31 @@ void main() {
       expect(changes, isEmpty);
     });
 
-    test('detects table rename when className matches but tableName differs',
-        () {
-      final old = _makeSnapshot(className: 'User', tableName: 'users');
-      final next = _makeSnapshot(className: 'User', tableName: 'app_users');
+    test(
+      'detects table rename when className matches but tableName differs',
+      () {
+        final old = _makeSnapshot(className: 'User', tableName: 'users');
+        final next = _makeSnapshot(className: 'User', tableName: 'app_users');
 
-      final changes = SchemaComparator.compareSchemas(old, next);
+        final changes = SchemaComparator.compareSchemas(old, next);
 
-      final rename = changes
-          .where((c) => c.type == SchemaChangeType.renameTable)
-          .toList();
-      expect(rename, hasLength(1));
-      expect(rename.first.oldTableName, 'users');
-      expect(rename.first.newTableName, 'app_users');
-    });
+        final rename = changes
+            .where((c) => c.type == SchemaChangeType.renameTable)
+            .toList();
+        expect(rename, hasLength(1));
+        expect(rename.first.oldTableName, 'users');
+        expect(rename.first.newTableName, 'app_users');
+      },
+    );
 
     test('detects added column', () {
       final idCol = _col(dartName: 'id', name: 'id');
       final nameCol = _col(
-          dartName: 'name', name: 'name', type: 'TEXT', dartType: 'String');
+        dartName: 'name',
+        name: 'name',
+        type: 'TEXT',
+        dartType: 'String',
+      );
       final old = _makeSnapshot(columns: [idCol]);
       final next = _makeSnapshot(columns: [idCol, nameCol]);
 
@@ -103,7 +109,11 @@ void main() {
     test('detects dropped column', () {
       final idCol = _col(dartName: 'id', name: 'id');
       final nameCol = _col(
-          dartName: 'name', name: 'name', type: 'TEXT', dartType: 'String');
+        dartName: 'name',
+        name: 'name',
+        type: 'TEXT',
+        dartType: 'String',
+      );
       final old = _makeSnapshot(columns: [idCol, nameCol]);
       final next = _makeSnapshot(columns: [idCol]);
 
@@ -155,14 +165,10 @@ void main() {
 
     test('detects renamed column (same dartName, different SQL name)', () {
       final old = _makeSnapshot(
-        columns: [
-          _col(dartName: 'userName', name: 'user_name', type: 'TEXT'),
-        ],
+        columns: [_col(dartName: 'userName', name: 'user_name', type: 'TEXT')],
       );
       final next = _makeSnapshot(
-        columns: [
-          _col(dartName: 'userName', name: 'username', type: 'TEXT'),
-        ],
+        columns: [_col(dartName: 'userName', name: 'username', type: 'TEXT')],
       );
 
       final changes = SchemaComparator.compareSchemas(old, next);
@@ -178,90 +184,88 @@ void main() {
     test('detects added index', () {
       final old = _makeSnapshot(indexes: []);
       final next = _makeSnapshot(
-        indexes: [IndexSchemaSnapshot(columns: ['email'], unique: true)],
+        indexes: [
+          IndexSchemaSnapshot(columns: ['email'], unique: true),
+        ],
       );
 
       final changes = SchemaComparator.compareSchemas(old, next);
 
-      final added =
-          changes.where((c) => c.type == SchemaChangeType.addIndex).toList();
+      final added = changes
+          .where((c) => c.type == SchemaChangeType.addIndex)
+          .toList();
       expect(added, hasLength(1));
       expect(added.first.index?.columns, ['email']);
     });
 
     test('detects dropped index', () {
       final old = _makeSnapshot(
-        indexes: [IndexSchemaSnapshot(columns: ['email'], unique: false)],
+        indexes: [
+          IndexSchemaSnapshot(columns: ['email'], unique: false),
+        ],
       );
       final next = _makeSnapshot(indexes: []);
 
       final changes = SchemaComparator.compareSchemas(old, next);
 
-      final dropped =
-          changes.where((c) => c.type == SchemaChangeType.dropIndex).toList();
+      final dropped = changes
+          .where((c) => c.type == SchemaChangeType.dropIndex)
+          .toList();
       expect(dropped, hasLength(1));
     });
 
-    test('does not detect change when index columns and unique are identical',
-        () {
-      final idx = IndexSchemaSnapshot(columns: ['email'], unique: true);
-      final schema = _makeSnapshot(indexes: [idx]);
+    test(
+      'does not detect change when index columns and unique are identical',
+      () {
+        final idx = IndexSchemaSnapshot(columns: ['email'], unique: true);
+        final schema = _makeSnapshot(indexes: [idx]);
 
-      final changes = SchemaComparator.compareSchemas(schema, schema);
+        final changes = SchemaComparator.compareSchemas(schema, schema);
 
-      expect(changes.where((c) => c.type == SchemaChangeType.addIndex), isEmpty);
-      expect(changes.where((c) => c.type == SchemaChangeType.dropIndex),
-          isEmpty);
-    });
+        expect(
+          changes.where((c) => c.type == SchemaChangeType.addIndex),
+          isEmpty,
+        );
+        expect(
+          changes.where((c) => c.type == SchemaChangeType.dropIndex),
+          isEmpty,
+        );
+      },
+    );
   });
 
   group('SchemaComparator.requiresTableRecreation', () {
     test('returns true when dropColumn change exists', () {
       final changes = [
-        SchemaChange(
-          type: SchemaChangeType.dropColumn,
-          tableName: 'users',
-        ),
+        SchemaChange(type: SchemaChangeType.dropColumn, tableName: 'users'),
       ];
       expect(SchemaComparator.requiresTableRecreation(changes), isTrue);
     });
 
     test('returns true when renameColumn change exists', () {
       final changes = [
-        SchemaChange(
-          type: SchemaChangeType.renameColumn,
-          tableName: 'users',
-        ),
+        SchemaChange(type: SchemaChangeType.renameColumn, tableName: 'users'),
       ];
       expect(SchemaComparator.requiresTableRecreation(changes), isTrue);
     });
 
     test('returns true when modifyColumn change exists', () {
       final changes = [
-        SchemaChange(
-          type: SchemaChangeType.modifyColumn,
-          tableName: 'users',
-        ),
+        SchemaChange(type: SchemaChangeType.modifyColumn, tableName: 'users'),
       ];
       expect(SchemaComparator.requiresTableRecreation(changes), isTrue);
     });
 
     test('returns false for addColumn only', () {
       final changes = [
-        SchemaChange(
-          type: SchemaChangeType.addColumn,
-          tableName: 'users',
-        ),
+        SchemaChange(type: SchemaChangeType.addColumn, tableName: 'users'),
       ];
       expect(SchemaComparator.requiresTableRecreation(changes), isFalse);
     });
 
     test('returns false for addIndex only', () {
       final changes = [
-        SchemaChange(
-          type: SchemaChangeType.addIndex,
-          tableName: 'users',
-        ),
+        SchemaChange(type: SchemaChangeType.addIndex, tableName: 'users'),
       ];
       expect(SchemaComparator.requiresTableRecreation(changes), isFalse);
     });
@@ -274,13 +278,17 @@ void main() {
   group('SchemaChange.toString', () {
     test('createTable format', () {
       final change = SchemaChange(
-          type: SchemaChangeType.createTable, tableName: 'users');
+        type: SchemaChangeType.createTable,
+        tableName: 'users',
+      );
       expect(change.toString(), 'CREATE TABLE users');
     });
 
     test('dropTable format', () {
-      final change =
-          SchemaChange(type: SchemaChangeType.dropTable, tableName: 'users');
+      final change = SchemaChange(
+        type: SchemaChangeType.dropTable,
+        tableName: 'users',
+      );
       expect(change.toString(), 'DROP TABLE users');
     });
 

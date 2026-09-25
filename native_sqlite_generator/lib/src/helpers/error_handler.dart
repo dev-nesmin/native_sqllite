@@ -14,12 +14,4 @@ class GeneratorError {
       throwError(message, element);
     }
   }
-
-  /// Checks if an element is not null, throws an error if it is.
-  static T requireNonNull<T>(T? value, String message, [Element? element]) {
-    if (value == null) {
-      throwError(message, element);
-    }
-    return value;
-  }
 }

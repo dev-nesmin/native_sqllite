@@ -60,25 +60,27 @@ Map<String, Object?> describe(Database db, String tableName) {
   List<Map<String, Object?>> rows(String sql) => [
     for (final row in db.select(sql)) {...row},
   ];
-  final indexes = rows("PRAGMA index_list('$tableName')")
-      .where((i) => i['origin'] == 'c')
-      .map(
-        (i) => {
-          'name': i['name'],
-          'unique': i['unique'],
-          'columns': rows(
-            "PRAGMA index_info('${i['name']}')",
-          ).map((c) => c['name']).toList(),
-        },
-      )
-      .toList()
-    ..sort((a, b) => '${a['name']}'.compareTo('${b['name']}'));
+  final indexes =
+      rows("PRAGMA index_list('$tableName')")
+          .where((i) => i['origin'] == 'c')
+          .map(
+            (i) => {
+              'name': i['name'],
+              'unique': i['unique'],
+              'columns': rows(
+                "PRAGMA index_info('${i['name']}')",
+              ).map((c) => c['name']).toList(),
+            },
+          )
+          .toList()
+        ..sort((a, b) => '${a['name']}'.compareTo('${b['name']}'));
   // ALTER TABLE ADD COLUMN appends, so column order may differ from a fresh
   // table; generated code reads columns by name, so compare them unordered.
-  final columns = rows("PRAGMA table_info('$tableName')")
-      .map((c) => {...c}..remove('cid'))
-      .toList()
-    ..sort((a, b) => '${a['name']}'.compareTo('${b['name']}'));
+  final columns =
+      rows(
+          "PRAGMA table_info('$tableName')",
+        ).map((c) => {...c}..remove('cid')).toList()
+        ..sort((a, b) => '${a['name']}'.compareTo('${b['name']}'));
   return {
     'columns': columns,
     'indexes': indexes,
@@ -106,21 +108,34 @@ Database migrateAndCompare(
 }
 
 void main() {
-  final users = table('users', [id, col('name', 'TEXT')], const [
-    IndexSchemaSnapshot(columns: ['name'], unique: false, name: 'idx_users_name'),
-  ]);
+  final users = table(
+    'users',
+    [id, col('name', 'TEXT')],
+    const [
+      IndexSchemaSnapshot(
+        columns: ['name'],
+        unique: false,
+        name: 'idx_users_name',
+      ),
+    ],
+  );
 
   void seedUsers(Database db) {
     db.execute("INSERT INTO users (name) VALUES ('ada'), ('grace')");
   }
 
-  List<String> names(Database db) =>
-      db.select('SELECT name FROM users ORDER BY id').map((r) => r['name'] as String).toList();
+  List<String> names(Database db) => db
+      .select('SELECT name FROM users ORDER BY id')
+      .map((r) => r['name'] as String)
+      .toList();
 
   test('adds a nullable column with ALTER TABLE, keeping data', () {
-    final after = table('users', [...users.columns, col('bio', 'TEXT', nullable: true)], users.indexes);
+    final after = table('users', [
+      ...users.columns,
+      col('bio', 'TEXT', nullable: true),
+    ], users.indexes);
     final migration = MigrationSqlGenerator.changeTable(users, after);
-    expect(migration.sql, ['ALTER TABLE users ADD COLUMN bio TEXT']);
+    expect(migration.sql, ['ALTER TABLE "users" ADD COLUMN "bio" TEXT']);
 
     final db = migrateAndCompare(users, after, seed: seedUsers);
     expect(names(db), ['ada', 'grace']);
@@ -141,14 +156,17 @@ void main() {
       col('email', 'TEXT', nullable: true, unique: true),
     ], users.indexes);
     final migration = MigrationSqlGenerator.changeTable(users, after);
-    expect(migration.sql.first, startsWith('CREATE TABLE users_new'));
+    expect(migration.sql.first, startsWith('CREATE TABLE "users_new"'));
 
     final db = migrateAndCompare(users, after, seed: seedUsers);
     expect(names(db), ['ada', 'grace']);
   });
 
   test('rebuilds when a column is removed and warns about its data', () {
-    final before = table('users', [...users.columns, col('legacy', 'TEXT', nullable: true)], users.indexes);
+    final before = table('users', [
+      ...users.columns,
+      col('legacy', 'TEXT', nullable: true),
+    ], users.indexes);
     final migration = MigrationSqlGenerator.changeTable(before, users);
     expect(migration.warnings.single, contains('legacy'));
 
@@ -157,7 +175,10 @@ void main() {
   });
 
   test('rebuilds when a column type or nullability changes', () {
-    final after = table('users', [id, col('name', 'TEXT', nullable: true)], users.indexes);
+    final after = table('users', [
+      id,
+      col('name', 'TEXT', nullable: true),
+    ], users.indexes);
     migrateAndCompare(users, after, seed: seedUsers);
   });
 
@@ -175,14 +196,22 @@ void main() {
 
   test('drops, changes and creates indexes without rebuilding', () {
     final after = table('users', users.columns, const [
-      IndexSchemaSnapshot(columns: ['name'], unique: true, name: 'idx_users_name'),
-      IndexSchemaSnapshot(columns: ['id', 'name'], unique: false, name: 'idx_users_both'),
+      IndexSchemaSnapshot(
+        columns: ['name'],
+        unique: true,
+        name: 'idx_users_name',
+      ),
+      IndexSchemaSnapshot(
+        columns: ['id', 'name'],
+        unique: false,
+        name: 'idx_users_both',
+      ),
     ]);
     final migration = MigrationSqlGenerator.changeTable(users, after);
     expect(migration.sql, [
-      'DROP INDEX IF EXISTS idx_users_name',
-      'CREATE UNIQUE INDEX idx_users_name ON users (name)',
-      'CREATE INDEX idx_users_both ON users (id, name)',
+      'DROP INDEX IF EXISTS "idx_users_name"',
+      'CREATE UNIQUE INDEX "idx_users_name" ON "users" ("name")',
+      'CREATE INDEX "idx_users_both" ON "users" ("id", "name")',
     ]);
     migrateAndCompare(users, after, seed: seedUsers);
   });

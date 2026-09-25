@@ -8,7 +8,11 @@ import 'package:native_sqlite_generator/src/models/table_info.dart';
 /// Helper class to convert TableInfo to schema snapshots
 class SchemaSnapshotHelper {
   /// Converts TableInfo to TableSchemaSnapshot
-  static TableSchemaSnapshot createSnapshot(TableInfo tableInfo, int version) {
+  static TableSchemaSnapshot createSnapshot(
+    TableInfo tableInfo,
+    int version, {
+    String? sourcePath,
+  }) {
     final columns = tableInfo.columns.map(_columnToSnapshot).toList();
     final indexes = tableInfo.indexes.map(_indexToSnapshot).toList();
 
@@ -18,13 +22,15 @@ class SchemaSnapshotHelper {
       columns,
       indexes,
       version,
+      sourcePath: sourcePath,
     );
   }
 
   /// Converts ColumnInfo to ColumnSchemaSnapshot
   static ColumnSchemaSnapshot _columnToSnapshot(ColumnInfo column) {
     final enumElement = column.dartType.element;
-    final enumValues = TypeUtils.isEnum(column.dartType) && enumElement is EnumElement
+    final enumValues =
+        TypeUtils.isEnum(column.dartType) && enumElement is EnumElement
         ? enumElement.constants.map((c) => c.name!).toList()
         : null;
 
@@ -35,6 +41,7 @@ class SchemaSnapshotHelper {
       nullable: column.isNullable,
       primaryKey: column.isPrimaryKey,
       autoIncrement: column.isAutoIncrement,
+      useLocalUuid: column.useLocalUuid,
       unique: column.isUnique,
       defaultValue: column.defaultValue,
       foreignKey: column.foreignKeyTable != null

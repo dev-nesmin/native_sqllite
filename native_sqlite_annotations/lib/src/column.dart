@@ -1,7 +1,7 @@
 /// Annotation to mark a field as a database column.
 class DbColumn {
   /// The name of the column in the database.
-  /// If not specified, the field name will be used.
+  /// If not specified, the field name is converted to snake_case.
   final String? name;
 
   /// Whether this column is nullable.
@@ -22,6 +22,7 @@ class DbColumn {
   /// Whether this field should be ignored for database generation.
   final bool ignore;
 
+  /// Creates a database-column annotation.
   const DbColumn({
     this.name,
     this.nullable,

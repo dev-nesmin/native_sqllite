@@ -20,10 +20,11 @@ object UserSchema {
     const val UPDATED_AT = "updated_at"
 
     // Same statements as the Dart UserSchema
-    const val CREATE_TABLE_SQL = "CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, email TEXT NOT NULL UNIQUE, phone_number TEXT, address TEXT, age INTEGER NOT NULL DEFAULT 1, is_active INTEGER NOT NULL DEFAULT 1, created_at INTEGER NOT NULL, updated_at INTEGER)"
+    const val CREATE_TABLE_SQL = "CREATE TABLE \"users\" (\"id\" INTEGER PRIMARY KEY AUTOINCREMENT, \"name\" TEXT NOT NULL, \"email\" TEXT NOT NULL UNIQUE, \"phone_number\" TEXT, \"address\" TEXT, \"age\" INTEGER NOT NULL DEFAULT 18, \"is_active\" INTEGER NOT NULL DEFAULT 1, \"created_at\" INTEGER NOT NULL, \"updated_at\" INTEGER)"
 
     val INDEX_SQL: List<String> = listOf(
-        "CREATE INDEX idx_users_email ON users (email)",
-        "CREATE INDEX idx_users_created_at ON users (created_at)",
+        "CREATE INDEX \"idx_users_email\" ON \"users\" (\"email\")",
+        "CREATE INDEX \"idx_users_created_at\" ON \"users\" (\"created_at\")",
+        "CREATE UNIQUE INDEX \"idx_users_phone\" ON \"users\" (\"phone_number\")",
     )
 }

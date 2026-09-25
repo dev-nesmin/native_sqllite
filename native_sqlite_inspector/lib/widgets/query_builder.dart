@@ -1,16 +1,16 @@
+// Portions adapted from Isar Community Inspector.
+// Copyright 2022 Simon Leier. Licensed under Apache-2.0.
+// See the package NOTICE and LICENSES/Apache-2.0.txt files.
+
 import 'package:flutter/material.dart';
 
-class QueryBuilder extends StatefulWidget {
-  const QueryBuilder({
-    super.key,
-    required this.database,
-    required this.table,
-    required this.onExecute,
-  });
+typedef ExecuteSql = Future<void> Function(String sql, bool allowWrite);
 
-  final String database;
+class QueryBuilder extends StatefulWidget {
+  const QueryBuilder({super.key, required this.table, required this.onExecute});
+
   final String table;
-  final Function(String sql) onExecute;
+  final ExecuteSql onExecute;
 
   @override
   State<QueryBuilder> createState() => _QueryBuilderState();
@@ -18,6 +18,7 @@ class QueryBuilder extends StatefulWidget {
 
 class _QueryBuilderState extends State<QueryBuilder> {
   final _controller = TextEditingController();
+  bool _allowWrite = false;
 
   @override
   void dispose() {
@@ -29,6 +30,7 @@ class _QueryBuilderState extends State<QueryBuilder> {
   Widget build(BuildContext context) {
     return Card(
       margin: EdgeInsets.zero,
+      shape: const RoundedRectangleBorder(),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -37,53 +39,61 @@ class _QueryBuilderState extends State<QueryBuilder> {
           children: [
             Row(
               children: [
-                Icon(Icons.code, size: 20),
+                const Icon(Icons.code, size: 20),
                 const SizedBox(width: 8),
                 Text(
-                  'SQL Query',
+                  'SQL console',
                   style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const Spacer(),
+                Tooltip(
+                  message: 'Permit statements that may modify the database',
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text('Allow writes'),
+                      Switch(
+                        value: _allowWrite,
+                        onChanged: (value) =>
+                            setState(() => _allowWrite = value),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             TextField(
               controller: _controller,
               maxLines: 3,
               style: const TextStyle(fontFamily: 'monospace'),
               decoration: InputDecoration(
                 border: const OutlineInputBorder(),
-                hintText: 'SELECT * FROM ${widget.table}',
-                hintStyle: TextStyle(color: Colors.grey[600]),
+                hintText: 'SELECT * FROM "${widget.table}"',
                 filled: true,
-                fillColor: Theme.of(context).colorScheme.surface,
               ),
+              onSubmitted: (_) => _execute(),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             Row(
               children: [
-                ElevatedButton.icon(
-                  onPressed: () {
-                    final sql = _controller.text.trim();
-                    if (sql.isNotEmpty) {
-                      widget.onExecute(sql);
-                    }
-                  },
+                FilledButton.icon(
+                  onPressed: _execute,
                   icon: const Icon(Icons.play_arrow),
                   label: const Text('Execute'),
                 ),
                 const SizedBox(width: 8),
                 TextButton(
-                  onPressed: () {
-                    _controller.clear();
-                  },
+                  onPressed: _controller.clear,
                   child: const Text('Clear'),
                 ),
                 const Spacer(),
                 TextButton(
                   onPressed: () {
-                    _controller.text = 'SELECT * FROM ${widget.table}';
+                    final escaped = widget.table.replaceAll('"', '""');
+                    _controller.text = 'SELECT * FROM "$escaped"';
                   },
-                  child: const Text('Select All'),
+                  child: const Text('Select all'),
                 ),
               ],
             ),
@@ -91,5 +101,10 @@ class _QueryBuilderState extends State<QueryBuilder> {
         ),
       ),
     );
+  }
+
+  Future<void> _execute() async {
+    final sql = _controller.text.trim();
+    if (sql.isNotEmpty) await widget.onExecute(sql, _allowWrite);
   }
 }

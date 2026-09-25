@@ -28,18 +28,59 @@ void main() {
       expect(config.version, 5);
     });
 
+    test('rejects an empty name', () {
+      expect(() => DatabaseConfig(name: '  '), throwsA(isA<ArgumentError>()));
+    });
+
+    test('rejects unsafe or extension-bearing names', () {
+      for (final name in ['a.b', '../escape', '/absolute', 'space name']) {
+        expect(
+          () => DatabaseConfig(name: name),
+          throwsA(isA<ArgumentError>()),
+          reason: name,
+        );
+      }
+    });
+
+    test('validates custom locations', () {
+      expect(
+        () => DatabaseConfig(name: 'db', directory: 'relative/path'),
+        throwsA(isA<ArgumentError>()),
+      );
+      expect(
+        () => DatabaseConfig(
+          name: 'db',
+          directory: '/tmp/data',
+          iosAppGroup: 'group.dev.nesmin',
+        ),
+        throwsA(isA<ArgumentError>()),
+      );
+    });
+
+    test('rejects versions below one', () {
+      expect(
+        () => DatabaseConfig(name: 'my_db', version: 0),
+        throwsA(isA<RangeError>()),
+      );
+    });
+
     test('accepts custom enableWAL', () {
       final config = DatabaseConfig(
-          name: 'my_db', version: 1, onCreate: [], enableWAL: false);
+        name: 'my_db',
+        version: 1,
+        onCreate: [],
+        enableWAL: false,
+      );
       expect(config.enableWAL, isFalse);
     });
 
     test('accepts custom enableForeignKeys', () {
       final config = DatabaseConfig(
-          name: 'my_db',
-          version: 1,
-          onCreate: [],
-          enableForeignKeys: false);
+        name: 'my_db',
+        version: 1,
+        onCreate: [],
+        enableForeignKeys: false,
+      );
       expect(config.enableForeignKeys, isFalse);
     });
 
@@ -48,15 +89,18 @@ void main() {
         'CREATE TABLE users (id INTEGER PRIMARY KEY)',
         'CREATE TABLE posts (id INTEGER PRIMARY KEY)',
       ];
-      final config =
-          DatabaseConfig(name: 'my_db', version: 1, onCreate: stmts);
+      final config = DatabaseConfig(name: 'my_db', version: 1, onCreate: stmts);
       expect(config.onCreate, stmts);
     });
 
     test('accepts onUpgrade statements', () {
       final stmts = ['ALTER TABLE users ADD COLUMN bio TEXT'];
       final config = DatabaseConfig(
-          name: 'my_db', version: 2, onCreate: [], onUpgrade: stmts);
+        name: 'my_db',
+        version: 2,
+        onCreate: [],
+        onUpgrade: stmts,
+      );
       expect(config.onUpgrade, stmts);
     });
 
@@ -95,6 +139,7 @@ void main() {
         },
         enableWAL: false,
         enableForeignKeys: false,
+        directory: '/tmp/native-sqlite',
       );
 
       final restored = DatabaseConfig.fromMap(original.toMap());
@@ -104,6 +149,8 @@ void main() {
       expect(restored.version, original.version);
       expect(restored.enableWAL, original.enableWAL);
       expect(restored.enableForeignKeys, original.enableForeignKeys);
+      expect(restored.directory, original.directory);
+      expect(restored.iosAppGroup, original.iosAppGroup);
       expect(restored.onCreate, original.onCreate);
       expect(restored.onUpgrade, original.onUpgrade);
     });
@@ -124,7 +171,10 @@ void main() {
     });
 
     test('fromMap handles null onCreate', () {
-      final config = DatabaseConfig.fromMap({'name': 'my_db', 'onCreate': null});
+      final config = DatabaseConfig.fromMap({
+        'name': 'my_db',
+        'onCreate': null,
+      });
       expect(config.onCreate, isNull);
     });
   });
@@ -156,6 +206,88 @@ void main() {
       final b = DatabaseConfig(name: 'db', version: 1, onCreate: []);
 
       expect(a.hashCode, b.hashCode);
+    });
+
+    test('different schema statements are not equal', () {
+      final a = DatabaseConfig(
+        name: 'db',
+        onCreate: ['CREATE TABLE a (id INTEGER)'],
+        migrations: {
+          2: ['ALTER TABLE a ADD COLUMN name TEXT'],
+        },
+      );
+      final b = DatabaseConfig(
+        name: 'db',
+        onCreate: ['CREATE TABLE b (id INTEGER)'],
+        migrations: {
+          2: ['ALTER TABLE b ADD COLUMN name TEXT'],
+        },
+      );
+
+      expect(a, isNot(equals(b)));
+    });
+
+    test('equal schema collections have equal hashes', () {
+      final a = DatabaseConfig(
+        name: 'db',
+        onUpgrade: ['CREATE INDEX idx ON users (name)'],
+        migrations: {
+          2: ['ALTER TABLE users ADD COLUMN name TEXT'],
+        },
+      );
+      final b = DatabaseConfig(
+        name: 'db',
+        onUpgrade: ['CREATE INDEX idx ON users (name)'],
+        migrations: {
+          2: ['ALTER TABLE users ADD COLUMN name TEXT'],
+        },
+      );
+
+      expect(a, equals(b));
+      expect(a.hashCode, b.hashCode);
+    });
+  });
+
+  group('DatabaseConfig open compatibility', () {
+    test('ignores SQL formatting and comments', () {
+      final compact = DatabaseConfig(
+        name: 'db',
+        onCreate: ['CREATE TABLE "items" ("id" INTEGER, "name" TEXT)'],
+      );
+      final formatted = DatabaseConfig(
+        name: 'db',
+        onCreate: [
+          '''
+          -- generated schema
+          CREATE TABLE "items" (
+            "id" INTEGER,
+            "name" TEXT
+          )
+          ''',
+        ],
+      );
+
+      expect(compact.hasSameOpenConfiguration(formatted), isTrue);
+    });
+
+    test('does not merge distinct SQL tokens or settings', () {
+      final config = DatabaseConfig(name: 'db', onCreate: ['SELECT a, b']);
+      expect(
+        config.hasSameOpenConfiguration(
+          DatabaseConfig(name: 'db', onCreate: ['SELECT ab']),
+        ),
+        isFalse,
+      );
+      expect(
+        config.hasSameOpenConfiguration(
+          DatabaseConfig(
+            name: 'db',
+            onCreate: ['SELECT a, b'],
+            enableWAL: false,
+          ),
+        ),
+        isFalse,
+      );
     });
   });
 

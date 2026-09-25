@@ -1,4 +1,3 @@
-
 /// Base class for type converters.
 /// Implement this to create custom type converters for complex types.
 ///
@@ -8,13 +7,14 @@
 ///   const ColorConverter();
 ///
 ///   @override
-///   int toSql(Color value) => value.value;
+///   int toSql(Color value) => value.toARGB32();
 ///
 ///   @override
 ///   Color fromSql(int sqlValue) => Color(sqlValue);
 /// }
 /// ```
 abstract class TypeConverter<DartType, SqlType> {
+  /// Creates a stateless converter.
   const TypeConverter();
 
   /// Converts a Dart value to its SQL representation.
@@ -26,15 +26,19 @@ abstract class TypeConverter<DartType, SqlType> {
 
 /// Annotation to specify a custom type converter for a field.
 ///
+/// The generated SQLite column type is inferred from [TypeConverter]'s
+/// `SqlType` argument. Converter constants may use generics, named
+/// constructors, and constructor arguments.
+///
 /// Example:
 /// ```dart
-/// @Column()
 /// @UseConverter(ColorConverter())
 /// final Color backgroundColor;
 /// ```
 class UseConverter {
   /// The type converter instance to use.
-  final TypeConverter converter;
+  final TypeConverter<dynamic, dynamic> converter;
 
+  /// Creates a converter annotation using [converter].
   const UseConverter(this.converter);
 }

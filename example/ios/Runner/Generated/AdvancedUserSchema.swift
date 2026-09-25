@@ -3,7 +3,7 @@ import Foundation
 /**
  * Schema constants for AdvancedUser table.
  * AUTO-GENERATED from Dart - DO NOT EDIT MANUALLY
- * Generated from: lib/models/advanced_user.dart
+ * Generated from: lib/models/advanced.dart
  */
 public enum AdvancedUserSchema {
     public static let tableName = "advanced_users"
@@ -26,7 +26,7 @@ public enum AdvancedUserSchema {
     public static let isVerified = "is_verified"
 
     // Same statements as the Dart AdvancedUserSchema
-    public static let createTableSql = "CREATE TABLE advanced_users (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, phone_number TEXT, address TEXT, country TEXT, zip_code TEXT, age INTEGER, city TEXT, login_duration INTEGER, profile_url TEXT, score REAL, status INTEGER NOT NULL, priority TEXT, created_at INTEGER NOT NULL, is_verified INTEGER NOT NULL)"
+    public static let createTableSql = "CREATE TABLE \"advanced_users\" (\"id\" INTEGER PRIMARY KEY AUTOINCREMENT, \"name\" TEXT NOT NULL, \"phone_number\" TEXT, \"address\" TEXT, \"country\" TEXT, \"zip_code\" TEXT, \"age\" INTEGER, \"city\" TEXT, \"login_duration\" INTEGER, \"profile_url\" TEXT, \"score\" REAL, \"status\" INTEGER NOT NULL, \"priority\" TEXT, \"created_at\" INTEGER NOT NULL, \"is_verified\" INTEGER NOT NULL)"
 
     public static let indexSql: [String] = [
     ]

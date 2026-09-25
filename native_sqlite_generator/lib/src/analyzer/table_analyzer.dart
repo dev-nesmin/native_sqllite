@@ -1,12 +1,17 @@
+import 'dart:convert';
+
+import 'package:analyzer/dart/constant/value.dart';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/nullability_suffix.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:native_sqlite_generator/src/config/generator_options.dart';
+import 'package:native_sqlite_generator/src/errors/generator_errors.dart';
 import 'package:native_sqlite_generator/src/helpers/error_handler.dart';
 import 'package:native_sqlite_generator/src/helpers/naming.dart';
 import 'package:native_sqlite_generator/src/helpers/naming_conventions.dart';
 import 'package:native_sqlite_generator/src/helpers/type_utils.dart';
 import 'package:native_sqlite_generator/src/models/column_info.dart';
+import 'package:native_sqlite_generator/src/models/constructor_parameter_info.dart';
 import 'package:native_sqlite_generator/src/models/index_info.dart';
 import 'package:native_sqlite_generator/src/models/table_info.dart';
 import 'package:source_gen/source_gen.dart';
@@ -45,7 +50,6 @@ class TableAnalyzer {
   static final _jsonFieldChecker = TypeChecker.fromUrl(
     'package:native_sqlite_annotations/src/json_field.dart#JsonField',
   );
-  // Freezed annotation checker - using simple name check or fromUrl if package known
   static final _freezedChecker = TypeChecker.fromUrl(
     'package:freezed_annotation/freezed_annotation.dart#Freezed',
   );
@@ -66,25 +70,33 @@ class TableAnalyzer {
     }
 
     // Analyze columns
-    final columns = _analyzeColumns(element);
+    final columnAnalysis = _analyzeColumns(element);
+    final columns = columnAnalysis.columns;
+    final constructorParameters = _analyzeConstructor(element, columnAnalysis);
 
-    // Analyze indexes (both from Table annotation and @Index annotations)
-    // Pass columns so we can map Dart names to SQL names
+    final primaryKeys = columns.where((column) => column.isPrimaryKey).toList();
+    if (primaryKeys.isEmpty) {
+      throw MissingPrimaryKeyError(element, tableName);
+    }
+    if (primaryKeys.length > 1) {
+      throw MultiplePrimaryKeysError(
+        element,
+        primaryKeys.map((column) => column.dartName).toList(),
+      );
+    }
+    // Analyze table-declared and class-level indexes.
     final indexes = _analyzeIndexes(element, tableName, annotation, columns);
 
-    // Get database name with fallback logic:
-    // 1. First check @DbTable annotation
-    // 2. Then check build.yaml config
-    // 3. Finally fall back to 'default_app'
+    // The runtime database is selected by its handle. Keep this legacy
+    // per-table value as metadata until the annotation API is finalized.
     final databaseName =
-        annotation.peek('database')?.stringValue ??
-        options.defaultDatabase ??
-        'default_app';
+        annotation.peek('database')?.stringValue ?? 'default_app';
 
     return TableInfo(
       dartName: className,
       sqlName: tableName,
       columns: columns,
+      constructorParameters: constructorParameters,
       indexes: indexes,
       databaseName: databaseName,
     );
@@ -94,7 +106,6 @@ class TableAnalyzer {
   void _validateClass(ClassElement element) {
     final isFreezed = _isFreezed(element);
 
-    // Abstract classes are allowed ONLY if they are Freezed classes
     if (element.isAbstract && !isFreezed) {
       GeneratorError.throwError(
         'Table class must not be abstract (unless using @freezed)',
@@ -108,12 +119,13 @@ class TableAnalyzer {
   }
 
   /// Analyzes all fields in the class and returns column information.
-  List<ColumnInfo> _analyzeColumns(ClassElement element) {
+  _ColumnAnalysis _analyzeColumns(ClassElement element) {
     final columns = <ColumnInfo>[];
+    final elements = <String, Element>{};
     final isFreezed = _isFreezed(element);
 
     if (isFreezed) {
-      // For Frozen classes, examine the factory constructor parameters
+      // Freezed models expose their persisted fields as factory parameters.
 
       final constructor = element.constructors.firstWhere(
         (c) =>
@@ -132,17 +144,28 @@ class TableAnalyzer {
 
         final columnInfo = _analyzeParameter(param);
         columns.add(columnInfo);
+        elements[columnInfo.dartName] = param;
       }
     } else {
-      // Regular classes - check fields
-      for (final field in element.fields) {
-        // Skip static fields and ignored fields
-        if (field.isStatic || _isIgnored(field)) {
+      // Regular classes include declared state from their superclass chain and
+      // applied mixins. Synthetic fields created for getters/setters are not
+      // model state and must never become columns.
+      for (final field in _instanceFields(element)) {
+        if (field.isStatic || field.isSynthetic || _isIgnored(field)) {
           continue;
+        }
+
+        if (field.name!.startsWith('_')) {
+          throw InvalidGenerationSourceError(
+            'Private database field "${field.name}" must be annotated with '
+            '@Ignore().',
+            element: field,
+          );
         }
 
         final columnInfo = _analyzeColumn(field);
         columns.add(columnInfo);
+        elements[columnInfo.dartName] = field;
       }
     }
 
@@ -153,7 +176,111 @@ class TableAnalyzer {
       element,
     );
 
-    return columns;
+    return _ColumnAnalysis(columns, elements);
+  }
+
+  List<FieldElement> _instanceFields(ClassElement element) {
+    final fields = <String, FieldElement>{};
+    final visited = <InterfaceElement>{};
+
+    void collect(InterfaceElement current) {
+      if (!visited.add(current)) return;
+
+      final supertype = current.supertype;
+      if (supertype != null) collect(supertype.element);
+      for (final mixin in current.mixins) {
+        collect(mixin.element);
+      }
+
+      for (final field in current.fields) {
+        final name = field.name;
+        if (name != null) fields[name] = field;
+      }
+    }
+
+    collect(element);
+    return fields.values.toList();
+  }
+
+  List<ConstructorParameterInfo> _analyzeConstructor(
+    ClassElement element,
+    _ColumnAnalysis analysis,
+  ) {
+    final constructor = _isFreezed(element)
+        ? element.constructors.firstWhere(
+            (candidate) =>
+                candidate.isFactory &&
+                (candidate.name == 'default' ||
+                    candidate.name == 'new' ||
+                    (candidate.name ?? '').isEmpty),
+            orElse: () => throw InvalidGenerationSourceError(
+              'Freezed classes must have a default factory constructor.',
+              element: element,
+            ),
+          )
+        : element.unnamedConstructor;
+
+    if (constructor == null) {
+      throw InvalidGenerationSourceError(
+        'Table class ${element.name} must have an unnamed constructor whose '
+        'parameters match its database fields.',
+        element: element,
+      );
+    }
+
+    final columnsByName = {
+      for (final column in analysis.columns) column.dartName: column,
+    };
+    final mappedNames = <String>{};
+    final result = <ConstructorParameterInfo>[];
+    final parameters = constructor.formalParameters;
+    final positional = parameters
+        .where((parameter) => parameter.isPositional)
+        .toList();
+    var lastMappedPositional = -1;
+
+    for (var index = 0; index < positional.length; index++) {
+      if (columnsByName.containsKey(positional[index].name)) {
+        lastMappedPositional = index;
+      }
+    }
+
+    for (final parameter in parameters) {
+      final name = parameter.name;
+      final column = name == null ? null : columnsByName[name];
+
+      if (column == null) {
+        final positionalIndex = positional.indexOf(parameter);
+        final mustProvide =
+            parameter.isRequired ||
+            (positionalIndex >= 0 && positionalIndex <= lastMappedPositional);
+        if (mustProvide) {
+          throw InvalidGenerationSourceError(
+            'Constructor parameter "$name" has no matching database field. '
+            'Make it an optional trailing parameter or add a field.',
+            element: parameter,
+          );
+        }
+        continue;
+      }
+
+      mappedNames.add(column.dartName);
+      result.add(
+        ConstructorParameterInfo(column: column, isNamed: parameter.isNamed),
+      );
+    }
+
+    for (final column in analysis.columns) {
+      if (mappedNames.contains(column.dartName)) continue;
+      throw InvalidGenerationSourceError(
+        'Database field "${column.dartName}" has no matching parameter in '
+        'the unnamed constructor for ${element.name}. Add the parameter or '
+        'annotate the field with @Ignore().',
+        element: analysis.elements[column.dartName] ?? element,
+      );
+    }
+
+    return result;
   }
 
   // Wrapper to analyze a parameter (for freezed)
@@ -180,8 +307,18 @@ class TableAnalyzer {
     // Get column name
     final columnName = _getColumnName(element, name);
 
+    // A converter changes both the generated codec and the physical SQLite
+    // type. Analyze it before choosing the column type so TypeConverter<D, S>
+    // is stored according to S rather than the model field's Dart type D.
+    final converter = _getConverterInfo(element);
+
     // Get SQL type (passing enum type for enum fields)
-    final sqlType = _getSqlType(element, dartType, enumType);
+    final sqlType = _getSqlType(
+      element,
+      converter?.storageType ?? dartType,
+      enumType,
+      converterStorageType: converter?.storageType,
+    );
 
     // Check if primary key
     final isPrimaryKey = _isPrimaryKey(element);
@@ -238,9 +375,6 @@ class TableAnalyzer {
     // Get foreign key info
     final foreignKeyInfo = _getForeignKeyInfo(element);
 
-    // Get converter expression (if this field uses a custom type converter)
-    final converterExpression = _getConverterExpression(element);
-
     // Check if this is a JSON field
     final isJsonField = _isJsonField(element);
 
@@ -260,7 +394,8 @@ class TableAnalyzer {
       foreignKeyOnDelete: foreignKeyInfo?['onDelete'] as String?,
       foreignKeyOnUpdate: foreignKeyInfo?['onUpdate'] as String?,
       enumType: enumType,
-      converterExpression: converterExpression,
+      converterExpression: converter?.expression,
+      converterStorageType: converter?.storageType,
       isJsonField: isJsonField,
     );
   }
@@ -299,19 +434,62 @@ class TableAnalyzer {
   }
 
   /// Gets the SQL type for a field.
-  SqlType _getSqlType(Element element, DartType type, String enumType) {
+  SqlType _getSqlType(
+    Element element,
+    DartType type,
+    String enumType, {
+    DartType? converterStorageType,
+  }) {
     // Check for explicit type annotation
     final annotation = _columnChecker.firstAnnotationOf(element);
     if (annotation != null) {
       final reader = ConstantReader(annotation);
       final explicitType = reader.peek('type')?.stringValue;
       if (explicitType != null) {
-        return _parseSqlType(explicitType);
+        final parsed = _parseSqlType(explicitType);
+        if (converterStorageType != null) {
+          final inferred = _sqlTypeForConverterStorage(
+            converterStorageType,
+            element,
+          );
+          if (parsed != inferred) {
+            throw InvalidGenerationSourceError(
+              '@DbColumn(type: "$explicitType") conflicts with the '
+              'converter storage type '
+              '${converterStorageType.getDisplayString()}, which maps to '
+              '${inferred.sqlName}.',
+              element: element,
+              todo:
+                  'Remove type: from @DbColumn or change it to '
+                  "'${inferred.sqlName}'.",
+            );
+          }
+        }
+        return parsed;
       }
+    }
+
+    if (converterStorageType != null) {
+      return _sqlTypeForConverterStorage(converterStorageType, element);
     }
 
     // Infer from Dart type, passing enum type for enum fields
     return SqlType.fromDartType(type, enumType: enumType);
+  }
+
+  SqlType _sqlTypeForConverterStorage(DartType type, Element element) {
+    final baseType = TypeUtils.getBaseTypeName(type);
+    const supported = {'int', 'double', 'num', 'String', 'Uint8List'};
+    if (!supported.contains(baseType)) {
+      throw InvalidGenerationSourceError(
+        'TypeConverter storage type "$baseType" is not supported by SQLite.',
+        element: element,
+        todo:
+            'Use int, double, num, String, or Uint8List as the converter '
+            'storage type.',
+      );
+    }
+    return SqlType.fromDartType(type);
   }
 
   /// Parses an SQL type string.
@@ -433,8 +611,8 @@ class TableAnalyzer {
     }
   }
 
-  /// Gets the type converter expression for a field.
-  String? _getConverterExpression(Element element) {
+  /// Gets the reconstructed converter and its SQL-facing storage type.
+  _ConverterInfo? _getConverterInfo(Element element) {
     final annotation = _useConverterChecker.firstAnnotationOf(element);
     if (annotation == null) return null;
 
@@ -443,15 +621,172 @@ class TableAnalyzer {
 
     if (converterValue == null || converterValue.isNull) return null;
 
-    // Get the revived constant
+    final object = converterValue.objectValue;
+    final concreteType = object.type;
+    if (concreteType is! InterfaceType) {
+      throw InvalidGenerationSourceError(
+        '@UseConverter requires a TypeConverter instance.',
+        element: element,
+      );
+    }
+
+    InterfaceType? converterSupertype;
+    for (final candidate in [concreteType, ...concreteType.allSupertypes]) {
+      if (_typeConverterChecker.isExactlyType(candidate)) {
+        converterSupertype = candidate;
+        break;
+      }
+    }
+    if (converterSupertype == null ||
+        converterSupertype.typeArguments.length != 2) {
+      throw InvalidGenerationSourceError(
+        '@UseConverter requires a class that extends TypeConverter<D, S>.',
+        element: element,
+      );
+    }
+
+    // Revive the actual constant invocation so named constructors and every
+    // positional/named argument survive code generation.
     final revived = converterValue.revive();
+    final expression = _revivableToSource(revived, object, element.library!);
 
-    // Build the converter expression from the revive data
-    final typeName = revived.source.fragment;
+    return _ConverterInfo(
+      expression: expression,
+      storageType: converterSupertype.typeArguments[1],
+    );
+  }
 
-    // Generate expression like: const ColorConverter()
-    // Always use const since converters should be const
-    return 'const $typeName()';
+  static final _typeConverterChecker = TypeChecker.fromUrl(
+    'package:native_sqlite_annotations/src/type_converter.dart#TypeConverter',
+  );
+
+  String _revivableToSource(
+    Revivable revived,
+    DartObject object,
+    LibraryElement context,
+  ) {
+    final arguments = <String>[
+      ...revived.positionalArguments.map(
+        (argument) => _constantToSource(argument, context),
+      ),
+      ...revived.namedArguments.entries.map(
+        (entry) => '${entry.key}: ${_constantToSource(entry.value, context)}',
+      ),
+    ];
+
+    if (revived.source.fragment.isEmpty) {
+      final prefix = _prefixForReference(
+        context,
+        revived.source,
+        revived.accessor.split('.').first,
+      );
+      return '$prefix${revived.accessor}';
+    }
+
+    final objectType = object.type;
+    final typeReference =
+        objectType is InterfaceType &&
+            objectType.element.name == revived.source.fragment
+        ? _typeToSource(objectType, context)
+        : '${_prefixForReference(context, revived.source.removeFragment(), revived.source.fragment)}${revived.source.fragment}';
+    final constructor = revived.accessor.isEmpty ? '' : '.${revived.accessor}';
+    return 'const $typeReference$constructor(${arguments.join(', ')})';
+  }
+
+  String _constantToSource(DartObject object, LibraryElement context) {
+    final reader = ConstantReader(object);
+    if (reader.isNull) return 'null';
+    if (reader.isBool) return '${reader.boolValue}';
+    if (reader.isInt) return '${reader.intValue}';
+    if (reader.isDouble) {
+      final value = reader.doubleValue;
+      if (value.isNaN) return 'double.nan';
+      if (value == double.infinity) return 'double.infinity';
+      if (value == double.negativeInfinity) return 'double.negativeInfinity';
+      return '$value';
+    }
+    if (reader.isString) {
+      return jsonEncode(reader.stringValue).replaceAll(r'$', r'\$');
+    }
+    if (reader.isSymbol) {
+      return 'const Symbol(${jsonEncode(object.toSymbolValue())})';
+    }
+    if (reader.isType) return _typeToSource(reader.typeValue, context);
+    if (reader.isList) {
+      return 'const [${reader.listValue.map((value) => _constantToSource(value, context)).join(', ')}]';
+    }
+    if (reader.isSet) {
+      return 'const {${reader.setValue.map((value) => _constantToSource(value, context)).join(', ')}}';
+    }
+    if (reader.isMap) {
+      final entries = reader.mapValue.entries.map((entry) {
+        final key = entry.key == null
+            ? 'null'
+            : _constantToSource(entry.key!, context);
+        final value = entry.value == null
+            ? 'null'
+            : _constantToSource(entry.value!, context);
+        return '$key: $value';
+      });
+      return 'const {${entries.join(', ')}}';
+    }
+
+    final record = object.toRecordValue();
+    if (record != null) {
+      final fields = <String>[
+        ...record.positional.map((value) => _constantToSource(value, context)),
+        ...record.named.entries.map(
+          (entry) => '${entry.key}: ${_constantToSource(entry.value, context)}',
+        ),
+      ];
+      if (record.positional.length == 1 && record.named.isEmpty) {
+        return '(${fields.single},)';
+      }
+      return '(${fields.join(', ')})';
+    }
+
+    return _revivableToSource(reader.revive(), object, context);
+  }
+
+  String _typeToSource(DartType type, LibraryElement context) {
+    if (type is InterfaceType) {
+      final element = type.element;
+      final prefix = _prefixForElement(context, element);
+      final arguments = type.typeArguments.isEmpty
+          ? ''
+          : '<${type.typeArguments.map((argument) => _typeToSource(argument, context)).join(', ')}>';
+      final nullable = type.nullabilitySuffix == NullabilitySuffix.question
+          ? '?'
+          : '';
+      return '$prefix${element.name}$arguments$nullable';
+    }
+    return type.getDisplayString();
+  }
+
+  String _prefixForElement(
+    LibraryElement context,
+    InterfaceElement referenced,
+  ) {
+    if (context.uri == referenced.library.uri) return '';
+    return _prefixForReference(
+      context,
+      referenced.library.uri,
+      referenced.name!,
+    );
+  }
+
+  String _prefixForReference(LibraryElement context, Uri source, String name) {
+    String? prefixed;
+    for (final import in context.firstFragment.libraryImports) {
+      final imported = import.namespace.definedNames2[name];
+      final matches = imported != null && imported.library?.uri == source;
+      if (!matches && import.importedLibrary?.uri != source) continue;
+
+      final prefix = import.prefix?.element.name;
+      if (prefix == null) return '';
+      prefixed ??= '$prefix.';
+    }
+    return prefixed ?? '';
   }
 
   /// Checks if a field is marked with @JsonField.
@@ -468,10 +803,13 @@ class TableAnalyzer {
   ) {
     final indexes = <IndexInfo>[];
 
-    // Create a map of Dart property names to SQL column names
-    final dartToSqlMap = <String, String>{};
+    // Accept both the Dart field name and the resolved SQL column name. This
+    // keeps model-oriented annotations ergonomic while allowing copied SQL
+    // names from migrations and documentation.
+    final columnNameToSql = <String, String>{};
     for (final column in columns) {
-      dartToSqlMap[column.dartName] = column.sqlName;
+      columnNameToSql[column.dartName] = column.sqlName;
+      columnNameToSql[column.sqlName] = column.sqlName;
     }
 
     // First, check for indexes defined in the @DbTable annotation
@@ -479,17 +817,22 @@ class TableAnalyzer {
     if (indexesFromTable != null && !indexesFromTable.isNull) {
       final indexesList = indexesFromTable.listValue;
       for (final indexValue in indexesList) {
-        final dartColumns = indexValue
+        final declaredColumns = indexValue
             .toListValue()!
             .map((e) => e.toStringValue()!)
             .toList();
 
         // Convert Dart property names to SQL column names
-        final sqlColumns = dartColumns.map((dartName) {
-          final sqlName = dartToSqlMap[dartName];
+        final sqlColumns = declaredColumns.map((declaredName) {
+          final sqlName = columnNameToSql[declaredName];
           if (sqlName == null) {
-            throw StateError(
-              'Index references unknown column "$dartName" in table $tableName',
+            throw InvalidGenerationSourceError(
+              'Index references unknown column "$declaredName" in table '
+              '$tableName.',
+              element: element,
+              todo:
+                  'Use a Dart field name or its generated SQL column name. '
+                  'Available columns: ${columnNameToSql.keys.join(', ')}.',
             );
           }
           return sqlName;
@@ -514,7 +857,7 @@ class TableAnalyzer {
       final reader = ConstantReader(annotation);
 
       final name = reader.peek('name')?.stringValue;
-      final dartColumns = reader
+      final declaredColumns = reader
           .read('columns')
           .listValue
           .map((e) => e.toStringValue()!)
@@ -522,11 +865,16 @@ class TableAnalyzer {
       final unique = reader.read('unique').boolValue;
 
       // Convert Dart property names to SQL column names
-      final sqlColumns = dartColumns.map((dartName) {
-        final sqlName = dartToSqlMap[dartName];
+      final sqlColumns = declaredColumns.map((declaredName) {
+        final sqlName = columnNameToSql[declaredName];
         if (sqlName == null) {
-          throw StateError(
-            'Index references unknown column "$dartName" in table $tableName',
+          throw InvalidGenerationSourceError(
+            'Index references unknown column "$declaredName" in table '
+            '$tableName.',
+            element: element,
+            todo:
+                'Use a Dart field name or its generated SQL column name. '
+                'Available columns: ${columnNameToSql.keys.join(', ')}.',
           );
         }
         return sqlName;
@@ -543,4 +891,18 @@ class TableAnalyzer {
 
     return indexes;
   }
+}
+
+class _ColumnAnalysis {
+  const _ColumnAnalysis(this.columns, this.elements);
+
+  final List<ColumnInfo> columns;
+  final Map<String, Element> elements;
+}
+
+class _ConverterInfo {
+  const _ConverterInfo({required this.expression, required this.storageType});
+
+  final String expression;
+  final DartType storageType;
 }

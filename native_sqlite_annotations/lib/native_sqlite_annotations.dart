@@ -1,4 +1,6 @@
-library native_sqlite_annotations;
+/// Annotations consumed by `native_sqlite_generator` to create typed SQLite
+/// repositories and native Android and iOS helpers.
+library;
 
 export 'src/column.dart';
 export 'src/table.dart';

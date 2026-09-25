@@ -41,9 +41,8 @@ release · **P2** before 1.0.
 
 ### REL-01 · P0 · Remove the `graphify-out/` folder from the repository
 
-- **Why:** 231 tracked files (6.2 MB) of a local analysis cache, 190 of them
-  containing `/Users/nesmin/...` paths. Added only in the unpushed commit
-  `64d1dca`.
+- **Why:** 233 tracked files of a local analysis cache, many containing local
+  absolute paths. They were added by the unpushed commit `761f511`.
 - **Do:** `git rm -r --cached graphify-out`, add `graphify-out/` to the root
   `.gitignore`. Ask the human whether to amend `64d1dca` (it is unpushed) or
   add a new commit.
@@ -62,8 +61,9 @@ release · **P2** before 1.0.
     (D-14) so CI and app builds are reproducible (pub never publishes it).
   - `flutter_manager.sh` (14 KB) duplicates the melos scripts: delete it or
     move it to `tool/` and document it.
-  - `.claude/settings.json` is tracked (also on `origin/main`) and contains
-    local paths → human decides (D-11): untrack and ignore, or keep.
+  - `.claude/settings.json` was removed from `origin/main` and is absent in
+    the current checkout → human decides (D-11) whether to ignore `.claude/`
+    so local settings cannot be reintroduced.
   - `git fetch --prune` to drop stale `origin/claude/*`, `origin/copilot/*`
     refs.
 - **Acceptance:** `git status` clean after a full build of every target;
@@ -310,7 +310,7 @@ human to protect `main` and release tags.
 
 ## 3. Pre-publish checklist (run in order)
 
-1. Decisions D-01…D-21 answered (see [README.md](README.md#decisions-needed);
+1. Decisions D-01…D-22 answered (see [README.md](README.md#decisions-needed);
    D-01, D-02, D-03 and D-09 are already decided).
 2. The GitHub repository is renamed to `native_sqlite` (D-02), and REL-01,
    REL-02, REL-03, REL-04, REL-05, REL-06, REL-07 are done.

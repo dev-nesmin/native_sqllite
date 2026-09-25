@@ -18,7 +18,7 @@ native_sqllite/
 │   └── native_sqlite_platform_interface/ ← Platform abstraction layer
 ├── native_sqlite_annotations/       ← Annotation definitions
 ├── native_sqlite_generator/         ← build_runner code generator
-└── native_sqlite_inspector/         ← DevTools-style database inspector
+└── native_sqlite_inspector/         ← source for the bundled DevTools extension
 ```
 
 ---
@@ -29,12 +29,16 @@ native_sqllite/
 - **Type-safe query builder** — fluent, chainable API with per-column filter/sort methods (no stringly-typed queries)
 - **Auto-generated CRUD repositories** — `insert`, `findById`, `findAll`, `update`, `delete`, `count`
 - **Schema migrations** — JSON snapshot tracking, automatic SQL generation for common changes
-- **Multi-platform** — Android, iOS, and Web with a unified Dart API
+- **Multi-platform** — Android, iOS, Web, Windows, and Linux with a unified Dart API
 - **Native code generation** — Kotlin and Swift schema helpers for platform-side database access
-- **WAL mode** — enabled by default for safe concurrent access from Flutter and native threads
-- **Multi-database** — different tables can live in different database files
+- **Shared native connection** — database-specific worker queues serialize
+  Flutter and native access; WAL is requested on Android/iOS and web uses a
+  MEMORY journal
+- **Multiple databases** — open explicit, type-safe handles for separate files
+- **Reactive queries** — immediate Dart-side refreshes plus polling that sees
+  writes made by native Kotlin/Swift helpers or other connections
 - **Freezed support** — works with `@freezed` immutable classes
-- **Inspector** — web-based DevTools UI to browse and edit live database data
+- **Inspector** — bundled Flutter DevTools extension for live database data
 
 ---
 
@@ -45,10 +49,10 @@ native_sqllite/
 ```yaml
 # pubspec.yaml
 dependencies:
-  native_sqlite: ^1.0.0
+  native_sqlite: ^0.0.1
 
 dev_dependencies:
-  native_sqlite_generator: ^1.0.0
+  native_sqlite_generator: ^0.0.1
   build_runner: ^2.4.0
 ```
 
@@ -60,12 +64,18 @@ targets:
   $default:
     builders:
       native_sqlite_generator:table:
-        options:
-          default_database: 'my_app'
-          # Optional: override where the schema JSON is written/read.
-          # Defaults to lib/generated/native_sqlite_schema.json
-          # schema_output_path: lib/generated/native_sqlite_schema.json
+        options: &native_sqlite_options
+          table_name_case: snake
+          column_name_case: snake
+      native_sqlite_generator:migration:
+        options: *native_sqlite_options
+      native_sqlite_generator:schema_registry:
+        options: *native_sqlite_options
 ```
+
+The anchor is the one source for model-analysis options. Unknown or invalid
+options fail the build. Configure the shared database name and native outputs
+only in `native_sqlite_config.yaml`.
 
 ### 3. Define a model
 
@@ -112,7 +122,7 @@ class User {
 ### 4. Run code generation
 
 ```bash
-dart run build_runner build --delete-conflicting-outputs
+flutter pub run build_runner build
 ```
 
 This creates `user.table.dart` containing `UserSchema`, `UserRepository`, and `UserQueryBuilder`.
@@ -161,8 +171,8 @@ Marks a class as a database table.
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `name` | `String?` | class name → snake_case | SQL table name |
-| `database` | `String?` | generator `default_database` | Database file this table belongs to |
-| `indexes` | `List<List<String>>?` | `null` | Composite indexes — each inner list is one index |
+| `database` | `String?` | `null` | Legacy per-table metadata; the repository's database handle selects the database |
+| `indexes` | `List<List<String>>?` | `null` | Non-unique indexes using Dart field or SQL column names |
 | `auto` | `bool` | `true` | Include in auto-generated `DatabaseManager` |
 
 ```dart
@@ -183,7 +193,7 @@ Marks a field as the primary key.
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `autoIncrement` | `bool` | `false` | SQLite `AUTOINCREMENT` — use with `int?` fields |
-| `useLocalUuid` | `bool` | `false` | Generate a UUID on insert — use with `String` fields |
+| `useLocalUuid` | `bool` | `false` | Generate a UUID on insert — use with nullable `String?` fields |
 
 ```dart
 @PrimaryKey(autoIncrement: true)
@@ -191,7 +201,7 @@ final int? id;
 
 // or UUID primary key:
 @PrimaryKey(useLocalUuid: true)
-final String id;
+final String? id;
 ```
 
 ---
@@ -240,7 +250,8 @@ final int userId;
 
 ### `@Index`
 
-Creates a standalone index on one or more columns.
+Creates a named or unique index on a class. Column entries may be Dart field
+names or generated SQL column names.
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -250,8 +261,14 @@ Creates a standalone index on one or more columns.
 
 ```dart
 @Index(columns: ['email'], unique: true)
-@DbColumn()
-final String email;
+@DbTable(name: 'users')
+class User {
+  @PrimaryKey(autoIncrement: true)
+  final int? id;
+  final String email;
+
+  const User({this.id, required this.email});
+}
 ```
 
 > **Tip:** For simple single-column indexes, use the `indexes` parameter on `@DbTable` instead.
@@ -291,12 +308,11 @@ Attaches a custom `TypeConverter` to a field.
 ```dart
 class ColorConverter extends TypeConverter<Color, int> {
   const ColorConverter();
-  int toSql(Color value) => value.value;
+  int toSql(Color value) => value.toARGB32();
   Color fromSql(int sqlValue) => Color(sqlValue);
 }
 
 @UseConverter(ColorConverter())
-@DbColumn(type: 'INTEGER')
 final Color backgroundColor;
 ```
 
@@ -348,8 +364,10 @@ UserSchema.EMAIL            // 'email'
 ### `XxxRepository` — CRUD operations
 
 ```dart
-final repo = UserRepository();            // uses default_database
-final repo = UserRepository('other_db'); // explicit database
+final repo = UserRepository(DatabaseManager.currentDatabase);
+final otherDb = await NativeSqlite.open(DatabaseConfig(name: 'other_db'),
+);
+final otherRepo = UserRepository(otherDb);
 
 await repo.insert(user);           // returns int row ID
 await repo.findById(1);            // returns User?
@@ -364,33 +382,33 @@ await repo.query('SELECT ...');    // raw query, returns List<User>
 ### `XxxQueryBuilder` — Fluent type-safe queries
 
 ```dart
-final results = await UserQueryBuilder('my_app')
+final results = await UserQueryBuilder(DatabaseManager.currentDatabase)
     // per-column filters (generated based on your fields)
-    .whereIdEquals(1)
-    .whereNameContains('alice')
-    .whereEmailEquals('alice@example.com')
-    .whereIsActiveEquals(true)
-    .whereCreatedAtGreaterThan(DateTime(2024))
+    .idEqualTo(1)
+    .nameContains('alice')
+    .emailEqualTo('alice@example.com')
+    .isActiveIsTrue()
+    .createdAtAfter(DateTime(2024))
     // sorting
-    .orderByNameAscending()
-    .orderByCreatedAtDescending()
+    .sortByNameAsc()
+    .thenByCreatedAtDesc()
     // pagination
     .limit(20)
     .offset(40)
     // execute
-    .find();                  // List<User>
+    .findAll();               // List<User>
 
-final user = await UserQueryBuilder('my_app')
-    .whereEmailEquals('alice@example.com')
-    .findOne();               // User?
+final user = await UserQueryBuilder(DatabaseManager.currentDatabase)
+    .emailEqualTo('alice@example.com')
+    .findFirst();             // User?
 
-final count = await UserQueryBuilder('my_app')
-    .whereIsActiveEquals(false)
+final count = await UserQueryBuilder(DatabaseManager.currentDatabase)
+    .isActiveIsFalse()
     .count();                 // int
 
-await UserQueryBuilder('my_app')
-    .whereCreatedAtLessThan(cutoff)
-    .delete();                // int rows deleted
+await UserQueryBuilder(DatabaseManager.currentDatabase)
+    .createdAtBefore(cutoff)
+    .deleteAll();             // int rows deleted
 ```
 
 ---
@@ -471,8 +489,6 @@ dart run native_sqlite_generator <command> [options]
 | `stats` | Print field-type distribution, constraint counts, and health metrics |
 | `migrate` | Generate migration SQL between two schema snapshot files |
 | `export` | Export all table schemas to a JSON or YAML file |
-| `clean-cache` | Clear the build cache |
-| `cache-stats` | Show cache hit/miss statistics |
 
 ### `analyze`
 
@@ -515,9 +531,7 @@ To generate Kotlin/Swift helpers, add `native_sqlite_config.yaml` to your projec
 native_sqlite:
   generate_native: true
   database_name: 'my_app'
-
-  models:
-    - 'lib/models/*.dart'
+  native_type_prefix: 'App' # optional: AppUser, AppUserHelper, AppUserStatus
 
   android:
     enabled: true
@@ -536,6 +550,10 @@ The `native_code` builder regenerates these files on every `build_runner` build
 `XxxHelper` (typed data class/struct and CRUD helper), plus one file per enum
 and a `DatabaseManager` that opens and migrates the database exactly like the
 Dart one:
+
+`native_type_prefix` defaults to empty. Set it when model names would collide
+with types in your Android or iOS app. Generated-output manifests safely remove
+stale files after a model is deleted or renamed.
 
 ```kotlin
 // Android (e.g. in a WorkManager worker)
@@ -564,49 +582,58 @@ picked up automatically.
 
 ## Platform Support
 
-| Feature | Android | iOS | Web |
-|---------|---------|-----|-----|
-| Core CRUD | ✅ | ✅ | ✅ |
-| WAL mode | ✅ | ✅ | ⚠️ Falls back to MEMORY journal mode (logged in debug builds) |
-| Transactions | ✅ | ✅ | ✅ |
-| Foreign keys | ✅ | ✅ | ✅ |
-| Persistence | ✅ | ✅ | ✅ IndexedDB (requires `web/sqlite3.wasm`) |
-| Versioned migrations | ✅ | ✅ | ✅ |
-| `deleteDatabase` | ✅ | ✅ | ✅ |
-| Inspector schema panel | ✅ | ✅ | ✅ |
-| Inspector edit/delete | ✅ any PK name | ✅ any PK name | ✅ any PK name |
-| Native code gen | ✅ Kotlin | ✅ Swift (CocoaPods and Swift Package Manager) | — |
+| Feature | Android | iOS | Web | Windows/Linux |
+|---------|---------|-----|-----|---------------|
+| Core CRUD | ✅ | ✅ | ✅ | ✅ Dart FFI |
+| WAL mode | ✅ | ✅ | ⚠️ MEMORY | ✅ |
+| Transactions | ✅ | ✅ | ✅ | ✅ |
+| Foreign keys | ✅ | ✅ | ✅ | ✅ |
+| Persistence | ✅ | ✅ | ✅ IndexedDB | ✅ user data directory |
+| Versioned migrations | ✅ | ✅ | ✅ | ✅ |
+| `deleteDatabase` | ✅ | ✅ | ✅ | ✅ |
+| Inspector schema/edit | ✅ | ✅ | ✅ | ✅ |
+| Native code gen | ✅ Kotlin | ✅ Swift | — | — |
+
+Detailed operational guidance is in [docs/guides](docs/guides/README.md),
+including native background work, isolates, errors, web persistence, testing,
+SQLite version portability, and troubleshooting.
 
 ---
 
 ## Database Inspector
 
-When running in debug mode the plugin prints an Inspector URL to the console:
+In debug mode the plugin registers Inspector service extensions on the root
+isolate. Open Flutter DevTools, enable `native_sqlite` in the **Extensions**
+menu, and select its tab. Its console banner never includes VM-service
+credentials. Configure it before opening a database:
 
-```
-╔══════════════════════════════════════════════════════╗
-║  Native SQLite Inspector is available at:            ║
-║  http://dev-nesmin.github.io/native_sqllite/#/PORT/TOKEN ║
-╚══════════════════════════════════════════════════════╝
+```dart
+InspectorConnect.enabled = false; // Disable registration.
+InspectorConnect.printBanner = false; // Keep it enabled, but quiet.
 ```
 
-Open the link in a browser to browse tables, run SQL queries, and edit/delete individual rows in your live app database.
+Use `--dart-define=NATIVE_SQLITE_INSPECTOR=false` as a build-wide kill switch.
+The inspector is disabled in profile and release builds. It connects through
+DevTools DDS and keeps inspected data local to the debug session; there is no
+hosted inspector page.
+
+![native_sqlite DevTools extension](native_sqlite_inspector/doc/inspector.png)
 
 ---
 
 ## Advanced Examples
 
-### Multi-database setup
+### Multiple database handles
 
 ```dart
-@DbTable(name: 'users', database: 'auth_db')
-class User { ... }
+final auth = await NativeSqlite.open(DatabaseConfig(name: 'auth_db'));
+final shop = await NativeSqlite.open(DatabaseConfig(name: 'shop_db'));
 
-@DbTable(name: 'products', database: 'shop_db')
-class Product { ... }
+final users = UserRepository(auth);
+final products = ProductRepository(shop);
 ```
 
-Each table uses its own database file. The repositories handle routing automatically.
+Repositories use the handle passed to their constructor; routing is explicit.
 
 ### Freezed integration
 
@@ -642,10 +669,18 @@ final LatLng location;
 ### Transactions
 
 ```dart
-await NativeSqlite.transaction('my_app', [
-  "INSERT INTO orders (user_id, total) VALUES (1, 99.99)",
-  "UPDATE users SET order_count = order_count + 1 WHERE id = 1",
-]);
+await DatabaseManager.currentDatabase.transaction((txn) async {
+  await txn.execute(
+    'INSERT INTO orders (user_id, total) VALUES (?, ?)',
+    [1, 99.99],
+  );
+  final rows = await txn.query('SELECT * FROM orders WHERE user_id = ?', [1]);
+  print(rows.toMapList());
+});
+
+final batch = DatabaseManager.currentDatabase.batch();
+batch.execute('INSERT INTO audit_log (message) VALUES (?)', ['created order']);
+await batch.commit(); // one channel call and one transaction
 ```
 
 ---
@@ -655,3 +690,17 @@ await NativeSqlite.transaction('my_app', [
 - **Table rebuilds** don't carry over `CHECK` constraints or `COLLATE` expressions (not supported by the annotations either).
 - **Column renames** are migrated as remove + add, so the column's data is dropped (the build warns). Rename data manually if needed.
 - **Web** has no WAL mode (MEMORY journal instead) and supports **one tab per database**: each tab loads the database into memory, so two tabs writing to the same database can overwrite each other's changes.
+
+---
+
+## Contributing and Security
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, generation, testing, and
+pull-request guidance. Participation is governed by the
+[Code of Conduct](CODE_OF_CONDUCT.md). Please report vulnerabilities privately
+as described in [SECURITY.md](SECURITY.md).
+
+## License
+
+native_sqlite is distributed under the
+[BSD 3-Clause License](LICENSE).

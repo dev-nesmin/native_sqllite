@@ -1,0 +1,9 @@
+# Package and tool output.
+.dart_tool/
+build/
+coverage/
+pubspec.lock
+
+# The compiled DevTools extension is intentionally published.
+!extension/devtools/build/
+!extension/devtools/build/**

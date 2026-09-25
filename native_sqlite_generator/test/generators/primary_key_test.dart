@@ -8,10 +8,73 @@ import '../utils/annotations.dart';
 
 void main() {
   group('PrimaryKey Enhancements', () {
+    test('requires exactly one primary key', () async {
+      final logs = <LogRecord>[];
+      await testBuilder(tableBuilder(BuilderOptions({})), {
+        ...realAnnotationsPackage,
+        'a|lib/no_key.dart': '''
+import 'package:native_sqlite_annotations/native_sqlite_annotations.dart';
+
+@DbTable()
+class NoKey {
+  final String value;
+
+  const NoKey({required this.value});
+}
+''',
+      }, onLog: logs.add);
+
+      expect(
+        logs,
+        contains(
+          isA<LogRecord>().having(
+            (log) => log.message,
+            'message',
+            contains('must have a primary key field'),
+          ),
+        ),
+      );
+    });
+
+    test('rejects composite primary keys with a clear error', () async {
+      final logs = <LogRecord>[];
+      await testBuilder(tableBuilder(BuilderOptions({})), {
+        ...realAnnotationsPackage,
+        'a|lib/composite_key.dart': '''
+import 'package:native_sqlite_annotations/native_sqlite_annotations.dart';
+
+@DbTable()
+class CompositeKey {
+  @PrimaryKey()
+  final String tenantId;
+
+  @PrimaryKey()
+  final String itemId;
+
+  const CompositeKey({required this.tenantId, required this.itemId});
+}
+''',
+      }, onLog: logs.add);
+
+      expect(
+        logs,
+        contains(
+          isA<LogRecord>().having(
+            (log) => log.message,
+            'message',
+            allOf(
+              contains('Multiple primary keys detected: tenantId, itemId'),
+              contains('Composite primary keys are not supported'),
+            ),
+          ),
+        ),
+      );
+    });
+
     test('validates that autoIncrement=true requires int field', () async {
       final logs = <LogRecord>[];
       await testBuilder(tableBuilder(BuilderOptions({})), {
-        ...mockAnnotationsPackage,
+        ...realAnnotationsPackage,
         'a|lib/test_model.dart': '''
 import 'package:native_sqlite_annotations/native_sqlite_annotations.dart';
 
@@ -42,7 +105,7 @@ class TestModel {
     test('validates that useLocalUuid=true requires String field', () async {
       final logs = <LogRecord>[];
       await testBuilder(tableBuilder(BuilderOptions({})), {
-        ...mockAnnotationsPackage,
+        ...realAnnotationsPackage,
         'a|lib/test_model.dart': '''
 import 'package:native_sqlite_annotations/native_sqlite_annotations.dart';
 
@@ -71,7 +134,7 @@ class TestModel {
     test('validates that useLocalUuid=true requires nullable field', () async {
       final logs = <LogRecord>[];
       await testBuilder(tableBuilder(BuilderOptions({})), {
-        ...mockAnnotationsPackage,
+        ...realAnnotationsPackage,
         'a|lib/test_model.dart': '''
 import 'package:native_sqlite_annotations/native_sqlite_annotations.dart';
 
@@ -102,7 +165,7 @@ class TestModel {
       () async {
         final logs = <LogRecord>[];
         await testBuilder(tableBuilder(BuilderOptions({})), {
-          ...mockAnnotationsPackage,
+          ...realAnnotationsPackage,
           'a|lib/test_model.dart': '''
 import 'package:native_sqlite_annotations/native_sqlite_annotations.dart';
 
@@ -133,7 +196,7 @@ class TestModel {
       await testBuilder(
         tableBuilder(BuilderOptions({})),
         {
-          ...mockAnnotationsPackage,
+          ...realAnnotationsPackage,
           'a|lib/test_uuid.dart': '''
 import 'package:native_sqlite_annotations/native_sqlite_annotations.dart';
 
@@ -153,9 +216,13 @@ class TestUuid {
           'a|lib/test_uuid.table.dart': decodedMatches(
             allOf(
               contains('Future<String> insert(TestUuid entity)'),
-              contains('final id = entity.id ?? _generateUuid();'),
-              contains('return id as String;'),
-              contains('String _generateUuid()'),
+              contains('"id" TEXT PRIMARY KEY NOT NULL'),
+              contains(
+                'final primaryKeyValue = entity.id ?? NativeSqliteUuid.generate();',
+              ),
+              contains('await database.insert('),
+              contains('return primaryKeyValue;'),
+              isNot(contains('Random.secure()')),
             ),
           ),
         },

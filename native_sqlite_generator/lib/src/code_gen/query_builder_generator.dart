@@ -2,6 +2,7 @@ import 'package:native_sqlite_generator/src/helpers/naming.dart';
 import 'package:native_sqlite_generator/src/helpers/type_utils.dart';
 import 'package:native_sqlite_generator/src/models/column_info.dart';
 import 'package:native_sqlite_generator/src/models/table_info.dart';
+import 'package:native_sqlite_generator/src/sql/sql_identifier.dart';
 
 /// Generates a type-safe query builder class for a table.
 class QueryBuilderGenerator {
@@ -13,23 +14,24 @@ class QueryBuilderGenerator {
     final buffer = StringBuffer();
 
     // Class header
-    buffer.writeln('// Query builder for $className');
+    buffer.writeln('/// Generated query builder for [$className].');
+    buffer.writeln('///');
+    buffer.writeln(
+      '/// Regenerate with `flutter pub run build_runner build` after changing the model.',
+    );
     buffer.writeln('class $queryClassName {');
-    buffer.writeln('  final String _databaseName;');
+    buffer.writeln('  final NativeSqliteDatabase _database;');
     buffer.writeln('  final List<String> _whereConditions = [];');
     buffer.writeln('  final List<Object?> _whereArgs = [];');
-    buffer.writeln('  String? _orderBy;');
+    buffer.writeln('  final List<String> _orderBy = [];');
     buffer.writeln('  int? _limit;');
     buffer.writeln('  int? _offset;');
     buffer.writeln();
-    buffer.writeln('  $queryClassName(this._databaseName);');
+    buffer.writeln('  $queryClassName(this._database);');
     buffer.writeln();
 
     // Generate filter methods for each column
     for (final column in table.columns) {
-      if (column.isPrimaryKey && column.isAutoIncrement) {
-        continue; // Skip auto-increment primary keys
-      }
       _generateFilterMethods(buffer, column, queryClassName);
     }
 
@@ -60,7 +62,7 @@ class QueryBuilderGenerator {
     String queryClassName,
   ) {
     final fieldName = column.dartName;
-    final sqlName = column.sqlName;
+    final sqlName = quoteSqlIdentifier(column.sqlName);
     final dartType = column.dartType;
 
     if (TypeUtils.isString(dartType)) {
@@ -148,32 +150,47 @@ class QueryBuilderGenerator {
     buffer.writeln(
       '  $queryClassName ${fieldName}EqualTo(String$nullCheck value) {',
     );
-    buffer.writeln('    _whereConditions.add(\'$sqlName = ?\');');
-    buffer.writeln('    _whereArgs.add(value);');
+    if (isNullable) {
+      buffer.writeln('    if (value == null) {');
+      buffer.writeln('      _whereConditions.add(\'$sqlName IS NULL\');');
+      buffer.writeln('    } else {');
+      buffer.writeln('      _whereConditions.add(\'$sqlName = ?\');');
+      buffer.writeln('      _whereArgs.add(value);');
+      buffer.writeln('    }');
+    } else {
+      buffer.writeln('    _whereConditions.add(\'$sqlName = ?\');');
+      buffer.writeln('    _whereArgs.add(value);');
+    }
     buffer.writeln('    return this;');
     buffer.writeln('  }');
     buffer.writeln();
 
     buffer.writeln('  /// Filter where $fieldName contains [value].');
     buffer.writeln('  $queryClassName ${fieldName}Contains(String value) {');
-    buffer.writeln('    _whereConditions.add(\'$sqlName LIKE ?\');');
-    buffer.writeln('    _whereArgs.add(\'%\$value%\');');
+    buffer.writeln(
+      '    _whereConditions.add(${_dartStringLiteral("$sqlName LIKE ? ESCAPE '\\'")});',
+    );
+    buffer.writeln('    _whereArgs.add(\'%\${_escapeLike(value)}%\');');
     buffer.writeln('    return this;');
     buffer.writeln('  }');
     buffer.writeln();
 
     buffer.writeln('  /// Filter where $fieldName starts with [value].');
     buffer.writeln('  $queryClassName ${fieldName}StartsWith(String value) {');
-    buffer.writeln('    _whereConditions.add(\'$sqlName LIKE ?\');');
-    buffer.writeln('    _whereArgs.add(\'\$value%\');');
+    buffer.writeln(
+      '    _whereConditions.add(${_dartStringLiteral("$sqlName LIKE ? ESCAPE '\\'")});',
+    );
+    buffer.writeln('    _whereArgs.add(\'\${_escapeLike(value)}%\');');
     buffer.writeln('    return this;');
     buffer.writeln('  }');
     buffer.writeln();
 
     buffer.writeln('  /// Filter where $fieldName ends with [value].');
     buffer.writeln('  $queryClassName ${fieldName}EndsWith(String value) {');
-    buffer.writeln('    _whereConditions.add(\'$sqlName LIKE ?\');');
-    buffer.writeln('    _whereArgs.add(\'%\$value\');');
+    buffer.writeln(
+      '    _whereConditions.add(${_dartStringLiteral("$sqlName LIKE ? ESCAPE '\\'")});',
+    );
+    buffer.writeln('    _whereArgs.add(\'%\${_escapeLike(value)}\');');
     buffer.writeln('    return this;');
     buffer.writeln('  }');
     buffer.writeln();
@@ -193,8 +210,17 @@ class QueryBuilderGenerator {
     buffer.writeln(
       '  $queryClassName ${fieldName}EqualTo($typeName$nullCheck value) {',
     );
-    buffer.writeln('    _whereConditions.add(\'$sqlName = ?\');');
-    buffer.writeln('    _whereArgs.add(value);');
+    if (isNullable) {
+      buffer.writeln('    if (value == null) {');
+      buffer.writeln('      _whereConditions.add(\'$sqlName IS NULL\');');
+      buffer.writeln('    } else {');
+      buffer.writeln('      _whereConditions.add(\'$sqlName = ?\');');
+      buffer.writeln('      _whereArgs.add(value);');
+      buffer.writeln('    }');
+    } else {
+      buffer.writeln('    _whereConditions.add(\'$sqlName = ?\');');
+      buffer.writeln('    _whereArgs.add(value);');
+    }
     buffer.writeln('    return this;');
     buffer.writeln('  }');
     buffer.writeln();
@@ -242,10 +268,17 @@ class QueryBuilderGenerator {
     buffer.writeln(
       '  $queryClassName ${fieldName}EqualTo(DateTime$nullCheck value) {',
     );
-    buffer.writeln('    _whereConditions.add(\'$sqlName = ?\');');
-    buffer.writeln(
-      '    _whereArgs.add(value${isNullable ? '?' : ''}.millisecondsSinceEpoch);',
-    );
+    if (isNullable) {
+      buffer.writeln('    if (value == null) {');
+      buffer.writeln('      _whereConditions.add(\'$sqlName IS NULL\');');
+      buffer.writeln('    } else {');
+      buffer.writeln('      _whereConditions.add(\'$sqlName = ?\');');
+      buffer.writeln('      _whereArgs.add(value.millisecondsSinceEpoch);');
+      buffer.writeln('    }');
+    } else {
+      buffer.writeln('    _whereConditions.add(\'$sqlName = ?\');');
+      buffer.writeln('    _whereArgs.add(value.millisecondsSinceEpoch);');
+    }
     buffer.writeln('    return this;');
     buffer.writeln('  }');
     buffer.writeln();
@@ -293,10 +326,17 @@ class QueryBuilderGenerator {
     buffer.writeln(
       '  $queryClassName ${fieldName}EqualTo(Duration$nullCheck value) {',
     );
-    buffer.writeln('    _whereConditions.add(\'$sqlName = ?\');');
-    buffer.writeln(
-      '    _whereArgs.add(value${isNullable ? '?' : ''}.inMilliseconds);',
-    );
+    if (isNullable) {
+      buffer.writeln('    if (value == null) {');
+      buffer.writeln('      _whereConditions.add(\'$sqlName IS NULL\');');
+      buffer.writeln('    } else {');
+      buffer.writeln('      _whereConditions.add(\'$sqlName = ?\');');
+      buffer.writeln('      _whereArgs.add(value.inMilliseconds);');
+      buffer.writeln('    }');
+    } else {
+      buffer.writeln('    _whereConditions.add(\'$sqlName = ?\');');
+      buffer.writeln('    _whereArgs.add(value.inMilliseconds);');
+    }
     buffer.writeln('    return this;');
     buffer.writeln('  }');
     buffer.writeln();
@@ -359,13 +399,24 @@ class QueryBuilderGenerator {
     buffer.writeln(
       '  $queryClassName ${fieldName}EqualTo($enumType$nullCheck value) {',
     );
-    buffer.writeln('    _whereConditions.add(\'$sqlName = ?\');');
-    if (enumStorageType == 'name') {
-      buffer.writeln('    _whereArgs.add(value${isNullable ? '?' : ''}.name);');
+    if (isNullable) {
+      buffer.writeln('    if (value == null) {');
+      buffer.writeln('      _whereConditions.add(\'$sqlName IS NULL\');');
+      buffer.writeln('    } else {');
+      buffer.writeln('      _whereConditions.add(\'$sqlName = ?\');');
+      if (enumStorageType == 'name') {
+        buffer.writeln('      _whereArgs.add(value.name);');
+      } else {
+        buffer.writeln('      _whereArgs.add(value.index);');
+      }
+      buffer.writeln('    }');
     } else {
-      buffer.writeln(
-        '    _whereArgs.add(value${isNullable ? '?' : ''}.index);',
-      );
+      buffer.writeln('    _whereConditions.add(\'$sqlName = ?\');');
+      if (enumStorageType == 'name') {
+        buffer.writeln('    _whereArgs.add(value.name);');
+      } else {
+        buffer.writeln('    _whereArgs.add(value.index);');
+      }
     }
     buffer.writeln('    return this;');
     buffer.writeln('  }');
@@ -378,13 +429,15 @@ class QueryBuilderGenerator {
     String queryClassName,
   ) {
     final fieldName = column.dartName;
-    final sqlName = column.sqlName;
+    final sqlName = quoteSqlIdentifier(column.sqlName);
 
     buffer.writeln('  /// Sort by $fieldName in ascending order.');
     buffer.writeln(
       '  $queryClassName sortBy${NamingUtils.toPascalCase(fieldName)}Asc() {',
     );
-    buffer.writeln('    _orderBy = \'$sqlName ASC\';');
+    buffer.writeln('    _orderBy');
+    buffer.writeln('      ..clear()');
+    buffer.writeln('      ..add(\'$sqlName ASC\');');
     buffer.writeln('    return this;');
     buffer.writeln('  }');
     buffer.writeln();
@@ -393,7 +446,27 @@ class QueryBuilderGenerator {
     buffer.writeln(
       '  $queryClassName sortBy${NamingUtils.toPascalCase(fieldName)}Desc() {',
     );
-    buffer.writeln('    _orderBy = \'$sqlName DESC\';');
+    buffer.writeln('    _orderBy');
+    buffer.writeln('      ..clear()');
+    buffer.writeln('      ..add(\'$sqlName DESC\');');
+    buffer.writeln('    return this;');
+    buffer.writeln('  }');
+    buffer.writeln();
+
+    buffer.writeln('  /// Then sort by $fieldName in ascending order.');
+    buffer.writeln(
+      '  $queryClassName thenBy${NamingUtils.toPascalCase(fieldName)}Asc() {',
+    );
+    buffer.writeln('    _orderBy.add(\'$sqlName ASC\');');
+    buffer.writeln('    return this;');
+    buffer.writeln('  }');
+    buffer.writeln();
+
+    buffer.writeln('  /// Then sort by $fieldName in descending order.');
+    buffer.writeln(
+      '  $queryClassName thenBy${NamingUtils.toPascalCase(fieldName)}Desc() {',
+    );
+    buffer.writeln('    _orderBy.add(\'$sqlName DESC\');');
     buffer.writeln('    return this;');
     buffer.writeln('  }');
     buffer.writeln();
@@ -402,6 +475,9 @@ class QueryBuilderGenerator {
   void _generatePaginationMethods(StringBuffer buffer, String queryClassName) {
     buffer.writeln('  /// Limit the number of results.');
     buffer.writeln('  $queryClassName limit(int value) {');
+    buffer.writeln(
+      "    if (value < 0) throw ArgumentError.value(value, 'value', 'must not be negative');",
+    );
     buffer.writeln('    _limit = value;');
     buffer.writeln('    return this;');
     buffer.writeln('  }');
@@ -409,6 +485,9 @@ class QueryBuilderGenerator {
 
     buffer.writeln('  /// Skip [value] results.');
     buffer.writeln('  $queryClassName offset(int value) {');
+    buffer.writeln(
+      "    if (value < 0) throw ArgumentError.value(value, 'value', 'must not be negative');",
+    );
     buffer.writeln('    _offset = value;');
     buffer.writeln('    return this;');
     buffer.writeln('  }');
@@ -421,15 +500,17 @@ class QueryBuilderGenerator {
     String queryClassName,
   ) {
     final className = table.dartName;
-    final tableName = table.sqlName;
+    final quotedTableName = quoteSqlIdentifier(table.sqlName);
 
     buffer.writeln('  /// Execute the query and return all matching records.');
     buffer.writeln('  Future<List<$className>> findAll() async {');
-    buffer.writeln('    final sql = _buildQuery();');
+    buffer.writeln('    final sql = toSql();');
     buffer.writeln(
-      '    final result = await NativeSqlite.query(_databaseName, sql, _whereArgs);',
+      '    final result = await _database.query(sql, _whereArgs);',
     );
-    buffer.writeln('    return result.toMapList().map(_fromMap).toList();');
+    buffer.writeln(
+      '    return result.toMapList().map(${table.rowMapperName}).toList();',
+    );
     buffer.writeln('  }');
     buffer.writeln();
 
@@ -437,9 +518,14 @@ class QueryBuilderGenerator {
       '  /// Execute the query and return the first matching record.',
     );
     buffer.writeln('  Future<$className?> findFirst() async {');
-    buffer.writeln('    _limit = 1;');
-    buffer.writeln('    final results = await findAll();');
-    buffer.writeln('    return results.isEmpty ? null : results.first;');
+    buffer.writeln('    final result = await _database.query(');
+    buffer.writeln('      _buildQuery(limitOverride: 1),');
+    buffer.writeln('      _whereArgs,');
+    buffer.writeln('    );');
+    buffer.writeln('    final rows = result.toMapList();');
+    buffer.writeln(
+      '    return rows.isEmpty ? null : ${table.rowMapperName}(rows.first);',
+    );
     buffer.writeln('  }');
     buffer.writeln();
 
@@ -451,10 +537,10 @@ class QueryBuilderGenerator {
       '        : \' WHERE \${_whereConditions.join(\' AND \')}\';',
     );
     buffer.writeln(
-      '    final sql = \'SELECT COUNT(*) as count FROM $tableName\$whereClause\';',
+      '    final sql = \'SELECT COUNT(*) as count FROM $quotedTableName\$whereClause\';',
     );
     buffer.writeln(
-      '    final result = await NativeSqlite.query(_databaseName, sql, _whereArgs);',
+      '    final result = await _database.query(sql, _whereArgs);',
     );
     buffer.writeln('    final rows = result.toMapList();');
     buffer.writeln(
@@ -468,9 +554,8 @@ class QueryBuilderGenerator {
     buffer.writeln('    final whereClause = _whereConditions.isEmpty');
     buffer.writeln('        ? null');
     buffer.writeln('        : _whereConditions.join(\' AND \');');
-    buffer.writeln('    return NativeSqlite.delete(');
-    buffer.writeln('      _databaseName,');
-    buffer.writeln('      \'$tableName\',');
+    buffer.writeln('    return _database.delete(');
+    buffer.writeln('      \'${table.sqlName}\',');
     buffer.writeln('      where: whereClause,');
     buffer.writeln('      whereArgs: _whereArgs.isEmpty ? null : _whereArgs,');
     buffer.writeln('    );');
@@ -479,20 +564,31 @@ class QueryBuilderGenerator {
   }
 
   void _generateHelperMethods(StringBuffer buffer, TableInfo table) {
-    final tableName = table.sqlName;
-    final className = table.dartName;
+    final tableName = quoteSqlIdentifier(table.sqlName);
 
-    buffer.writeln('  String _buildQuery() {');
+    buffer.writeln('  /// The parameterized SQL represented by this builder.');
+    buffer.writeln('  String toSql() => _buildQuery();');
+    buffer.writeln();
+    buffer.writeln('  /// Alias for [toSql], intended for logs and debuggers.');
+    buffer.writeln('  String get debugSql => toSql();');
+    buffer.writeln();
+    buffer.writeln('  /// Bound values in placeholder order.');
+    buffer.writeln(
+      '  List<Object?> get arguments => List<Object?>.unmodifiable(_whereArgs);',
+    );
+    buffer.writeln();
+    buffer.writeln('  String _buildQuery({int? limitOverride}) {');
     buffer.writeln('    final whereClause = _whereConditions.isEmpty');
     buffer.writeln('        ? \'\'');
     buffer.writeln(
       '        : \' WHERE \${_whereConditions.join(\' AND \')}\';',
     );
     buffer.writeln(
-      '    final orderClause = _orderBy == null ? \'\' : \' ORDER BY \$_orderBy\';',
+      '    final orderClause = _orderBy.isEmpty ? \'\' : \' ORDER BY \${_orderBy.join(\', \')}\';',
     );
+    buffer.writeln('    final effectiveLimit = limitOverride ?? _limit;');
     buffer.writeln(
-      '    final limitClause = _limit == null ? \'\' : \' LIMIT \$_limit\';',
+      "    final limitClause = effectiveLimit != null ? ' LIMIT \$effectiveLimit' : (_offset == null ? '' : ' LIMIT -1');",
     );
     buffer.writeln(
       '    final offsetClause = _offset == null ? \'\' : \' OFFSET \$_offset\';',
@@ -502,17 +598,13 @@ class QueryBuilderGenerator {
     );
     buffer.writeln('  }');
     buffer.writeln();
+    buffer.writeln('  static String _escapeLike(String value) => value');
+    buffer.writeln(r"      .replaceAll(r'\', r'\\')");
+    buffer.writeln(r"      .replaceAll('%', r'\%')");
+    buffer.writeln(r"      .replaceAll('_', r'\_');");
+  }
 
-    // Generate _fromMap method (same as in repository)
-    buffer.writeln('  $className _fromMap(Map<String, Object?> map) {');
-    buffer.writeln('    return $className(');
-    for (final column in table.columns) {
-      final fieldName = column.dartName;
-      final accessor = 'map[\'${column.sqlName}\']';
-      final deserialize = column.deserializeExpression(accessor);
-      buffer.writeln('      $fieldName: $deserialize,');
-    }
-    buffer.writeln('    );');
-    buffer.writeln('  }');
+  static String _dartStringLiteral(String value) {
+    return "'${value.replaceAll(r'\', r'\\').replaceAll("'", r"\'").replaceAll(r'$', r'\$')}'";
   }
 }

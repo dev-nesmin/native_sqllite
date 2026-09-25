@@ -11,13 +11,6 @@ class IndexInfo {
   /// Whether this is a unique index.
   final bool unique;
 
-  /// Generates the CREATE INDEX SQL statement.
-  String generateSql(String tableName) {
-    final uniqueStr = unique ? 'UNIQUE ' : '';
-    final columnsStr = columns.join(', ');
-    return 'CREATE ${uniqueStr}INDEX $name ON $tableName ($columnsStr)';
-  }
-
   @override
   String toString() {
     return 'IndexInfo($name on ${columns.join(", ")}, unique: $unique)';

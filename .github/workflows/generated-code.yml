@@ -1,0 +1,43 @@
+name: Generated code integration
+
+on:
+  pull_request:
+    paths:
+      - 'native_sqlite/**'
+      - 'native_sqlite_annotations/**'
+      - 'native_sqlite_generator/**'
+      - 'example/**'
+      - 'tool/test_generated_code.sh'
+      - '.github/workflows/generated-code.yml'
+  push:
+    branches: [main, master]
+    paths:
+      - 'native_sqlite/**'
+      - 'native_sqlite_annotations/**'
+      - 'native_sqlite_generator/**'
+      - 'example/**'
+      - 'tool/test_generated_code.sh'
+      - '.github/workflows/generated-code.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  generate-test-and-compile:
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: '3.47.5'
+          channel: stable
+          cache: true
+
+      - name: Generate, test, and compile Dart, Kotlin, and Swift
+        env:
+          NATIVE_SQLITE_CHECK_GENERATED_DIFF: '1'
+        run: ./tool/test_generated_code.sh

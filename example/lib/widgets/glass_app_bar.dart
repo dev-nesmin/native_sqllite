@@ -25,21 +25,20 @@ class GlassAppBar extends StatelessWidget implements PreferredSizeWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final colors = theme.colorScheme;
 
     // Base color with slight opacity
     final baseColor =
         backgroundColor ??
-        (isDark
-            ? Colors.black.withValues(alpha: 0.6)
-            : Colors.white.withValues(alpha: 0.7));
+        colors.surface.withValues(alpha: isDark ? 0.72 : 0.82);
 
     return Container(
       decoration: BoxDecoration(
         border: Border(
           bottom: BorderSide(
             color: isDark
-                ? Colors.white.withValues(alpha: 0.1)
-                : Colors.black.withValues(alpha: 0.1),
+                ? colors.outlineVariant.withValues(alpha: 0.5)
+                : colors.outlineVariant,
             width: 0.5,
           ),
         ),
@@ -67,19 +66,17 @@ class GlassAppBar extends StatelessWidget implements PreferredSizeWidget {
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
-                  color: isDark ? Colors.white : Colors.black87,
+                  color: colors.onSurface,
                 ),
               ),
               leading: leading,
               actions: actions,
               automaticallyImplyLeading: automaticallyImplyLeading,
               elevation: elevation,
-              backgroundColor: Colors.transparent,
-              surfaceTintColor: Colors.transparent,
+              backgroundColor: colors.surface.withValues(alpha: 0),
+              surfaceTintColor: colors.surface.withValues(alpha: 0),
               centerTitle: true,
-              iconTheme: IconThemeData(
-                color: isDark ? Colors.white : Colors.black87,
-              ),
+              iconTheme: IconThemeData(color: colors.onSurface),
             ),
           ),
         ),

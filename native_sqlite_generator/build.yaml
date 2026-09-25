@@ -4,9 +4,9 @@ builders:
     builder_factories: ["tableBuilder"]
     build_extensions: {".dart": [".table.dart"]}
     auto_apply: dependents
-    build_to: source  # Changed from cache to source - generates in lib/
+    build_to: source
     applies_builders: ["source_gen|combining_builder"]
-  
+
   migration:
     import: "package:native_sqlite_generator/builder.dart"
     builder_factories: ["migrationBuilder"]

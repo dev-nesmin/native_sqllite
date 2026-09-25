@@ -3,7 +3,7 @@ import Foundation
 /**
  * Schema constants for StyledItem table.
  * AUTO-GENERATED from Dart - DO NOT EDIT MANUALLY
- * Generated from: lib/models/styled_item.dart
+ * Generated from: lib/models/custom_converter.dart
  */
 public enum StyledItemSchema {
     public static let tableName = "styled_items"
@@ -17,7 +17,7 @@ public enum StyledItemSchema {
     public static let createdAt = "created_at"
 
     // Same statements as the Dart StyledItemSchema
-    public static let createTableSql = "CREATE TABLE styled_items (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, background_color INTEGER NOT NULL, text_color INTEGER, tags TEXT NOT NULL, created_at INTEGER NOT NULL)"
+    public static let createTableSql = "CREATE TABLE \"styled_items\" (\"id\" INTEGER PRIMARY KEY AUTOINCREMENT, \"name\" TEXT NOT NULL, \"background_color\" INTEGER NOT NULL, \"text_color\" INTEGER, \"tags\" TEXT NOT NULL, \"created_at\" INTEGER NOT NULL)"
 
     public static let indexSql: [String] = [
     ]

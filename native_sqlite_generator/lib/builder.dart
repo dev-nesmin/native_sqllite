@@ -1,3 +1,6 @@
+/// Build-runner entrypoints for native_sqlite schema and repository code.
+library;
+
 import 'package:build/build.dart';
 import 'package:native_sqlite_generator/src/config/generator_options.dart';
 import 'package:native_sqlite_generator/src/generators/schema_registry_builder.dart';
@@ -10,14 +13,9 @@ import 'package:source_gen/source_gen.dart';
 Builder tableBuilder(BuilderOptions options) {
   final generatorOptions = GeneratorOptions.fromOptions(options);
 
-  // Use .g.dart extension if generateAsPartFile is true, otherwise .table.dart
-  final extension = generatorOptions.generateAsPartFile
-      ? '.g.dart'
-      : '.table.dart';
-
   return LibraryBuilder(
     TableGenerator(generatorOptions),
-    generatedExtension: extension,
+    generatedExtension: '.table.dart',
     header: _buildHeader(generatorOptions),
   );
 }
@@ -42,15 +40,13 @@ String _buildHeader(GeneratorOptions options) {
   return lines.join('\n');
 }
 
-/// Tracks schema changes by generating .schema.json files
-/// All schemas are generated in lib/generated/schemas/ directory
+/// Tracks all managed tables in one schema snapshot and migration history.
 Builder migrationBuilder(BuilderOptions options) {
   final generatorOptions = GeneratorOptions.fromOptions(options);
   return SchemaTrackingBuilder(generatorOptions);
 }
 
-/// Generates DatabaseManager automatically (like Flutter l10n)
-/// NO trigger file needed - just run build_runner!
+/// Generates the package's DatabaseManager from all managed tables.
 Builder schemaRegistryBuilder(BuilderOptions options) {
   final generatorOptions = GeneratorOptions.fromOptions(options);
   return SchemaRegistryBuilder(generatorOptions);
@@ -58,5 +54,4 @@ Builder schemaRegistryBuilder(BuilderOptions options) {
 
 /// Generates native Android/iOS code when generate_native: true.
 /// Runs after the migration builder so the schema JSON is available.
-Builder nativeCodeBuilder(BuilderOptions options) =>
-    NativeCodeBuilder();
+Builder nativeCodeBuilder(BuilderOptions options) => NativeCodeBuilder();

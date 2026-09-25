@@ -19,6 +19,7 @@ class ColumnInfo {
     this.foreignKeyOnUpdate,
     this.enumType = 'ordinal',
     this.converterExpression,
+    this.converterStorageType,
     this.isJsonField = false,
     this.useLocalUuid = false,
   });
@@ -69,6 +70,9 @@ class ColumnInfo {
   /// If present, this will be used for serialization/deserialization.
   final String? converterExpression;
 
+  /// The SQL-facing Dart type `S` from `TypeConverter<DartType, S>`.
+  final DartType? converterStorageType;
+
   /// Whether this field should be serialized as JSON.
   final bool isJsonField;
 
@@ -100,7 +104,7 @@ class ColumnInfo {
 
       // Handle dynamic type
       if (baseType == 'dynamic') {
-        return '${nullCheck}jsonEncode($accessor)$nullSuffix';
+        return '${nullCheck}NativeSqliteCodec.jsonEncode($accessor)$nullSuffix';
       }
 
       // Check if it's a Map or primitive List (use jsonEncode directly)
@@ -110,17 +114,17 @@ class ColumnInfo {
           baseType == 'List<double>' ||
           baseType == 'List<bool>' ||
           baseType == 'List<dynamic>') {
-        return '${nullCheck}jsonEncode($accessor)$nullSuffix';
+        return '${nullCheck}NativeSqliteCodec.jsonEncode($accessor)$nullSuffix';
       } else if (baseType.startsWith('List<')) {
         // List of custom objects - need to map to toJson()
         // Use ! for nullable lists since we already checked != null
         final bang = isNullable ? '!' : '';
-        return '${nullCheck}jsonEncode($accessor$bang.map((e) => e.toJson()).toList())$nullSuffix';
+        return '${nullCheck}NativeSqliteCodec.jsonEncode($accessor$bang.map((e) => e.toJson()).toList())$nullSuffix';
       } else {
         // Custom object with toJson() method
         // Use ! for nullable objects since we already checked != null
         final bang = isNullable ? '!' : '';
-        return '${nullCheck}jsonEncode($accessor$bang.toJson())$nullSuffix';
+        return '${nullCheck}NativeSqliteCodec.jsonEncode($accessor$bang.toJson())$nullSuffix';
       }
     }
 
@@ -136,11 +140,12 @@ class ColumnInfo {
     if (hasConverter) {
       // Use custom converter
       // Need to cast the map value to the SQL storage type
-      final sqlDartType = _getSqlDartType();
       final nullCheck = isNullable ? '$accessor != null ? ' : '';
       final nullSuffix = isNullable ? ' : null' : '';
-      final cast = ' as $sqlDartType';
-      return '$nullCheck$converterExpression.fromSql($accessor$cast)$nullSuffix';
+      final storedValue = sqlType == SqlType.blob
+          ? 'NativeSqliteCodec.asBlob($accessor)'
+          : '$accessor as ${_getSqlDartType()}';
+      return '$nullCheck$converterExpression.fromSql($storedValue)$nullSuffix';
     }
 
     if (isJsonField) {
@@ -151,22 +156,22 @@ class ColumnInfo {
 
       // Handle dynamic type
       if (baseType == 'dynamic') {
-        return '${nullCheck}jsonDecode($accessor as String)$nullSuffix';
+        return '${nullCheck}NativeSqliteCodec.jsonDecode($accessor as String)$nullSuffix';
       }
 
       // Check if it's a Map or primitive List
       if (baseType.startsWith('Map<')) {
-        return '${nullCheck}jsonDecode($accessor as String) as $baseType$nullSuffix';
+        return '${nullCheck}NativeSqliteCodec.jsonDecode($accessor as String) as $baseType$nullSuffix';
       } else if (baseType == 'List<String>') {
-        return '${nullCheck}(jsonDecode($accessor as String) as List).cast<String>()$nullSuffix';
+        return '$nullCheck(NativeSqliteCodec.jsonDecode($accessor as String) as List).cast<String>()$nullSuffix';
       } else if (baseType == 'List<int>') {
-        return '${nullCheck}(jsonDecode($accessor as String) as List).cast<int>()$nullSuffix';
+        return '$nullCheck(NativeSqliteCodec.jsonDecode($accessor as String) as List).cast<int>()$nullSuffix';
       } else if (baseType == 'List<double>') {
-        return '${nullCheck}(jsonDecode($accessor as String) as List).cast<double>()$nullSuffix';
+        return '$nullCheck(NativeSqliteCodec.jsonDecode($accessor as String) as List).cast<double>()$nullSuffix';
       } else if (baseType == 'List<bool>') {
-        return '${nullCheck}(jsonDecode($accessor as String) as List).cast<bool>()$nullSuffix';
+        return '$nullCheck(NativeSqliteCodec.jsonDecode($accessor as String) as List).cast<bool>()$nullSuffix';
       } else if (baseType == 'List<dynamic>') {
-        return '${nullCheck}jsonDecode($accessor as String) as List<dynamic>$nullSuffix';
+        return '${nullCheck}NativeSqliteCodec.jsonDecode($accessor as String) as List<dynamic>$nullSuffix';
       } else if (baseType.startsWith('List<')) {
         // List of custom objects - need to extract inner type and map fromJson
         // Extract the inner type from List<Type>
@@ -174,10 +179,10 @@ class ColumnInfo {
           5,
           baseType.length - 1,
         ); // Remove 'List<' and '>'
-        return '${nullCheck}(jsonDecode($accessor as String) as List).map((e) => $innerType.fromJson(e as Map<String, dynamic>)).toList()$nullSuffix';
+        return '$nullCheck(NativeSqliteCodec.jsonDecode($accessor as String) as List).map((e) => $innerType.fromJson(e as Map<String, dynamic>)).toList()$nullSuffix';
       } else {
         // Custom object with fromJson() factory constructor
-        return '${nullCheck}$baseType.fromJson(jsonDecode($accessor as String) as Map<String, dynamic>)$nullSuffix';
+        return '$nullCheck$baseType.fromJson(NativeSqliteCodec.jsonDecode($accessor as String) as Map<String, dynamic>)$nullSuffix';
       }
     }
 
@@ -194,6 +199,11 @@ class ColumnInfo {
   /// Gets the Dart type that corresponds to the SQL storage type.
   /// Used for casting when deserializing with converters.
   String _getSqlDartType() {
+    final converterType = converterStorageType;
+    if (converterType != null) {
+      final baseType = TypeUtils.getBaseTypeName(converterType);
+      return baseType;
+    }
     switch (sqlType) {
       case SqlType.integer:
         return 'int';

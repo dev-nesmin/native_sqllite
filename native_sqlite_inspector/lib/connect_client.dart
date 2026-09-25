@@ -1,313 +1,178 @@
+// Portions adapted from Isar Community Inspector.
+// Copyright 2022 Simon Leier. Licensed under Apache-2.0.
+// See the package NOTICE and LICENSES/Apache-2.0.txt files.
+
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
-import 'package:vm_service/vm_service.dart';
-import 'package:web_socket_channel/web_socket_channel.dart';
+import 'package:native_sqlite/inspector_protocol.dart';
 
+import 'devtools_transport.dart';
+
+typedef InspectorServiceCall =
+    Future<Object?> Function(String method, Map<String, Object?> args);
+
+/// Typed client for the native_sqlite VM service extensions exposed by the
+/// connected debug application.
 class ConnectClient {
-  ConnectClient(this.vmService, this.isolateId);
+  ConnectClient._(this._callService, [this._transport]);
 
-  static const Duration kNormalTimeout = Duration(seconds: 4);
-  static const Duration kLongTimeout = Duration(seconds: 10);
+  static const normalTimeout = Duration(seconds: 4);
+  static const longTimeout = Duration(seconds: 10);
 
-  final VmService vmService;
-  final String isolateId;
-
-  // Database info cache
-  final databaseInfo = <String, DatabaseInfo>{};
-
-  // Stream controllers for events
+  final InspectorServiceCall _callService;
+  final DevToolsTransport? _transport;
+  final databaseInfo = <String, InspectorDatabaseInfo>{};
   final _dataChangedController = StreamController<void>.broadcast();
+  final _connectionChangedController = StreamController<void>.broadcast();
+  bool _disposed = false;
 
   Stream<void> get dataChanged => _dataChangedController.stream;
+  Stream<void> get connectionChanged => _connectionChangedController.stream;
 
-  static Future<ConnectClient> connect(String port, String secret) async {
-    // WebSocket URL format: ws://127.0.0.1:port/secret=/ws
-    final wsUrl = Uri.parse('ws://127.0.0.1:$port/$secret=/ws');
-    debugPrint('Inspector: Attempting to connect to $wsUrl');
+  static Future<ConnectClient> connect() async {
+    final transport = createDevToolsTransport();
+    final client = ConnectClient._(transport.call, transport);
+    await client._verifyProtocol();
+    await client._listenToDevTools();
+    return client;
+  }
 
-    try {
-      final channel = WebSocketChannel.connect(wsUrl);
-      debugPrint('Inspector: WebSocket channel created');
+  @visibleForTesting
+  static Future<ConnectClient> connectWith(InspectorServiceCall call) async {
+    final client = ConnectClient._(call);
+    await client._verifyProtocol();
+    return client;
+  }
 
-      // Handle errors
-      final stream = channel.stream.handleError((error) {
-        debugPrint('Inspector: WebSocket error: $error');
-      });
+  Future<void> _listenToDevTools() async {
+    await _transport!.start(
+      onDataChanged: () {
+        if (!_dataChangedController.isClosed) {
+          _dataChangedController.add(null);
+        }
+      },
+      onMainIsolateChanged: () {
+        databaseInfo.clear();
+        if (!_connectionChangedController.isClosed) {
+          _connectionChangedController.add(null);
+        }
+      },
+    );
+  }
 
-      final service = VmService(
-        stream,
-        channel.sink.add,
-        disposeHandler: channel.sink.close,
+  Future<void> _verifyProtocol() async {
+    final info = InspectorInfo.fromJson(
+      _asMap(
+        await _call(
+          NativeSqliteInspectorProtocol.getInfo,
+          timeout: normalTimeout,
+        ),
+      ),
+    );
+    if (info.protocol != NativeSqliteInspectorProtocol.version) {
+      throw StateError(
+        'Inspector protocol ${info.protocol} is not supported by this '
+        'extension (expected ${NativeSqliteInspectorProtocol.version}).',
       );
-
-      debugPrint('Inspector: VmService initialized, getting VM...');
-
-      // Add timeout for initial connection
-      final vm = await service.getVM().timeout(const Duration(seconds: 5));
-      debugPrint('Inspector: VM received: ${vm.name}');
-
-      final isolateId = vm.isolates!.where((e) => e.name == 'main').first.id!;
-      debugPrint('Inspector: Main isolate found: $isolateId');
-
-      await service.streamListen(EventStreams.kExtension);
-      debugPrint('Inspector: Listening to extension events');
-
-      final client = ConnectClient(service, isolateId);
-
-      // Set up event handlers
-      final handlers = {
-        'ext.native_sqlite.data_changed': (_) {
-          client._dataChangedController.add(null);
-        },
-      };
-
-      service.onExtensionEvent.listen((Event event) {
-        final data = event.extensionData?.data ?? {};
-        handlers[event.extensionKind]?.call(data);
-      });
-
-      debugPrint('Inspector: Client ready');
-      return client;
-    } on TimeoutException {
-      debugPrint('Inspector: Connection timed out');
-      throw Exception(
-        'Connection timed out. If you are using the hosted inspector (https), '
-        'your browser might be blocking the insecure WebSocket connection (ws://). '
-        'Please allow "Insecure Content" for this site in your browser settings.',
-      );
-    } catch (e) {
-      debugPrint('Inspector: Connection failed with error: $e');
-      throw Exception('Failed to connect: $e');
     }
   }
 
-  Future<T> _call<T>(
+  Future<Object?> _call(
     String method, {
-    Duration? timeout = kNormalTimeout,
-    Map<String, dynamic>? args,
-  }) async {
-    var responseFuture = vmService.callServiceExtension(
-      method,
-      isolateId: isolateId,
-      args: {if (args != null) 'args': jsonEncode(args)},
-    );
-
-    if (timeout != null) {
-      responseFuture = responseFuture.timeout(timeout);
-    }
-
-    final response = await responseFuture;
-    return response.json?['result'] as T;
+    Map<String, Object?> args = const {},
+    Duration timeout = normalTimeout,
+  }) {
+    if (_disposed) throw StateError('Inspector client has been disposed.');
+    return _callService(method, args).timeout(timeout);
   }
 
-  Future<List<DatabaseInfo>> listDatabases() async {
-    final databases =
-        await _call<List<dynamic>>('ext.native_sqlite.listDatabases');
-    return databases
-        .map((e) => DatabaseInfo.fromJson(e as Map<String, dynamic>))
+  Future<List<InspectorDatabaseInfo>> listDatabases() async {
+    final raw = await _call(NativeSqliteInspectorProtocol.listDatabases);
+    final databases = (raw as List)
+        .map((value) => InspectorDatabaseInfo.fromJson(_asMap(value)))
         .toList();
+    databaseInfo
+      ..clear()
+      ..addEntries(
+        databases.map((database) => MapEntry(database.name, database)),
+      );
+    return databases;
   }
 
-  Future<DatabaseInfo> getSchema(String database) async {
-    final schema = await _call<Map<String, dynamic>>(
-      'ext.native_sqlite.getSchema',
-      args: {'database': database},
+  Future<List<InspectorTableSchema>> getSchema(String database) async {
+    final raw = await _call(
+      NativeSqliteInspectorProtocol.getSchema,
+      args: InspectorDatabaseRequest(database).toJson(),
     );
-    return DatabaseInfo.fromJson(schema);
+    final tables = (raw as List)
+        .map((value) => InspectorTableSchema.fromJson(_asMap(value)))
+        .toList();
+    final current = databaseInfo[database];
+    if (current != null) {
+      databaseInfo[database] = InspectorDatabaseInfo(
+        name: current.name,
+        path: current.path,
+        tables: tables,
+        size: current.size,
+      );
+    }
+    return tables;
   }
 
-  // Note: watchDatabase not yet implemented in backend
-  // Future<void> watchDatabase(String database) async {
-  //   databaseInfo.clear();
-  //   await _call<dynamic>(
-  //     'ext.native_sqlite.watchDatabase',
-  //     args: {'database': database},
-  //   );
-  // }
-
-  Future<Map<String, Object?>> executeQuery(Map<String, dynamic> query) async {
-    return _call<Map<String, Object?>>(
-      'ext.native_sqlite.executeQuery',
-      args: query,
-      timeout: kLongTimeout,
-    );
-  }
-
-  Future<List<Map<String, dynamic>>> executeSql(
-    String database,
-    String sql,
+  Future<InspectorQueryPage> executeQuery(
+    InspectorBrowseRequest request,
   ) async {
-    final result = await _call<List<dynamic>>(
-      'ext.native_sqlite.executeSql',
-      args: {'database': database, 'sql': sql},
-      timeout: kLongTimeout,
+    final raw = await _call(
+      NativeSqliteInspectorProtocol.executeQuery,
+      args: request.toJson(),
+      timeout: longTimeout,
     );
-    return result.cast<Map<String, dynamic>>();
+    return InspectorQueryPage.fromJson(_asMap(raw));
   }
 
-  Future<void> importJson(
-    String database,
-    String table,
-    List<dynamic> objects,
-  ) async {
-    await _call<dynamic>(
-      'ext.native_sqlite.importJson',
-      args: {
-        'database': database,
-        'table': table,
-        'data': objects,
-      },
+  Future<InspectorSqlResult> executeSql(InspectorSqlRequest request) async {
+    final raw = await _call(
+      NativeSqliteInspectorProtocol.executeSql,
+      args: request.toJson(),
+      timeout: longTimeout,
     );
+    return InspectorSqlResult.fromJson(_asMap(raw));
   }
 
-  Future<List<Map<String, dynamic>>> exportJson(
-    Map<String, dynamic> query,
-  ) async {
-    final data = await _call<List<dynamic>>(
-      'ext.native_sqlite.exportJson',
-      args: query,
-      timeout: kLongTimeout,
+  Future<int> getDataVersion(String database) async {
+    final value = await _call(
+      NativeSqliteInspectorProtocol.getDataVersion,
+      args: InspectorDatabaseRequest(database).toJson(),
     );
-    return data.cast<Map<String, dynamic>>();
+    return value as int;
   }
 
-  Future<void> updateRecord(
-    String database,
-    String table,
-    dynamic id,
-    Map<String, dynamic> values,
-  ) async {
-    await _call<dynamic>(
-      'ext.native_sqlite.updateRecord',
-      args: {
-        'database': database,
-        'table': table,
-        'id': id,
-        'values': values,
-      },
+  Future<void> updateRecord(InspectorMutationRequest request) async {
+    await _call(
+      NativeSqliteInspectorProtocol.updateRecord,
+      args: request.toJson(),
+      timeout: longTimeout,
     );
   }
 
-  Future<void> deleteRecord(
-    String database,
-    String table,
-    dynamic id,
-  ) async {
-    await _call<dynamic>(
-      'ext.native_sqlite.deleteRecord',
-      args: {
-        'database': database,
-        'table': table,
-        'id': id,
-      },
+  Future<void> deleteRecord(InspectorMutationRequest request) async {
+    await _call(
+      NativeSqliteInspectorProtocol.deleteRecord,
+      args: request.toJson(),
+      timeout: longTimeout,
     );
   }
 
-  Future<void> disconnect() async {
+  Future<void> dispose() async {
+    if (_disposed) return;
+    _disposed = true;
+    await _transport?.dispose();
     await _dataChangedController.close();
-    await vmService.dispose();
-  }
-}
-
-// Database info model
-class DatabaseInfo {
-  DatabaseInfo({
-    required this.name,
-    required this.path,
-    required this.tables,
-    this.size,
-  });
-
-  final String name;
-  final String path;
-  final List<TableSchema> tables;
-  final int? size;
-
-  factory DatabaseInfo.fromJson(Map<String, dynamic> json) {
-    return DatabaseInfo(
-      name: json['name'] as String,
-      path: json['path'] as String,
-      tables: (json['tables'] as List<dynamic>)
-          .map((t) => TableSchema.fromJson(t as Map<String, dynamic>))
-          .toList(),
-      size: json['size'] as int?,
-    );
+    await _connectionChangedController.close();
   }
 
-  Map<String, dynamic> toJson() {
-    return {
-      'name': name,
-      'path': path,
-      'tables': tables.map((t) => t.toJson()).toList(),
-      'size': size,
-    };
-  }
-}
-
-class TableSchema {
-  TableSchema({
-    required this.name,
-    required this.columns,
-    this.primaryKey,
-    this.indexes = const [],
-  });
-
-  final String name;
-  final List<ColumnInfo> columns;
-  final String? primaryKey;
-  final List<String> indexes;
-
-  factory TableSchema.fromJson(Map<String, dynamic> json) {
-    return TableSchema(
-      name: json['name'] as String,
-      columns: (json['columns'] as List<dynamic>)
-          .map((c) => ColumnInfo.fromJson(c as Map<String, dynamic>))
-          .toList(),
-      primaryKey: json['primaryKey'] as String?,
-      indexes: (json['indexes'] as List<dynamic>).cast<String>(),
-    );
-  }
-
-  Map<String, dynamic> toJson() {
-    return {
-      'name': name,
-      'columns': columns.map((c) => c.toJson()).toList(),
-      'primaryKey': primaryKey,
-      'indexes': indexes,
-    };
-  }
-}
-
-class ColumnInfo {
-  ColumnInfo({
-    required this.name,
-    required this.type,
-    required this.nullable,
-    this.defaultValue,
-  });
-
-  final String name;
-  final String type;
-  final bool nullable;
-  final dynamic defaultValue;
-
-  factory ColumnInfo.fromJson(Map<String, dynamic> json) {
-    return ColumnInfo(
-      name: json['name'] as String,
-      type: json['type'] as String,
-      nullable: json['nullable'] as bool,
-      defaultValue: json['defaultValue'],
-    );
-  }
-
-  Map<String, dynamic> toJson() {
-    return {
-      'name': name,
-      'type': type,
-      'nullable': nullable,
-      'defaultValue': defaultValue,
-    };
+  static Map<String, Object?> _asMap(Object? value) {
+    return (value as Map).cast<String, Object?>();
   }
 }

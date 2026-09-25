@@ -141,12 +141,8 @@ puro dart format <dir>                                        # apply (not on ge
 ### 4.3 Tests
 
 ```bash
-# Generator (plain `dart test` fails in the workspace — use the direct runner)
-cd native_sqlite_generator && \
-  "$HOME/.puro/envs/3.47.5/flutter/bin/dart" --packages=../.dart_tool/package_config.json \
-  "$HOME/.puro/shared/pub_cache/hosted/pub.dev/test-1.31.1/bin/test.dart"
-# (If the resolved `test` version changes, update the path: see
-#  .dart_tool/package_config.json → "test".)
+# Generator (resolves the direct `test` runner from package_config.json)
+tool/test_generator.sh
 
 # Runtime package
 cd native_sqlite/native_sqlite && puro flutter test
@@ -200,10 +196,7 @@ open Android emulator (API 36) and Chrome 153.
 ### 5.1 Detect what is open
 
 ```bash
-DEVICES_JSON="$(puro flutter devices --machine 2>/dev/null)"
-IOS_SIM="$(jq -r '[.[] | select(.targetPlatform=="ios" and .emulator==true)][0].id // empty' <<<"$DEVICES_JSON")"
-ANDROID_EMU="$(jq -r '[.[] | select((.targetPlatform|startswith("android")) and .emulator==true)][0].id // empty' <<<"$DEVICES_JSON")"
-WEB_CHROME="$(jq -r '[.[] | select(.id=="chrome")][0].id // empty' <<<"$DEVICES_JSON")"
+eval "$(tool/devices.sh)"
 echo "iOS simulator: ${IOS_SIM:-none} | Android emulator: ${ANDROID_EMU:-none} | Chrome: ${WEB_CHROME:-none}"
 ```
 
@@ -215,8 +208,8 @@ xcrun simctl list devices booted -j | jq -r '.devices[][] | select(.state=="Boot
 "$ANDROID_HOME/platform-tools/adb" devices | awk '/^emulator-/{print $1}'
 ```
 
-Task TOOL-01 (in [02-plugin-work-plan.md](02-plugin-work-plan.md)) adds
-this as `tool/devices.sh` so it becomes `eval "$(tool/devices.sh)"`.
+`tool/devices.sh` only selects entries reported as emulators for Android and
+iOS, so a connected physical device is never returned.
 
 Only if nothing is open (and the task needs a device): boot one, then
 re-run the detection.

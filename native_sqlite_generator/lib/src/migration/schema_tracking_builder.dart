@@ -42,6 +42,8 @@ class SchemaTrackingBuilder implements Builder {
   Future<void> build(BuildStep buildStep) async {
     log.info('📁 Collecting schemas...');
 
+    _cleanLegacySnapshotMetadata();
+
     // Load previous schema to detect changes and deletions
     final previousSchema = await _loadPreviousSchema(buildStep);
     final previousTables = <String, Map<String, dynamic>>{};
@@ -62,7 +64,8 @@ class SchemaTrackingBuilder implements Builder {
     final matchedPreviousTables = <String>{};
     var correctedLegacyNames = false;
     final dartFiles = Glob('lib/**.dart');
-    final assets = await buildStep.findAssets(dartFiles).toList();
+    final assets = await buildStep.findAssets(dartFiles).toList()
+      ..sort((left, right) => left.path.compareTo(right.path));
     final analyzer = TableAnalyzer(options);
     final legacyCorrection = LegacySnapshotCorrection(options);
     final tableMigrations = <Map<String, dynamic>>[];
@@ -89,14 +92,46 @@ class SchemaTrackingBuilder implements Builder {
         );
 
         final tableName = tableInfo.sqlName;
-        final currentProbe = SchemaSnapshotHelper.createSnapshot(tableInfo, 0);
+        final currentProbe = SchemaSnapshotHelper.createSnapshot(
+          tableInfo,
+          0,
+          sourcePath: assetId.path,
+        );
+        final isAutoManaged =
+            annotatedElement.annotation.peek('auto')?.boolValue ?? true;
+
+        if (!isAutoManaged) {
+          // Older generator versions wrote auto:false tables into the shared
+          // snapshot. Treat the old entry as matched so it disappears without
+          // becoming a deletion migration or bumping the managed schema.
+          var previousKey = tableName;
+          if (!previousTables.containsKey(previousKey)) {
+            previousKey =
+                legacyCorrection.findLegacyTableKey(
+                  previousTables,
+                  currentProbe,
+                ) ??
+                '';
+          }
+          if (previousTables.containsKey(previousKey)) {
+            matchedPreviousTables.add(previousKey);
+          }
+          log.info(
+            'Skipping ${tableInfo.dartName} (auto=false) in migrations and '
+            'native schema output',
+          );
+          continue;
+        }
 
         // Find the previous snapshot of this table, correcting names written
         // by older generator versions that skipped the naming convention.
         var previousKey = tableName;
         if (!previousTables.containsKey(previousKey)) {
           previousKey =
-              legacyCorrection.findLegacyTableKey(previousTables, currentProbe) ??
+              legacyCorrection.findLegacyTableKey(
+                previousTables,
+                currentProbe,
+              ) ??
               '';
         }
         Map<String, dynamic>? previousTable;
@@ -129,6 +164,7 @@ class SchemaTrackingBuilder implements Builder {
         final snapshot = SchemaSnapshotHelper.createSnapshot(
           tableInfo,
           newVersion,
+          sourcePath: assetId.path,
         );
 
         final snapshotJson = snapshot.toJson();
@@ -137,20 +173,29 @@ class SchemaTrackingBuilder implements Builder {
         // earlier version, i.e. when a previous schema exists at all.
         if (schemaChanged && previousSchema != null) {
           anyTableChanged = true;
-          final migration = previousTable == null
-              ? MigrationSqlGenerator.createTable(snapshot)
-              : MigrationSqlGenerator.changeTable(
-                  TableSchemaSnapshot.fromJson(previousTable),
-                  snapshot,
-                );
+          final TableMigration migration;
+          try {
+            migration = previousTable == null
+                ? MigrationSqlGenerator.createTable(snapshot)
+                : MigrationSqlGenerator.changeTable(
+                    TableSchemaSnapshot.fromJson(previousTable),
+                    snapshot,
+                  );
+          } on MigrationException catch (error) {
+            throw InvalidGenerationSourceError(
+              error.message,
+              element: element,
+              todo: 'Make the new column nullable or give it a defaultValue.',
+            );
+          }
           tableMigrations.add({
             'tableName': tableName,
             'className': tableInfo.dartName,
             ...migration.toJson(),
           });
-          log.info('📝 ${tableInfo.dartName}: ${migration.summary}');
+          log.fine('${tableInfo.dartName}: ${migration.summary}');
           for (final warning in migration.warnings) {
-            log.warning('⚠️  $warning');
+            log.warning(warning);
           }
         } else if (schemaChanged) {
           anyTableChanged = true;
@@ -168,10 +213,10 @@ class SchemaTrackingBuilder implements Builder {
       if (!matchedPreviousTables.contains(entry.key)) {
         final deletedSchema = Map<String, dynamic>.from(entry.value);
         deletedSchema['deleted'] = true;
-        deletedSchema['deletedAt'] = DateTime.now().toIso8601String();
+        deletedSchema.remove('deletedAt');
         deletedTables.add(deletedSchema);
         log.warning(
-          '🗑️  Model for table "${entry.key}" was removed; the table and its '
+          'Model for table "${entry.key}" was removed; the table and its '
           'data stay in existing databases.',
         );
       }
@@ -186,19 +231,31 @@ class SchemaTrackingBuilder implements Builder {
         ? tableMigrations
         : previousSchema?['migrationFormat'] == migrationFormat
         ? (previousSchema?['migrations'] as List? ?? const [])
-        : const [];
+        : const <Object?>[];
+
+    deletedTables.sort(
+      (left, right) =>
+          (left['tableName'] as String).compareTo(right['tableName'] as String),
+    );
+    tableMigrations.sort(
+      (left, right) =>
+          (left['tableName'] as String).compareTo(right['tableName'] as String),
+    );
+    final schemas = currentSchemas.values.toList()
+      ..sort(
+        (left, right) => (left['tableName'] as String).compareTo(
+          right['tableName'] as String,
+        ),
+      );
 
     // Write consolidated schemas file
     final output = {
       'version': '1.0.0',
       'schemaVersion': newSchemaVersion,
-      'generatedAt': DateTime.now().toIso8601String(),
-      'schemas': currentSchemas.values.toList(),
+      'schemas': schemas,
       'deletedTables': deletedTables,
       'migrationFormat': migrationFormat,
       'migrations': migrations,
-      'previousSchemas':
-          previousSchema?['schemas'], // Keep previous for reference
     };
 
     final jsonString = const JsonEncoder.withIndent('  ').convert(output);
@@ -232,24 +289,68 @@ class SchemaTrackingBuilder implements Builder {
     // Only write if this version doesn't exist yet — unless the snapshot of
     // this same version was just corrected, in which case it must be fixed
     // so later builds diff against the real column names.
-    if (!versionedFile.existsSync() || (correctedLegacyNames && !hasChanges)) {
+    final versionedContent = versionedFile.existsSync()
+        ? versionedFile.readAsStringSync()
+        : null;
+    if (versionedContent == null ||
+        (!hasChanges &&
+            (correctedLegacyNames || versionedContent != jsonString))) {
       versionedFile.writeAsStringSync(jsonString);
       log.info(
-        '💾 Saved versioned snapshot: native_sqlite_schema_v$newSchemaVersion.json',
+        'Saved versioned snapshot: native_sqlite_schema_v$newSchemaVersion.json',
       );
     }
 
-    log.info('✅ Tracked ${currentSchemas.length} schemas (v$newSchemaVersion)');
+    log.info('Tracked ${currentSchemas.length} schemas (v$newSchemaVersion)');
     if (deletedTables.isNotEmpty) {
-      log.info('   🗑️  ${deletedTables.length} deleted table(s)');
+      log.info('${deletedTables.length} deleted table model(s)');
     }
     if (migrations.isNotEmpty) {
-      log.info('   🔄 ${migrations.length} migration(s) generated');
+      log.info('${migrations.length} migration(s) generated');
     }
   }
 
   String _hashOf(TableSchemaSnapshot s) =>
       TableSchemaSnapshot.computeHash(s.tableName, s.columns, s.indexes);
+
+  /// Removes informational fields emitted by older generator versions so
+  /// every committed snapshot is stable across machines and build times.
+  void _cleanLegacySnapshotMetadata() {
+    final directory = Directory('lib/generated/schemas');
+    if (!directory.existsSync()) return;
+
+    final files =
+        directory
+            .listSync()
+            .whereType<File>()
+            .where((file) => file.path.endsWith('.json'))
+            .toList()
+          ..sort((left, right) => left.path.compareTo(right.path));
+    for (final file in files) {
+      try {
+        final json = jsonDecode(file.readAsStringSync());
+        if (json is! Map<String, dynamic>) continue;
+        var changed = false;
+        changed = json.remove('generatedAt') != null || changed;
+        changed = json.remove('previousSchemas') != null || changed;
+        final deletedTables = json['deletedTables'];
+        if (deletedTables is List) {
+          for (final table
+              in deletedTables.whereType<Map<Object?, Object?>>()) {
+            changed = table.remove('deletedAt') != null || changed;
+          }
+        }
+        if (changed) {
+          file.writeAsStringSync(
+            const JsonEncoder.withIndent('  ').convert(json),
+          );
+          log.info('🧹 Removed volatile metadata from ${file.path}');
+        }
+      } on Object catch (error) {
+        log.warning('Could not clean legacy snapshot ${file.path}: $error');
+      }
+    }
+  }
 
   Future<Map<String, dynamic>?> _loadPreviousSchema(BuildStep buildStep) async {
     try {
@@ -288,10 +389,14 @@ class SchemaTrackingBuilder implements Builder {
       final content = latestFile.readAsStringSync();
       final schema = jsonDecode(content) as Map<String, dynamic>;
       return schema;
-    } catch (e) {
-      // If we can't read previous schema, start fresh
-      log.warning('⚠️  Failed to load previous schema: $e');
-      return null;
+    } catch (error, stackTrace) {
+      Error.throwWithStackTrace(
+        StateError(
+          'Failed to load the previous schema snapshot. Refusing to restart '
+          'schema history at version 1: $error',
+        ),
+        stackTrace,
+      );
     }
   }
 }

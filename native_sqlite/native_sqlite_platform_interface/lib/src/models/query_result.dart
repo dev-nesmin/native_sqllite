@@ -1,3 +1,5 @@
+import 'collection_equality.dart';
+
 /// Result of a SQL query.
 class QueryResult {
   /// The column names in the result set.
@@ -7,6 +9,7 @@ class QueryResult {
   /// Each row is a list of values corresponding to the columns.
   final List<List<Object?>> rows;
 
+  /// Creates a result with ordered [columns] and positional [rows].
   const QueryResult({required this.columns, required this.rows});
 
   /// Converts the result to a list of maps, where each map represents a row.
@@ -25,10 +28,12 @@ class QueryResult {
     return toMapList().map((map) => TypedRow(map)).toList();
   }
 
+  /// Encodes this result for a platform channel call.
   Map<String, dynamic> toMap() {
     return {'columns': columns, 'rows': rows};
   }
 
+  /// Decodes a result received through a platform channel.
   factory QueryResult.fromMap(Map<String, dynamic> map) {
     final columns = (map['columns'] as List<dynamic>).cast<String>();
     final rows = (map['rows'] as List<dynamic>)
@@ -47,19 +52,13 @@ class QueryResult {
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
     if (other is! QueryResult) return false;
-    if (columns.length != other.columns.length) return false;
-    if (rows.length != other.rows.length) return false;
-
-    for (var i = 0; i < columns.length; i++) {
-      if (columns[i] != other.columns[i]) return false;
-    }
-
-    return true;
+    return deepCollectionEquals(columns, other.columns) &&
+        deepCollectionEquals(rows, other.rows);
   }
 
   @override
   int get hashCode {
-    return Object.hash(columns, rows.length);
+    return Object.hash(deepCollectionHash(columns), deepCollectionHash(rows));
   }
 }
 
@@ -67,6 +66,7 @@ class QueryResult {
 class TypedRow {
   final Map<String, Object?> _data;
 
+  /// Wraps a column-name-to-value mapping.
   TypedRow(this._data);
 
   /// Gets a value by key, allowing dynamic type casting.

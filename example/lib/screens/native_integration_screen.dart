@@ -1,5 +1,4 @@
-import 'dart:io';
-
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -21,24 +20,32 @@ class _NativeIntegrationScreenState extends State<NativeIntegrationScreen> {
   String _output = 'Press a button to test native integration...';
   bool _isLoading = false;
 
+  String get _nativeLanguage => switch (defaultTargetPlatform) {
+    TargetPlatform.android => 'Kotlin',
+    TargetPlatform.iOS => 'Swift',
+    _ => 'native',
+  };
+
+  String get _platformName => switch (defaultTargetPlatform) {
+    TargetPlatform.android => 'Android (Kotlin)',
+    TargetPlatform.iOS => 'iOS (Swift)',
+    _ => 'this platform',
+  };
+
+  void _setOutput(String output) {
+    if (mounted) setState(() => _output = output);
+  }
+
   Future<void> _testNativeAccess() async {
     setState(() => _isLoading = true);
     try {
-      final String result = await platform.invokeMethod('testNativeAccess');
-      setState(() {
-        _output = result;
-        _isLoading = false;
-      });
-    } on PlatformException catch (e) {
-      setState(() {
-        _output = 'Failed to test native access: ${e.message}';
-        _isLoading = false;
-      });
+      final result = await platform.invokeMethod<String>('testNativeAccess');
+      if (result == null) throw StateError('Native code returned no result.');
+      _setOutput(result);
     } catch (e) {
-      setState(() {
-        _output = 'Error: $e';
-        _isLoading = false;
-      });
+      _setOutput('Failed to test native access: $e');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -51,26 +58,26 @@ class _NativeIntegrationScreenState extends State<NativeIntegrationScreen> {
     if (result != null) {
       setState(() => _isLoading = true);
       try {
-        final int userId = await platform.invokeMethod('createUserFromNative', {
-          'name': result['name'],
-          'email': result['email'],
-        });
-        setState(() {
-          _output =
-              'Success!\n\n'
-              'Created user from native ${Platform.isAndroid ? 'Kotlin' : 'Swift'} code.\n\n'
-              'User ID: $userId\n'
-              'Name: ${result['name']}\n'
-              'Email: ${result['email']}\n\n'
-              'This demonstrates that native code can access '
-              'the SQLite database directly without going through Flutter!';
-          _isLoading = false;
-        });
-      } on PlatformException catch (e) {
-        setState(() {
-          _output = 'Failed to create user: ${e.message}';
-          _isLoading = false;
-        });
+        final userId = await platform.invokeMethod<int>(
+          'createUserFromNative',
+          {'name': result['name'], 'email': result['email']},
+        );
+        if (userId == null) {
+          throw StateError('Native code returned no user ID.');
+        }
+        _setOutput(
+          'Success!\n\n'
+          'Created user from native $_nativeLanguage code.\n\n'
+          'User ID: $userId\n'
+          'Name: ${result['name']}\n'
+          'Email: ${result['email']}\n\n'
+          'This demonstrates that native code can access '
+          'the SQLite database directly without going through Flutter!',
+        );
+      } catch (e) {
+        _setOutput('Failed to create user: $e');
+      } finally {
+        if (mounted) setState(() => _isLoading = false);
       }
     }
   }
@@ -78,49 +85,39 @@ class _NativeIntegrationScreenState extends State<NativeIntegrationScreen> {
   Future<void> _getUsersFromNative() async {
     setState(() => _isLoading = true);
     try {
-      final List<dynamic> users = await platform.invokeMethod(
-        'getUsersFromNative',
-      );
+      final users =
+          await platform.invokeListMethod<Map<Object?, Object?>>(
+            'getUsersFromNative',
+          ) ??
+          const [];
 
       final buffer = StringBuffer();
-      buffer.writeln(
-        'Users fetched from native ${Platform.isAndroid ? 'Kotlin' : 'Swift'} code:\n',
-      );
+      buffer.writeln('Users fetched from native $_nativeLanguage code:\n');
       buffer.writeln('Total: ${users.length} users\n');
 
       for (var i = 0; i < users.length && i < 10; i++) {
-        final user = users[i] as Map;
+        final user = users[i];
         buffer.writeln('${i + 1}. ${user['name']}');
         buffer.writeln('   Email: ${user['email']}');
         buffer.writeln('   Age: ${user['age']}');
         buffer.writeln('   ID: ${user['id']}\n');
       }
 
-      setState(() {
-        _output = buffer.toString();
-        _isLoading = false;
-      });
-    } on PlatformException catch (e) {
-      setState(() {
-        _output = 'Failed to get users: ${e.message}';
-        _isLoading = false;
-      });
+      _setOutput(buffer.toString());
+    } catch (e) {
+      _setOutput('Failed to get users: $e');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final platformName = Platform.isAndroid
-        ? 'Android (Kotlin)'
-        : 'iOS (Swift)';
-
     return Scaffold(
-      extendBodyBehindAppBar: true,
       appBar: GlassAppBar(title: 'Native Integration'),
       body: Column(
         children: [
-          const SizedBox(height: kToolbarHeight),
-          _buildInfoCard(platformName),
+          _buildInfoCard(_platformName),
           _buildButtonsSection(),
           const Divider(height: 1),
           _buildOutputSection(),
@@ -130,9 +127,10 @@ class _NativeIntegrationScreenState extends State<NativeIntegrationScreen> {
   }
 
   Widget _buildInfoCard(String platformName) {
+    final colors = Theme.of(context).colorScheme;
     return Card(
       margin: const EdgeInsets.all(16),
-      color: Colors.blue.shade50,
+      color: colors.primaryContainer,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -140,17 +138,18 @@ class _NativeIntegrationScreenState extends State<NativeIntegrationScreen> {
           children: [
             Row(
               children: [
-                Icon(
-                  Platform.isAndroid ? Icons.android : Icons.apple,
-                  color: Colors.blue.shade700,
-                ),
+                Icon(switch (defaultTargetPlatform) {
+                  TargetPlatform.android => Icons.android,
+                  TargetPlatform.iOS => Icons.apple,
+                  _ => Icons.web,
+                }, color: colors.onPrimaryContainer),
                 const SizedBox(width: 8),
                 Text(
                   'Native $platformName Integration',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
-                    color: Colors.blue.shade700,
+                    color: colors.onPrimaryContainer,
                   ),
                 ),
               ],
@@ -170,6 +169,20 @@ class _NativeIntegrationScreenState extends State<NativeIntegrationScreen> {
   }
 
   Widget _buildButtonsSection() {
+    if (kIsWeb) {
+      return Card(
+        margin: const EdgeInsets.all(16),
+        child: const Padding(
+          padding: EdgeInsets.all(16),
+          child: Text(
+            'Native Kotlin and Swift helpers are available on Android and '
+            'iOS. The web build uses the same Dart API backed by SQLite WASM, '
+            'so there are no platform-native actions to run here.',
+          ),
+        ),
+      );
+    }
+
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -207,9 +220,10 @@ class _NativeIntegrationScreenState extends State<NativeIntegrationScreen> {
   }
 
   Widget _buildOutputSection() {
+    final colors = Theme.of(context).colorScheme;
     return Expanded(
       child: Container(
-        color: Colors.grey[100],
+        color: colors.surfaceContainer,
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -234,16 +248,16 @@ class _NativeIntegrationScreenState extends State<NativeIntegrationScreen> {
               child: Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.black87,
+                  color: colors.inverseSurface,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: SingleChildScrollView(
                   child: Text(
                     _output,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontFamily: 'monospace',
                       fontSize: 12,
-                      color: Colors.greenAccent,
+                      color: colors.onInverseSurface,
                     ),
                   ),
                 ),

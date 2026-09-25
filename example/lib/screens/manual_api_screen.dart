@@ -1,9 +1,38 @@
 import 'package:flutter/material.dart';
-import 'package:native_sqlite/native_sqlite.dart';
 
+import '../services/raw_api_demo_service.dart';
+import '../widgets/async_view.dart';
 import '../widgets/glass_app_bar.dart';
 
-/// Demonstrates using the Native SQLite API directly without code generation
+const _apiCoverage = <({String name, String description})>[
+  (name: 'getDatabasePath', description: 'Resolve the platform database path'),
+  (
+    name: 'open',
+    description: 'Create an isolated database from generated schemas',
+  ),
+  (name: 'executeInsert', description: 'Raw parameterized INSERT with row ID'),
+  (
+    name: 'execute',
+    description: 'Raw parameterized statement and affected rows',
+  ),
+  (name: 'query', description: 'Parameterized SELECT and typed QueryResult'),
+  (name: 'insert', description: 'Map-based insert'),
+  (name: 'update', description: 'Map-based update with bound WHERE values'),
+  (
+    name: 'transaction',
+    description: 'Atomic callback with a transaction handle',
+  ),
+  (name: 'batch', description: 'Mixed operations in one platform call'),
+  (name: 'delete', description: 'Delete with a bound predicate'),
+  (name: 'close', description: 'Release the owned database handle'),
+  (name: 'deleteDatabase', description: 'Remove the disposable database'),
+  (name: 'UNIQUE', description: 'Typed SQLITE_CONSTRAINT_UNIQUE'),
+  (name: 'NOT NULL', description: 'Typed SQLITE_CONSTRAINT_NOTNULL'),
+  (name: 'FOREIGN KEY', description: 'Typed SQLITE_CONSTRAINT_FOREIGNKEY'),
+  (name: 'syntax error', description: 'Typed SQLITE_ERROR'),
+];
+
+/// Complete raw API and typed-error laboratory.
 class ManualApiScreen extends StatefulWidget {
   const ManualApiScreen({super.key});
 
@@ -12,293 +41,146 @@ class ManualApiScreen extends StatefulWidget {
 }
 
 class _ManualApiScreenState extends State<ManualApiScreen> {
-  final _nameController = TextEditingController();
-  final _emailController = TextEditingController();
-  List<Map<String, Object?>> _items = [];
-  bool _isLoading = false;
+  bool _loading = false;
+  bool _hasRun = false;
+  Object? _error;
+  List<RawApiResult> _results = const [];
 
-  @override
-  void initState() {
-    super.initState();
-    _loadItems();
-  }
-
-  @override
-  void dispose() {
-    _nameController.dispose();
-    _emailController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _loadItems() async {
-    setState(() => _isLoading = true);
+  Future<void> _run() async {
+    setState(() {
+      _loading = true;
+      _hasRun = true;
+      _error = null;
+      _results = const [];
+    });
     try {
-      final result = await NativeSqlite.query(
-        'example_app',
-        'SELECT * FROM users ORDER BY createdAt DESC LIMIT 20',
-        [],
-      );
-      setState(() {
-        _items = result.toMapList();
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() => _isLoading = false);
-      _showError('Error loading items: $e');
+      final results = await const RawApiDemoService().run();
+      if (!mounted) return;
+      setState(() => _results = results);
+    } on Object catch (error) {
+      if (!mounted) return;
+      setState(() => _error = error);
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
-  }
-
-  Future<void> _insertItem() async {
-    if (_nameController.text.isEmpty || _emailController.text.isEmpty) {
-      _showError('Please fill in all fields');
-      return;
-    }
-
-    try {
-      // Using manual insert API
-      final id = await NativeSqlite.insert('example_app', 'users', {
-        'name': _nameController.text,
-        'email': _emailController.text,
-        'age': 25,
-        'isActive': 1,
-        'createdAt': DateTime.now().millisecondsSinceEpoch,
-      });
-
-      _showSuccess('User inserted with ID: $id');
-      _nameController.clear();
-      _emailController.clear();
-      _loadItems();
-    } catch (e) {
-      _showError('Error inserting: $e');
-    }
-  }
-
-  Future<void> _updateItem(int id, String name) async {
-    try {
-      final rowsAffected = await NativeSqlite.update(
-        'example_app',
-        'users',
-        {
-          'name': '$name (Updated)',
-          'updatedAt': DateTime.now().millisecondsSinceEpoch,
-        },
-        where: 'id = ?',
-        whereArgs: [id],
-      );
-
-      _showSuccess('Updated $rowsAffected row(s)');
-      _loadItems();
-    } catch (e) {
-      _showError('Error updating: $e');
-    }
-  }
-
-  Future<void> _deleteItem(int id) async {
-    try {
-      final rowsAffected = await NativeSqlite.delete(
-        'example_app',
-        'users',
-        where: 'id = ?',
-        whereArgs: [id],
-      );
-
-      _showSuccess('Deleted $rowsAffected row(s)');
-      _loadItems();
-    } catch (e) {
-      _showError('Error deleting: $e');
-    }
-  }
-
-  Future<void> _executeCustomQuery() async {
-    try {
-      final result = await NativeSqlite.query(
-        'example_app',
-        'SELECT COUNT(*) as count, AVG(age) as avg_age FROM users',
-        [],
-      );
-
-      final data = result.toTypedList().first;
-      _showSuccess(
-        'Total users: ${data.getInt('count')}, Average age: ${data.getFormattedNumber('avg_age', 1)}',
-      );
-    } catch (e) {
-      _showError('Error executing query: $e');
-    }
-  }
-
-  void _showSuccess(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.green),
-    );
-  }
-
-  void _showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.red),
-    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final passed = _results.where((result) => result.passed).length;
     return Scaffold(
-      extendBodyBehindAppBar: true,
-      appBar: GlassAppBar(
-        title: 'Manual API Demo',
-        actions: [
-          IconButton(icon: const Icon(Icons.refresh), onPressed: _loadItems),
-        ],
-      ),
-      body: Column(
+      appBar: const GlassAppBar(title: 'Raw API & Errors'),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
         children: [
-          const SizedBox(height: kToolbarHeight),
-          _buildInfoCard(),
-          _buildInputForm(),
-          _buildActionButtons(),
-          const Divider(height: 1),
-          _buildDataList(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInfoCard() {
-    return Card(
-      margin: const EdgeInsets.all(16),
-      color: Colors.orange.shade50,
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
-          children: [
-            Icon(Icons.info_outline, color: Colors.orange.shade700),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                'This screen uses the Native SQLite API directly without code generation',
-                style: TextStyle(fontSize: 12, color: Colors.orange.shade900),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildInputForm() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Column(
-        children: [
-          TextField(
-            controller: _nameController,
-            decoration: const InputDecoration(
-              labelText: 'Name',
-              border: OutlineInputBorder(),
-              prefixIcon: Icon(Icons.person),
-            ),
+          Text(
+            'The entire low-level API, safely isolated',
+            style: Theme.of(context).textTheme.headlineSmall,
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'The tour creates a disposable database from generated schema '
+            'constants. Every value is bound as an argument; the app database '
+            'is never modified.',
+          ),
+          const SizedBox(height: 16),
+          FilledButton.icon(
+            onPressed: _loading ? null : _run,
+            icon: _loading
+                ? const SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.play_arrow),
+            label: Text(_loading ? 'Running API tour…' : 'Run full API tour'),
           ),
           const SizedBox(height: 12),
-          TextField(
-            controller: _emailController,
-            decoration: const InputDecoration(
-              labelText: 'Email',
-              border: OutlineInputBorder(),
-              prefixIcon: Icon(Icons.email),
+          if (_hasRun && !_loading && _error == null)
+            Text(
+              '$passed/${_results.length} checks passed.',
+              style: Theme.of(context).textTheme.titleMedium,
             ),
-            keyboardType: TextInputType.emailAddress,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildActionButtons() {
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Row(
-        children: [
-          Expanded(
-            child: ElevatedButton.icon(
-              onPressed: _insertItem,
-              icon: const Icon(Icons.add),
-              label: const Text('Insert'),
+          const SizedBox(height: 8),
+          AsyncView<List<RawApiResult>>(
+            value: _hasRun ? _results : null,
+            loading: _loading,
+            error: _error,
+            isEmpty: (results) => results.isEmpty,
+            emptyBuilder: (context) => Column(
+              children: [
+                for (final operation in _apiCoverage)
+                  _PendingOperation(operation: operation),
+              ],
             ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: OutlinedButton.icon(
-              onPressed: _executeCustomQuery,
-              icon: const Icon(Icons.analytics),
-              label: const Text('Stats Query'),
+            dataBuilder: (context, results) => Column(
+              children: [
+                for (final result in results) _ResultCard(result: result),
+              ],
             ),
           ),
         ],
       ),
     );
   }
+}
 
-  Widget _buildDataList() {
-    return Expanded(
-      child: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _items.isEmpty
-          ? const Center(
-              child: Text(
-                'No data yet.\nInsert some items to see them here.',
-                textAlign: TextAlign.center,
+class _PendingOperation extends StatelessWidget {
+  const _PendingOperation({required this.operation});
+
+  final ({String name, String description}) operation;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: ListTile(
+        leading: const Icon(Icons.radio_button_unchecked),
+        title: Text(operation.name),
+        subtitle: Text(operation.description),
+        trailing: const Text('Pending'),
+      ),
+    );
+  }
+}
+
+class _ResultCard extends StatelessWidget {
+  const _ResultCard({required this.result});
+
+  final RawApiResult result;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final error = result.error;
+    return Card(
+      child: ListTile(
+        leading: Icon(
+          result.passed ? Icons.check_circle : Icons.cancel,
+          color: result.passed ? colors.primary : colors.error,
+        ),
+        title: Text(result.operation),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(result.detail),
+            if (error != null) ...[
+              const SizedBox(height: 4),
+              Wrap(
+                spacing: 6,
+                runSpacing: 4,
+                children: [
+                  Chip(label: Text('code ${error.resultCode}')),
+                  Chip(label: Text('extended ${error.extendedResultCode}')),
+                  if (error.isConstraintViolation)
+                    const Chip(label: Text('constraint')),
+                  if (error.isSyntaxError) const Chip(label: Text('syntax')),
+                ],
               ),
-            )
-          : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: _items.length,
-              itemBuilder: (context, index) {
-                final item = _items[index];
-                final id = item['id'] as int;
-                final name = item['name'] as String;
-                final email = item['email'] as String;
-                final age = item['age'] as int;
-                final createdAt = DateTime.fromMillisecondsSinceEpoch(
-                  item['createdAt'] as int,
-                );
-
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  child: ListTile(
-                    leading: CircleAvatar(child: Text('$id')),
-                    title: Text(name),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(email),
-                        Text(
-                          'Age: $age • Created: ${createdAt.toString().substring(0, 16)}',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                      ],
-                    ),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.edit, size: 20),
-                          onPressed: () => _updateItem(id, name),
-                        ),
-                        IconButton(
-                          icon: const Icon(
-                            Icons.delete,
-                            size: 20,
-                            color: Colors.red,
-                          ),
-                          onPressed: () => _deleteItem(id),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
+              if (error.sql case final sql?) SelectableText('SQL: $sql'),
+            ],
+          ],
+        ),
+        isThreeLine: true,
+      ),
     );
   }
 }

@@ -9,8 +9,11 @@ This package is automatically selected when your Flutter app runs on the web —
 ## Features
 
 - Full CRUD, transactions, raw SQL and versioned migrations (same rules as Android and iOS)
+- Database names are restricted to ASCII letters, digits, underscores, and hyphens; native custom-directory and App Group options are rejected on web
 - Persistence in IndexedDB: every write is flushed before the call completes
 - `deleteDatabase` removes the database files from IndexedDB
+- Repeated opens share a reference-counted connection when their complete
+  configurations match; a conflicting configuration throws
 
 ---
 

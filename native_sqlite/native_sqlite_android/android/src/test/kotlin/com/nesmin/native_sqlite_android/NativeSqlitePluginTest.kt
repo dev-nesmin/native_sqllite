@@ -1,18 +1,17 @@
-package com.nesmin.native_sqlite_android
+package dev.nesmin.native_sqlite
 
 import android.content.Context
-import dev.nesmin.native_sqlite.DatabaseConfig
-import dev.nesmin.native_sqlite.NativeSqliteManager
-import dev.nesmin.native_sqlite.NativeSqlitePlugin
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
+import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Test
 import org.mockito.ArgumentMatchers
 import org.mockito.Mock
 import org.mockito.Mockito
+import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
 import org.mockito.MockitoAnnotations
@@ -38,11 +37,12 @@ class NativeSqlitePluginTest {
     @Before
     fun setUp() {
         MockitoAnnotations.openMocks(this)
-        
+
+        `when`(mockContext.applicationContext).thenReturn(mockContext)
         `when`(mockFlutterPluginBinding.applicationContext).thenReturn(mockContext)
         `when`(mockFlutterPluginBinding.binaryMessenger).thenReturn(mockBinaryMessenger)
 
-        plugin = NativeSqlitePlugin(mockManager)
+        plugin = createPlugin()
         plugin.onAttachedToEngine(mockFlutterPluginBinding)
     }
 
@@ -66,7 +66,7 @@ class NativeSqlitePluginTest {
             Boolean::class.java -> false as T
             Map::class.java -> mapOf<Any, Any>() as T
             List::class.java -> listOf<Any>() as T
-            DatabaseConfig::class.java -> DatabaseConfig("test", 1, null, null, true, true) as T
+            DatabaseConfig::class.java -> DatabaseConfig(name = "test") as T
             else -> Mockito.any(type) // Fallback, might return null
         }
     }
@@ -105,11 +105,18 @@ class NativeSqlitePluginTest {
         )
         val call = MethodCall("insert", arguments)
 
-        `when`(mockManager.insert(eq(dbName), eq(table), any(Map::class.java) as Map<String, Any?>)).thenReturn(rowId)
+        `when`(
+            mockManager.insert(
+                eq(dbName),
+                eq(table),
+                any(Map::class.java) as Map<String, Any?>,
+                ArgumentMatchers.isNull(),
+            )
+        ).thenReturn(rowId)
 
         plugin.onMethodCall(call, mockResult)
 
-        verify(mockManager).insert(eq(dbName), eq(table), eq(values))
+        verify(mockManager).insert(eq(dbName), eq(table), eq(values), ArgumentMatchers.isNull())
         verify(mockResult).success(rowId)
     }
 
@@ -130,11 +137,18 @@ class NativeSqlitePluginTest {
         )
         val call = MethodCall("query", arguments)
 
-        `when`(mockManager.query(eq(dbName), eq(sql), any(List::class.java))).thenReturn(queryResult)
+        `when`(
+            mockManager.query(
+                eq(dbName),
+                eq(sql),
+                any(List::class.java),
+                ArgumentMatchers.isNull(),
+            )
+        ).thenReturn(queryResult)
 
         plugin.onMethodCall(call, mockResult)
 
-        verify(mockManager).query(eq(dbName), eq(sql), eq(queryArgs))
+        verify(mockManager).query(eq(dbName), eq(sql), eq(queryArgs), ArgumentMatchers.isNull())
         verify(mockResult).success(queryResult)
     }
 
@@ -152,11 +166,18 @@ class NativeSqlitePluginTest {
         )
         val call = MethodCall("execute", arguments)
 
-        `when`(mockManager.execute(eq(dbName), eq(sql), any(List::class.java))).thenReturn(rowsAffected)
+        `when`(
+            mockManager.execute(
+                eq(dbName),
+                eq(sql),
+                any(List::class.java),
+                ArgumentMatchers.isNull(),
+            )
+        ).thenReturn(rowsAffected)
 
         plugin.onMethodCall(call, mockResult)
 
-        verify(mockManager).execute(eq(dbName), eq(sql), eq(execArgs))
+        verify(mockManager).execute(eq(dbName), eq(sql), eq(execArgs), ArgumentMatchers.isNull())
         verify(mockResult).success(rowsAffected)
     }
 
@@ -166,6 +187,74 @@ class NativeSqlitePluginTest {
 
         plugin.onMethodCall(call, mockResult)
 
-        verify(mockResult).error(eq("NATIVE_SQLITE_ERROR"), any(String::class.java), any(String::class.java))
+        verify(mockResult).error(
+            eq("NATIVE_SQLITE_ERROR"),
+            eq("Database name is required"),
+            ArgumentMatchers.nullable(Any::class.java)
+        )
     }
+
+    @Test
+    fun `detaching one engine leaves shared databases available to another engine`() {
+        val secondPlugin = createPlugin()
+        secondPlugin.onAttachedToEngine(mockFlutterPluginBinding)
+        val queryResult = mapOf(
+            "columns" to listOf("value"),
+            "rows" to listOf(listOf(1))
+        )
+        `when`(mockManager.query("shared", "SELECT 1", emptyList())).thenReturn(queryResult)
+
+        plugin.onDetachedFromEngine(mockFlutterPluginBinding)
+        secondPlugin.onMethodCall(
+            MethodCall(
+                "query",
+                mapOf("name" to "shared", "sql" to "SELECT 1", "arguments" to emptyList<Any?>())
+            ),
+            mockResult
+        )
+
+        verify(mockManager, never()).closeAll()
+        verify(mockManager).query("shared", "SELECT 1", emptyList())
+        verify(mockResult).success(queryResult)
+    }
+
+    @Test
+    fun `database work and result delivery use their dispatchers`() {
+        val tasks = mutableListOf<() -> Unit>()
+        val completions = mutableListOf<() -> Unit>()
+        val queuedPlugin = NativeSqlitePlugin(
+            mockManager,
+            taskDispatcher = { name, action ->
+                assertEquals("worker_db", name)
+                tasks += action
+            },
+            resultDispatcher = { action -> completions += action },
+        )
+        val queryResult = mapOf(
+            "columns" to listOf("value"),
+            "rows" to listOf(listOf(1))
+        )
+        `when`(mockManager.query("worker_db", "SELECT 1", emptyList())).thenReturn(queryResult)
+
+        queuedPlugin.onMethodCall(
+            MethodCall(
+                "query",
+                mapOf("name" to "worker_db", "sql" to "SELECT 1", "arguments" to emptyList<Any?>())
+            ),
+            mockResult
+        )
+
+        verify(mockManager, never()).query("worker_db", "SELECT 1", emptyList())
+        tasks.single().invoke()
+        verify(mockManager).query("worker_db", "SELECT 1", emptyList())
+        verify(mockResult, never()).success(queryResult)
+        completions.single().invoke()
+        verify(mockResult).success(queryResult)
+    }
+
+    private fun createPlugin() = NativeSqlitePlugin(
+        mockManager,
+        taskDispatcher = { _, action -> action() },
+        resultDispatcher = { action -> action() },
+    )
 }

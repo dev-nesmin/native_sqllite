@@ -1,7 +1,6 @@
 // dart format width=80
 // coverage:ignore-file
 // GENERATED CODE - DO NOT MODIFY BY HAND
-// Generated on: 2026-09-24T00:00:48.076988
 
 // ignore_for_file: type=lint, prefer_single_quotes, lines_longer_than_80_chars, depend_on_referenced_packages, unused_element, unused_import
 
@@ -11,29 +10,18 @@
 
 part of 'product.dart';
 
-// Table schema for Product
+/// Generated table schema for [Product].
+///
+/// Regenerate with `flutter pub run build_runner build` after changing the model.
 abstract class ProductSchema {
   static const String tableName = 'products';
 
-  static const String createTableSql = '''
-    CREATE TABLE products (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL,
-      description TEXT,
-      price REAL NOT NULL,
-      stock INTEGER NOT NULL DEFAULT 0,
-      is_available INTEGER NOT NULL DEFAULT 1,
-      category_id INTEGER NOT NULL,
-      image_url TEXT,
-      created_at INTEGER NOT NULL,
-      updated_at INTEGER,
-      FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE ON UPDATE CASCADE
-    )
-  ''';
+  static const String createTableSql =
+      'CREATE TABLE "products" ("id" INTEGER PRIMARY KEY AUTOINCREMENT, "name" TEXT NOT NULL, "description" TEXT, "price" REAL NOT NULL, "stock" INTEGER NOT NULL DEFAULT 0, "is_available" INTEGER NOT NULL DEFAULT 1, "category_id" INTEGER NOT NULL, "image_url" TEXT, "created_at" INTEGER NOT NULL, "updated_at" INTEGER, FOREIGN KEY ("category_id") REFERENCES "categories"("id") ON DELETE CASCADE ON UPDATE CASCADE)';
 
   static const List<String> indexSql = [
-    '''CREATE INDEX idx_products_category_id_price ON products (category_id, price)''',
-    '''CREATE INDEX idx_products_name ON products (name)''',
+    'CREATE INDEX "idx_products_category_id_price" ON "products" ("category_id", "price")',
+    'CREATE INDEX "idx_products_name" ON "products" ("name")',
   ];
 
   // Column names
@@ -49,109 +37,177 @@ abstract class ProductSchema {
   static const String UPDATED_AT = 'updated_at';
 }
 
-// Query builder for Product
+Product _ProductFromMap(Map<String, Object?> map) {
+  return Product(
+    id: map['id'] as int?,
+    name: map['name'] as String,
+    description: map['description'] as String?,
+    price: map['price'] as double,
+    stock: map['stock'] as int,
+    isAvailable: (map['is_available'] as int) == 1,
+    categoryId: map['category_id'] as int,
+    imageUrl: map['image_url'] as String?,
+    createdAt: DateTime.fromMillisecondsSinceEpoch(map['created_at'] as int),
+    updatedAt: map['updated_at'] != null
+        ? DateTime.fromMillisecondsSinceEpoch(map['updated_at'] as int)
+        : null,
+  );
+}
+
+/// Generated query builder for [Product].
+///
+/// Regenerate with `flutter pub run build_runner build` after changing the model.
 class ProductQueryBuilder {
-  final String _databaseName;
+  final NativeSqliteDatabase _database;
   final List<String> _whereConditions = [];
   final List<Object?> _whereArgs = [];
-  String? _orderBy;
+  final List<String> _orderBy = [];
   int? _limit;
   int? _offset;
 
-  ProductQueryBuilder(this._databaseName);
+  ProductQueryBuilder(this._database);
+
+  /// Filter where id equals [value].
+  ProductQueryBuilder idEqualTo(int? value) {
+    if (value == null) {
+      _whereConditions.add('"id" IS NULL');
+    } else {
+      _whereConditions.add('"id" = ?');
+      _whereArgs.add(value);
+    }
+    return this;
+  }
+
+  /// Filter where id is greater than [value].
+  ProductQueryBuilder idGreaterThan(int value) {
+    _whereConditions.add('"id" > ?');
+    _whereArgs.add(value);
+    return this;
+  }
+
+  /// Filter where id is less than [value].
+  ProductQueryBuilder idLessThan(int value) {
+    _whereConditions.add('"id" < ?');
+    _whereArgs.add(value);
+    return this;
+  }
+
+  /// Filter where id is between [min] and [max].
+  ProductQueryBuilder idBetween(int min, int max) {
+    _whereConditions.add('"id" BETWEEN ? AND ?');
+    _whereArgs.add(min);
+    _whereArgs.add(max);
+    return this;
+  }
+
+  /// Filter where id is null.
+  ProductQueryBuilder idIsNull() {
+    _whereConditions.add('"id" IS NULL');
+    return this;
+  }
+
+  /// Filter where id is not null.
+  ProductQueryBuilder idIsNotNull() {
+    _whereConditions.add('"id" IS NOT NULL');
+    return this;
+  }
 
   /// Filter where name equals [value].
   ProductQueryBuilder nameEqualTo(String value) {
-    _whereConditions.add('name = ?');
+    _whereConditions.add('"name" = ?');
     _whereArgs.add(value);
     return this;
   }
 
   /// Filter where name contains [value].
   ProductQueryBuilder nameContains(String value) {
-    _whereConditions.add('name LIKE ?');
-    _whereArgs.add('%$value%');
+    _whereConditions.add('"name" LIKE ? ESCAPE \'\\\'');
+    _whereArgs.add('%${_escapeLike(value)}%');
     return this;
   }
 
   /// Filter where name starts with [value].
   ProductQueryBuilder nameStartsWith(String value) {
-    _whereConditions.add('name LIKE ?');
-    _whereArgs.add('$value%');
+    _whereConditions.add('"name" LIKE ? ESCAPE \'\\\'');
+    _whereArgs.add('${_escapeLike(value)}%');
     return this;
   }
 
   /// Filter where name ends with [value].
   ProductQueryBuilder nameEndsWith(String value) {
-    _whereConditions.add('name LIKE ?');
-    _whereArgs.add('%$value');
+    _whereConditions.add('"name" LIKE ? ESCAPE \'\\\'');
+    _whereArgs.add('%${_escapeLike(value)}');
     return this;
   }
 
   /// Filter where description equals [value].
   ProductQueryBuilder descriptionEqualTo(String? value) {
-    _whereConditions.add('description = ?');
-    _whereArgs.add(value);
+    if (value == null) {
+      _whereConditions.add('"description" IS NULL');
+    } else {
+      _whereConditions.add('"description" = ?');
+      _whereArgs.add(value);
+    }
     return this;
   }
 
   /// Filter where description contains [value].
   ProductQueryBuilder descriptionContains(String value) {
-    _whereConditions.add('description LIKE ?');
-    _whereArgs.add('%$value%');
+    _whereConditions.add('"description" LIKE ? ESCAPE \'\\\'');
+    _whereArgs.add('%${_escapeLike(value)}%');
     return this;
   }
 
   /// Filter where description starts with [value].
   ProductQueryBuilder descriptionStartsWith(String value) {
-    _whereConditions.add('description LIKE ?');
-    _whereArgs.add('$value%');
+    _whereConditions.add('"description" LIKE ? ESCAPE \'\\\'');
+    _whereArgs.add('${_escapeLike(value)}%');
     return this;
   }
 
   /// Filter where description ends with [value].
   ProductQueryBuilder descriptionEndsWith(String value) {
-    _whereConditions.add('description LIKE ?');
-    _whereArgs.add('%$value');
+    _whereConditions.add('"description" LIKE ? ESCAPE \'\\\'');
+    _whereArgs.add('%${_escapeLike(value)}');
     return this;
   }
 
   /// Filter where description is null.
   ProductQueryBuilder descriptionIsNull() {
-    _whereConditions.add('description IS NULL');
+    _whereConditions.add('"description" IS NULL');
     return this;
   }
 
   /// Filter where description is not null.
   ProductQueryBuilder descriptionIsNotNull() {
-    _whereConditions.add('description IS NOT NULL');
+    _whereConditions.add('"description" IS NOT NULL');
     return this;
   }
 
   /// Filter where price equals [value].
   ProductQueryBuilder priceEqualTo(double value) {
-    _whereConditions.add('price = ?');
+    _whereConditions.add('"price" = ?');
     _whereArgs.add(value);
     return this;
   }
 
   /// Filter where price is greater than [value].
   ProductQueryBuilder priceGreaterThan(double value) {
-    _whereConditions.add('price > ?');
+    _whereConditions.add('"price" > ?');
     _whereArgs.add(value);
     return this;
   }
 
   /// Filter where price is less than [value].
   ProductQueryBuilder priceLessThan(double value) {
-    _whereConditions.add('price < ?');
+    _whereConditions.add('"price" < ?');
     _whereArgs.add(value);
     return this;
   }
 
   /// Filter where price is between [min] and [max].
   ProductQueryBuilder priceBetween(double min, double max) {
-    _whereConditions.add('price BETWEEN ? AND ?');
+    _whereConditions.add('"price" BETWEEN ? AND ?');
     _whereArgs.add(min);
     _whereArgs.add(max);
     return this;
@@ -159,28 +215,28 @@ class ProductQueryBuilder {
 
   /// Filter where stock equals [value].
   ProductQueryBuilder stockEqualTo(int value) {
-    _whereConditions.add('stock = ?');
+    _whereConditions.add('"stock" = ?');
     _whereArgs.add(value);
     return this;
   }
 
   /// Filter where stock is greater than [value].
   ProductQueryBuilder stockGreaterThan(int value) {
-    _whereConditions.add('stock > ?');
+    _whereConditions.add('"stock" > ?');
     _whereArgs.add(value);
     return this;
   }
 
   /// Filter where stock is less than [value].
   ProductQueryBuilder stockLessThan(int value) {
-    _whereConditions.add('stock < ?');
+    _whereConditions.add('"stock" < ?');
     _whereArgs.add(value);
     return this;
   }
 
   /// Filter where stock is between [min] and [max].
   ProductQueryBuilder stockBetween(int min, int max) {
-    _whereConditions.add('stock BETWEEN ? AND ?');
+    _whereConditions.add('"stock" BETWEEN ? AND ?');
     _whereArgs.add(min);
     _whereArgs.add(max);
     return this;
@@ -188,42 +244,42 @@ class ProductQueryBuilder {
 
   /// Filter where isAvailable is true.
   ProductQueryBuilder isAvailableIsTrue() {
-    _whereConditions.add('is_available = ?');
+    _whereConditions.add('"is_available" = ?');
     _whereArgs.add(1);
     return this;
   }
 
   /// Filter where isAvailable is false.
   ProductQueryBuilder isAvailableIsFalse() {
-    _whereConditions.add('is_available = ?');
+    _whereConditions.add('"is_available" = ?');
     _whereArgs.add(0);
     return this;
   }
 
   /// Filter where categoryId equals [value].
   ProductQueryBuilder categoryIdEqualTo(int value) {
-    _whereConditions.add('category_id = ?');
+    _whereConditions.add('"category_id" = ?');
     _whereArgs.add(value);
     return this;
   }
 
   /// Filter where categoryId is greater than [value].
   ProductQueryBuilder categoryIdGreaterThan(int value) {
-    _whereConditions.add('category_id > ?');
+    _whereConditions.add('"category_id" > ?');
     _whereArgs.add(value);
     return this;
   }
 
   /// Filter where categoryId is less than [value].
   ProductQueryBuilder categoryIdLessThan(int value) {
-    _whereConditions.add('category_id < ?');
+    _whereConditions.add('"category_id" < ?');
     _whereArgs.add(value);
     return this;
   }
 
   /// Filter where categoryId is between [min] and [max].
   ProductQueryBuilder categoryIdBetween(int min, int max) {
-    _whereConditions.add('category_id BETWEEN ? AND ?');
+    _whereConditions.add('"category_id" BETWEEN ? AND ?');
     _whereArgs.add(min);
     _whereArgs.add(max);
     return this;
@@ -231,68 +287,72 @@ class ProductQueryBuilder {
 
   /// Filter where imageUrl equals [value].
   ProductQueryBuilder imageUrlEqualTo(String? value) {
-    _whereConditions.add('image_url = ?');
-    _whereArgs.add(value);
+    if (value == null) {
+      _whereConditions.add('"image_url" IS NULL');
+    } else {
+      _whereConditions.add('"image_url" = ?');
+      _whereArgs.add(value);
+    }
     return this;
   }
 
   /// Filter where imageUrl contains [value].
   ProductQueryBuilder imageUrlContains(String value) {
-    _whereConditions.add('image_url LIKE ?');
-    _whereArgs.add('%$value%');
+    _whereConditions.add('"image_url" LIKE ? ESCAPE \'\\\'');
+    _whereArgs.add('%${_escapeLike(value)}%');
     return this;
   }
 
   /// Filter where imageUrl starts with [value].
   ProductQueryBuilder imageUrlStartsWith(String value) {
-    _whereConditions.add('image_url LIKE ?');
-    _whereArgs.add('$value%');
+    _whereConditions.add('"image_url" LIKE ? ESCAPE \'\\\'');
+    _whereArgs.add('${_escapeLike(value)}%');
     return this;
   }
 
   /// Filter where imageUrl ends with [value].
   ProductQueryBuilder imageUrlEndsWith(String value) {
-    _whereConditions.add('image_url LIKE ?');
-    _whereArgs.add('%$value');
+    _whereConditions.add('"image_url" LIKE ? ESCAPE \'\\\'');
+    _whereArgs.add('%${_escapeLike(value)}');
     return this;
   }
 
   /// Filter where imageUrl is null.
   ProductQueryBuilder imageUrlIsNull() {
-    _whereConditions.add('image_url IS NULL');
+    _whereConditions.add('"image_url" IS NULL');
     return this;
   }
 
   /// Filter where imageUrl is not null.
   ProductQueryBuilder imageUrlIsNotNull() {
-    _whereConditions.add('image_url IS NOT NULL');
+    _whereConditions.add('"image_url" IS NOT NULL');
     return this;
   }
 
   /// Filter where createdAt equals [value].
   ProductQueryBuilder createdAtEqualTo(DateTime value) {
-    _whereConditions.add('created_at = ?');
+    _whereConditions.add('"created_at" = ?');
     _whereArgs.add(value.millisecondsSinceEpoch);
     return this;
   }
 
   /// Filter where createdAt is after [value].
   ProductQueryBuilder createdAtAfter(DateTime value) {
-    _whereConditions.add('created_at > ?');
+    _whereConditions.add('"created_at" > ?');
     _whereArgs.add(value.millisecondsSinceEpoch);
     return this;
   }
 
   /// Filter where createdAt is before [value].
   ProductQueryBuilder createdAtBefore(DateTime value) {
-    _whereConditions.add('created_at < ?');
+    _whereConditions.add('"created_at" < ?');
     _whereArgs.add(value.millisecondsSinceEpoch);
     return this;
   }
 
   /// Filter where createdAt is between [start] and [end].
   ProductQueryBuilder createdAtBetween(DateTime start, DateTime end) {
-    _whereConditions.add('created_at BETWEEN ? AND ?');
+    _whereConditions.add('"created_at" BETWEEN ? AND ?');
     _whereArgs.add(start.millisecondsSinceEpoch);
     _whereArgs.add(end.millisecondsSinceEpoch);
     return this;
@@ -300,28 +360,32 @@ class ProductQueryBuilder {
 
   /// Filter where updatedAt equals [value].
   ProductQueryBuilder updatedAtEqualTo(DateTime? value) {
-    _whereConditions.add('updated_at = ?');
-    _whereArgs.add(value?.millisecondsSinceEpoch);
+    if (value == null) {
+      _whereConditions.add('"updated_at" IS NULL');
+    } else {
+      _whereConditions.add('"updated_at" = ?');
+      _whereArgs.add(value.millisecondsSinceEpoch);
+    }
     return this;
   }
 
   /// Filter where updatedAt is after [value].
   ProductQueryBuilder updatedAtAfter(DateTime value) {
-    _whereConditions.add('updated_at > ?');
+    _whereConditions.add('"updated_at" > ?');
     _whereArgs.add(value.millisecondsSinceEpoch);
     return this;
   }
 
   /// Filter where updatedAt is before [value].
   ProductQueryBuilder updatedAtBefore(DateTime value) {
-    _whereConditions.add('updated_at < ?');
+    _whereConditions.add('"updated_at" < ?');
     _whereArgs.add(value.millisecondsSinceEpoch);
     return this;
   }
 
   /// Filter where updatedAt is between [start] and [end].
   ProductQueryBuilder updatedAtBetween(DateTime start, DateTime end) {
-    _whereConditions.add('updated_at BETWEEN ? AND ?');
+    _whereConditions.add('"updated_at" BETWEEN ? AND ?');
     _whereArgs.add(start.millisecondsSinceEpoch);
     _whereArgs.add(end.millisecondsSinceEpoch);
     return this;
@@ -329,160 +393,327 @@ class ProductQueryBuilder {
 
   /// Filter where updatedAt is null.
   ProductQueryBuilder updatedAtIsNull() {
-    _whereConditions.add('updated_at IS NULL');
+    _whereConditions.add('"updated_at" IS NULL');
     return this;
   }
 
   /// Filter where updatedAt is not null.
   ProductQueryBuilder updatedAtIsNotNull() {
-    _whereConditions.add('updated_at IS NOT NULL');
+    _whereConditions.add('"updated_at" IS NOT NULL');
     return this;
   }
 
   /// Sort by id in ascending order.
   ProductQueryBuilder sortByIdAsc() {
-    _orderBy = 'id ASC';
+    _orderBy
+      ..clear()
+      ..add('"id" ASC');
     return this;
   }
 
   /// Sort by id in descending order.
   ProductQueryBuilder sortByIdDesc() {
-    _orderBy = 'id DESC';
+    _orderBy
+      ..clear()
+      ..add('"id" DESC');
+    return this;
+  }
+
+  /// Then sort by id in ascending order.
+  ProductQueryBuilder thenByIdAsc() {
+    _orderBy.add('"id" ASC');
+    return this;
+  }
+
+  /// Then sort by id in descending order.
+  ProductQueryBuilder thenByIdDesc() {
+    _orderBy.add('"id" DESC');
     return this;
   }
 
   /// Sort by name in ascending order.
   ProductQueryBuilder sortByNameAsc() {
-    _orderBy = 'name ASC';
+    _orderBy
+      ..clear()
+      ..add('"name" ASC');
     return this;
   }
 
   /// Sort by name in descending order.
   ProductQueryBuilder sortByNameDesc() {
-    _orderBy = 'name DESC';
+    _orderBy
+      ..clear()
+      ..add('"name" DESC');
+    return this;
+  }
+
+  /// Then sort by name in ascending order.
+  ProductQueryBuilder thenByNameAsc() {
+    _orderBy.add('"name" ASC');
+    return this;
+  }
+
+  /// Then sort by name in descending order.
+  ProductQueryBuilder thenByNameDesc() {
+    _orderBy.add('"name" DESC');
     return this;
   }
 
   /// Sort by description in ascending order.
   ProductQueryBuilder sortByDescriptionAsc() {
-    _orderBy = 'description ASC';
+    _orderBy
+      ..clear()
+      ..add('"description" ASC');
     return this;
   }
 
   /// Sort by description in descending order.
   ProductQueryBuilder sortByDescriptionDesc() {
-    _orderBy = 'description DESC';
+    _orderBy
+      ..clear()
+      ..add('"description" DESC');
+    return this;
+  }
+
+  /// Then sort by description in ascending order.
+  ProductQueryBuilder thenByDescriptionAsc() {
+    _orderBy.add('"description" ASC');
+    return this;
+  }
+
+  /// Then sort by description in descending order.
+  ProductQueryBuilder thenByDescriptionDesc() {
+    _orderBy.add('"description" DESC');
     return this;
   }
 
   /// Sort by price in ascending order.
   ProductQueryBuilder sortByPriceAsc() {
-    _orderBy = 'price ASC';
+    _orderBy
+      ..clear()
+      ..add('"price" ASC');
     return this;
   }
 
   /// Sort by price in descending order.
   ProductQueryBuilder sortByPriceDesc() {
-    _orderBy = 'price DESC';
+    _orderBy
+      ..clear()
+      ..add('"price" DESC');
+    return this;
+  }
+
+  /// Then sort by price in ascending order.
+  ProductQueryBuilder thenByPriceAsc() {
+    _orderBy.add('"price" ASC');
+    return this;
+  }
+
+  /// Then sort by price in descending order.
+  ProductQueryBuilder thenByPriceDesc() {
+    _orderBy.add('"price" DESC');
     return this;
   }
 
   /// Sort by stock in ascending order.
   ProductQueryBuilder sortByStockAsc() {
-    _orderBy = 'stock ASC';
+    _orderBy
+      ..clear()
+      ..add('"stock" ASC');
     return this;
   }
 
   /// Sort by stock in descending order.
   ProductQueryBuilder sortByStockDesc() {
-    _orderBy = 'stock DESC';
+    _orderBy
+      ..clear()
+      ..add('"stock" DESC');
+    return this;
+  }
+
+  /// Then sort by stock in ascending order.
+  ProductQueryBuilder thenByStockAsc() {
+    _orderBy.add('"stock" ASC');
+    return this;
+  }
+
+  /// Then sort by stock in descending order.
+  ProductQueryBuilder thenByStockDesc() {
+    _orderBy.add('"stock" DESC');
     return this;
   }
 
   /// Sort by isAvailable in ascending order.
   ProductQueryBuilder sortByIsAvailableAsc() {
-    _orderBy = 'is_available ASC';
+    _orderBy
+      ..clear()
+      ..add('"is_available" ASC');
     return this;
   }
 
   /// Sort by isAvailable in descending order.
   ProductQueryBuilder sortByIsAvailableDesc() {
-    _orderBy = 'is_available DESC';
+    _orderBy
+      ..clear()
+      ..add('"is_available" DESC');
+    return this;
+  }
+
+  /// Then sort by isAvailable in ascending order.
+  ProductQueryBuilder thenByIsAvailableAsc() {
+    _orderBy.add('"is_available" ASC');
+    return this;
+  }
+
+  /// Then sort by isAvailable in descending order.
+  ProductQueryBuilder thenByIsAvailableDesc() {
+    _orderBy.add('"is_available" DESC');
     return this;
   }
 
   /// Sort by categoryId in ascending order.
   ProductQueryBuilder sortByCategoryIdAsc() {
-    _orderBy = 'category_id ASC';
+    _orderBy
+      ..clear()
+      ..add('"category_id" ASC');
     return this;
   }
 
   /// Sort by categoryId in descending order.
   ProductQueryBuilder sortByCategoryIdDesc() {
-    _orderBy = 'category_id DESC';
+    _orderBy
+      ..clear()
+      ..add('"category_id" DESC');
+    return this;
+  }
+
+  /// Then sort by categoryId in ascending order.
+  ProductQueryBuilder thenByCategoryIdAsc() {
+    _orderBy.add('"category_id" ASC');
+    return this;
+  }
+
+  /// Then sort by categoryId in descending order.
+  ProductQueryBuilder thenByCategoryIdDesc() {
+    _orderBy.add('"category_id" DESC');
     return this;
   }
 
   /// Sort by imageUrl in ascending order.
   ProductQueryBuilder sortByImageUrlAsc() {
-    _orderBy = 'image_url ASC';
+    _orderBy
+      ..clear()
+      ..add('"image_url" ASC');
     return this;
   }
 
   /// Sort by imageUrl in descending order.
   ProductQueryBuilder sortByImageUrlDesc() {
-    _orderBy = 'image_url DESC';
+    _orderBy
+      ..clear()
+      ..add('"image_url" DESC');
+    return this;
+  }
+
+  /// Then sort by imageUrl in ascending order.
+  ProductQueryBuilder thenByImageUrlAsc() {
+    _orderBy.add('"image_url" ASC');
+    return this;
+  }
+
+  /// Then sort by imageUrl in descending order.
+  ProductQueryBuilder thenByImageUrlDesc() {
+    _orderBy.add('"image_url" DESC');
     return this;
   }
 
   /// Sort by createdAt in ascending order.
   ProductQueryBuilder sortByCreatedAtAsc() {
-    _orderBy = 'created_at ASC';
+    _orderBy
+      ..clear()
+      ..add('"created_at" ASC');
     return this;
   }
 
   /// Sort by createdAt in descending order.
   ProductQueryBuilder sortByCreatedAtDesc() {
-    _orderBy = 'created_at DESC';
+    _orderBy
+      ..clear()
+      ..add('"created_at" DESC');
+    return this;
+  }
+
+  /// Then sort by createdAt in ascending order.
+  ProductQueryBuilder thenByCreatedAtAsc() {
+    _orderBy.add('"created_at" ASC');
+    return this;
+  }
+
+  /// Then sort by createdAt in descending order.
+  ProductQueryBuilder thenByCreatedAtDesc() {
+    _orderBy.add('"created_at" DESC');
     return this;
   }
 
   /// Sort by updatedAt in ascending order.
   ProductQueryBuilder sortByUpdatedAtAsc() {
-    _orderBy = 'updated_at ASC';
+    _orderBy
+      ..clear()
+      ..add('"updated_at" ASC');
     return this;
   }
 
   /// Sort by updatedAt in descending order.
   ProductQueryBuilder sortByUpdatedAtDesc() {
-    _orderBy = 'updated_at DESC';
+    _orderBy
+      ..clear()
+      ..add('"updated_at" DESC');
+    return this;
+  }
+
+  /// Then sort by updatedAt in ascending order.
+  ProductQueryBuilder thenByUpdatedAtAsc() {
+    _orderBy.add('"updated_at" ASC');
+    return this;
+  }
+
+  /// Then sort by updatedAt in descending order.
+  ProductQueryBuilder thenByUpdatedAtDesc() {
+    _orderBy.add('"updated_at" DESC');
     return this;
   }
 
   /// Limit the number of results.
   ProductQueryBuilder limit(int value) {
+    if (value < 0)
+      throw ArgumentError.value(value, 'value', 'must not be negative');
     _limit = value;
     return this;
   }
 
   /// Skip [value] results.
   ProductQueryBuilder offset(int value) {
+    if (value < 0)
+      throw ArgumentError.value(value, 'value', 'must not be negative');
     _offset = value;
     return this;
   }
 
   /// Execute the query and return all matching records.
   Future<List<Product>> findAll() async {
-    final sql = _buildQuery();
-    final result = await NativeSqlite.query(_databaseName, sql, _whereArgs);
-    return result.toMapList().map(_fromMap).toList();
+    final sql = toSql();
+    final result = await _database.query(sql, _whereArgs);
+    return result.toMapList().map(_ProductFromMap).toList();
   }
 
   /// Execute the query and return the first matching record.
   Future<Product?> findFirst() async {
-    _limit = 1;
-    final results = await findAll();
-    return results.isEmpty ? null : results.first;
+    final result = await _database.query(
+      _buildQuery(limitOverride: 1),
+      _whereArgs,
+    );
+    final rows = result.toMapList();
+    return rows.isEmpty ? null : _ProductFromMap(rows.first);
   }
 
   /// Count the number of matching records.
@@ -490,8 +721,8 @@ class ProductQueryBuilder {
     final whereClause = _whereConditions.isEmpty
         ? ''
         : ' WHERE ${_whereConditions.join(' AND ')}';
-    final sql = 'SELECT COUNT(*) as count FROM products$whereClause';
-    final result = await NativeSqlite.query(_databaseName, sql, _whereArgs);
+    final sql = 'SELECT COUNT(*) as count FROM "products"$whereClause';
+    final result = await _database.query(sql, _whereArgs);
     final rows = result.toMapList();
     return rows.isEmpty ? 0 : rows.first['count'] as int;
   }
@@ -501,52 +732,55 @@ class ProductQueryBuilder {
     final whereClause = _whereConditions.isEmpty
         ? null
         : _whereConditions.join(' AND ');
-    return NativeSqlite.delete(
-      _databaseName,
+    return _database.delete(
       'products',
       where: whereClause,
       whereArgs: _whereArgs.isEmpty ? null : _whereArgs,
     );
   }
 
-  String _buildQuery() {
+  /// The parameterized SQL represented by this builder.
+  String toSql() => _buildQuery();
+
+  /// Alias for [toSql], intended for logs and debuggers.
+  String get debugSql => toSql();
+
+  /// Bound values in placeholder order.
+  List<Object?> get arguments => List<Object?>.unmodifiable(_whereArgs);
+
+  String _buildQuery({int? limitOverride}) {
     final whereClause = _whereConditions.isEmpty
         ? ''
         : ' WHERE ${_whereConditions.join(' AND ')}';
-    final orderClause = _orderBy == null ? '' : ' ORDER BY $_orderBy';
-    final limitClause = _limit == null ? '' : ' LIMIT $_limit';
+    final orderClause = _orderBy.isEmpty
+        ? ''
+        : ' ORDER BY ${_orderBy.join(', ')}';
+    final effectiveLimit = limitOverride ?? _limit;
+    final limitClause = effectiveLimit != null
+        ? ' LIMIT $effectiveLimit'
+        : (_offset == null ? '' : ' LIMIT -1');
     final offsetClause = _offset == null ? '' : ' OFFSET $_offset';
-    return 'SELECT * FROM products$whereClause$orderClause$limitClause$offsetClause';
+    return 'SELECT * FROM "products"$whereClause$orderClause$limitClause$offsetClause';
   }
 
-  Product _fromMap(Map<String, Object?> map) {
-    return Product(
-      id: map['id'] as int?,
-      name: map['name'] as String,
-      description: map['description'] as String?,
-      price: map['price'] as double,
-      stock: map['stock'] as int,
-      isAvailable: (map['is_available'] as int) == 1,
-      categoryId: map['category_id'] as int,
-      imageUrl: map['image_url'] as String?,
-      createdAt: DateTime.fromMillisecondsSinceEpoch(map['created_at'] as int),
-      updatedAt: map['updated_at'] != null
-          ? DateTime.fromMillisecondsSinceEpoch(map['updated_at'] as int)
-          : null,
-    );
-  }
+  static String _escapeLike(String value) => value
+      .replaceAll(r'\', r'\\')
+      .replaceAll('%', r'\%')
+      .replaceAll('_', r'\_');
 }
 
-// Repository for Product
+/// Generated repository for [Product].
+///
+/// Regenerate with `flutter pub run build_runner build` after changing the model.
 class ProductRepository {
-  final String databaseName;
+  final NativeSqliteDatabase database;
 
-  const ProductRepository([this.databaseName = 'example_app']);
+  const ProductRepository(this.database);
 
   /// Inserts a new Product into the database.
   /// Returns the ID of the inserted row.
   Future<int?> insert(Product entity) async {
-    final id = await NativeSqlite.insert(databaseName, 'products', {
+    final rowId = await database.insert('products', {
       'name': entity.name,
       'description': entity.description,
       'price': entity.price,
@@ -557,39 +791,34 @@ class ProductRepository {
       'created_at': entity.createdAt.millisecondsSinceEpoch,
       'updated_at': entity.updatedAt?.millisecondsSinceEpoch,
     });
-    return id;
+    return rowId;
   }
 
   /// Finds a Product by its ID.
   /// Returns null if not found.
   Future<Product?> findById(int? id) async {
-    final result = await NativeSqlite.query(
-      databaseName,
-      'SELECT * FROM products WHERE id = ? LIMIT 1',
+    final result = await database.query(
+      'SELECT * FROM "products" WHERE "id" = ? LIMIT 1',
       [id],
     );
 
     final rows = result.toMapList();
     if (rows.isEmpty) return null;
 
-    return _fromMap(rows.first);
+    return _ProductFromMap(rows.first);
   }
 
   /// Finds all Products in the database.
   Future<List<Product>> findAll() async {
-    final result = await NativeSqlite.query(
-      databaseName,
-      'SELECT * FROM products',
-    );
+    final result = await database.query('SELECT * FROM "products"');
 
-    return result.toMapList().map(_fromMap).toList();
+    return result.toMapList().map(_ProductFromMap).toList();
   }
 
   /// Updates an existing Product in the database.
   /// Returns the number of rows affected.
   Future<int> update(Product entity) async {
-    return NativeSqlite.update(
-      databaseName,
+    return database.update(
       'products',
       {
         'name': entity.name,
@@ -602,7 +831,7 @@ class ProductRepository {
         'created_at': entity.createdAt.millisecondsSinceEpoch,
         'updated_at': entity.updatedAt?.millisecondsSinceEpoch,
       },
-      where: 'id = ?',
+      where: '"id" = ?',
       whereArgs: [entity.id],
     );
   }
@@ -610,25 +839,19 @@ class ProductRepository {
   /// Deletes a Product by its ID.
   /// Returns the number of rows deleted.
   Future<int> delete(int? id) async {
-    return NativeSqlite.delete(
-      databaseName,
-      'products',
-      where: 'id = ?',
-      whereArgs: [id],
-    );
+    return database.delete('products', where: '"id" = ?', whereArgs: [id]);
   }
 
   /// Deletes all records from the table.
   /// Returns the number of rows deleted.
   Future<int> deleteAll() async {
-    return NativeSqlite.delete(databaseName, 'products');
+    return database.delete('products');
   }
 
   /// Returns the total count of records in the table.
   Future<int> count() async {
-    final result = await NativeSqlite.query(
-      databaseName,
-      'SELECT COUNT(*) as count FROM products',
+    final result = await database.query(
+      'SELECT COUNT(*) as count FROM "products"',
     );
 
     final rows = result.toMapList();
@@ -639,30 +862,12 @@ class ProductRepository {
 
   /// Creates a new query builder for type-safe queries.
   ProductQueryBuilder queryBuilder() {
-    return ProductQueryBuilder(databaseName);
+    return ProductQueryBuilder(database);
   }
 
   /// Executes a custom query and returns the results as Product objects.
   Future<List<Product>> query(String sql, [List<Object?>? arguments]) async {
-    final result = await NativeSqlite.query(databaseName, sql, arguments);
-    return result.toMapList().map(_fromMap).toList();
-  }
-
-  /// Converts a map to a Product object.
-  Product _fromMap(Map<String, Object?> map) {
-    return Product(
-      id: map['id'] as int?,
-      name: map['name'] as String,
-      description: map['description'] as String?,
-      price: map['price'] as double,
-      stock: map['stock'] as int,
-      isAvailable: (map['is_available'] as int) == 1,
-      categoryId: map['category_id'] as int,
-      imageUrl: map['image_url'] as String?,
-      createdAt: DateTime.fromMillisecondsSinceEpoch(map['created_at'] as int),
-      updatedAt: map['updated_at'] != null
-          ? DateTime.fromMillisecondsSinceEpoch(map['updated_at'] as int)
-          : null,
-    );
+    final result = await database.query(sql, arguments);
+    return result.toMapList().map(_ProductFromMap).toList();
   }
 }

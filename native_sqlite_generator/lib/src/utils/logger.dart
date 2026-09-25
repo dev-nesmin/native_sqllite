@@ -16,11 +16,11 @@ void setupLogger({bool verbose = false, bool quiet = false}) {
 
   Logger.root.onRecord.listen((record) {
     if (record.level >= Level.SEVERE) {
-      print('❌ ${record.message}');
+      print(record.message);
       if (record.error != null) print(record.error);
       if (record.stackTrace != null) print(record.stackTrace);
     } else if (record.level >= Level.WARNING) {
-      print('⚠️  ${record.message}');
+      print(record.message);
     } else if (record.level >= Level.INFO) {
       print(record.message);
     } else {

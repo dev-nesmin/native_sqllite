@@ -10,7 +10,7 @@ class StatsCommand {
   StatsCommand(this.verbose);
 
   Future<void> execute() async {
-    print('📊 Gathering table statistics...\n');
+    print('Gathering table statistics...\n');
 
     final stats = TableStatistics();
     final files = await _findDartFiles();
@@ -114,20 +114,20 @@ class StatsCommand {
       }
     } catch (e) {
       if (verbose) {
-        print('⚠️  Error analyzing ${file.path}: $e');
+        print('Error analyzing ${file.path}: $e');
       }
     }
   }
 
   void _printStatistics(TableStatistics stats) {
     if (stats.tableCount == 0) {
-      print('ℹ️  No tables found in project');
+      print('No tables found in project');
       print('');
       print('Add @DbTable() annotation to your model classes to get started.');
       return;
     }
 
-    print('📈 Project Statistics:');
+    print('Project Statistics:');
     print('');
 
     // Basic counts
@@ -269,7 +269,7 @@ class StatsCommand {
     }
 
     if (recommendations.isNotEmpty) {
-      print('💡 Recommendations:');
+      print('Recommendations:');
       for (int i = 0; i < recommendations.length; i++) {
         print('   ${i + 1}. ${recommendations[i]}');
       }
@@ -277,7 +277,7 @@ class StatsCommand {
     }
 
     print(
-      '✅ Run "dart run native_sqlite_generator analyze" for detailed analysis',
+      'Run "dart run native_sqlite_generator analyze" for detailed analysis',
     );
   }
 }

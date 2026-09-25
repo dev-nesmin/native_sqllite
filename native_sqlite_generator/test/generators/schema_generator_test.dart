@@ -11,7 +11,7 @@ void main() {
       await testBuilder(
         tableBuilder(BuilderOptions({})),
         {
-          ...mockAnnotationsPackage,
+          ...realAnnotationsPackage,
           'a|lib/test_user.dart': '''
 import 'package:native_sqlite_annotations/native_sqlite_annotations.dart';
 
@@ -34,9 +34,9 @@ class TestUser {
               contains("static const String tableName = 'users';"),
               contains("static const String ID = 'id';"),
               contains("static const String NAME = 'full_name';"),
-              contains('CREATE TABLE users'),
-              contains('id INTEGER PRIMARY KEY AUTOINCREMENT'),
-              contains('full_name TEXT NOT NULL UNIQUE'),
+              contains('CREATE TABLE "users"'),
+              contains('"id" INTEGER PRIMARY KEY AUTOINCREMENT'),
+              contains('"full_name" TEXT NOT NULL UNIQUE'),
             ),
           ),
         },
@@ -47,7 +47,7 @@ class TestUser {
       await testBuilder(
         tableBuilder(BuilderOptions({})),
         {
-          ...mockAnnotationsPackage,
+          ...realAnnotationsPackage,
           'a|lib/test_post.dart': '''
 import 'package:native_sqlite_annotations/native_sqlite_annotations.dart';
 
@@ -66,8 +66,8 @@ class TestPost {
         outputs: {
           'a|lib/test_post.table.dart': decodedMatches(
             allOf(
-              contains('CREATE TABLE posts'),
-              isNot(contains('bio TEXT NOT NULL')),
+              contains('CREATE TABLE "posts"'),
+              isNot(contains('"bio" TEXT NOT NULL')),
             ),
           ),
         },
@@ -78,7 +78,7 @@ class TestPost {
       await testBuilder(
         tableBuilder(BuilderOptions({})),
         {
-          ...mockAnnotationsPackage,
+          ...realAnnotationsPackage,
           'a|lib/test_item.dart': '''
 import 'package:native_sqlite_annotations/native_sqlite_annotations.dart';
 
@@ -96,7 +96,7 @@ class TestItem {
         },
         outputs: {
           'a|lib/test_item.table.dart': decodedMatches(
-            contains("DEFAULT 'active'"),
+            contains(r"DEFAULT \'active\'"),
           ),
         },
       );
@@ -106,7 +106,7 @@ class TestItem {
       await testBuilder(
         tableBuilder(BuilderOptions({})),
         {
-          ...mockAnnotationsPackage,
+          ...realAnnotationsPackage,
           'a|lib/test_comment.dart': '''
 import 'package:native_sqlite_annotations/native_sqlite_annotations.dart';
 
@@ -115,7 +115,7 @@ class TestComment {
   @PrimaryKey(autoIncrement: true)
   final int? id;
 
-  @ForeignKey('posts', 'id', onDelete: 'CASCADE')
+  @ForeignKey(table: 'posts', column: 'id', onDelete: 'CASCADE')
   @DbColumn()
   final int postId;
 
@@ -139,7 +139,7 @@ class TestComment {
       await testBuilder(
         tableBuilder(BuilderOptions({})),
         {
-          ...mockAnnotationsPackage,
+          ...realAnnotationsPackage,
           'a|lib/test_product.dart': '''
 import 'package:native_sqlite_annotations/native_sqlite_annotations.dart';
 
@@ -167,11 +167,112 @@ class TestProduct {
       );
     });
 
+    test('accepts SQL column names and class-level unique indexes', () async {
+      await testBuilder(
+        tableBuilder(BuilderOptions({})),
+        {
+          ...realAnnotationsPackage,
+          'a|lib/indexed_event.dart': '''
+import 'package:native_sqlite_annotations/native_sqlite_annotations.dart';
+
+@Index(columns: ['event_code'], unique: true, name: 'unique_event_code')
+@DbTable(indexes: [['created_at']])
+class IndexedEvent {
+  @PrimaryKey(autoIncrement: true)
+  final int? id;
+
+  @DbColumn(name: 'event_code')
+  final String eventCode;
+
+  final DateTime createdAt;
+
+  const IndexedEvent({this.id, required this.eventCode, required this.createdAt});
+}
+''',
+        },
+        outputs: {
+          'a|lib/indexed_event.table.dart': decodedMatches(
+            allOf(
+              contains('CREATE INDEX "idx_indexed_event_created_at"'),
+              contains('CREATE UNIQUE INDEX "unique_event_code"'),
+              contains(r'("event_code")'),
+            ),
+          ),
+        },
+      );
+    });
+
+    test('infers converter storage types and revives full constants', () async {
+      await testBuilder(
+        tableBuilder(BuilderOptions({})),
+        {
+          ...realAnnotationsPackage,
+          'a|lib/converter_codecs.dart': '''
+import 'dart:convert';
+import 'dart:typed_data';
+import 'package:native_sqlite_annotations/native_sqlite_annotations.dart';
+
+class NumberConverter extends TypeConverter<String, int> {
+  const NumberConverter();
+  @override
+  int toSql(String value) => int.parse(value);
+  @override
+  String fromSql(int value) => value.toString();
+}
+
+class DelimitedConverter<T> extends TypeConverter<List<String>, Uint8List> {
+  final String separator;
+  final bool trim;
+  const DelimitedConverter.named(this.separator, {this.trim = false});
+  @override
+  Uint8List toSql(List<String> value) =>
+      Uint8List.fromList(utf8.encode(value.join(separator)));
+  @override
+  List<String> fromSql(Uint8List value) => utf8.decode(value).split(separator);
+}
+''',
+          'a|lib/converted_item.dart': '''
+import 'package:native_sqlite_annotations/native_sqlite_annotations.dart';
+import 'converter_codecs.dart' as codecs;
+
+@DbTable()
+class ConvertedItem {
+  @PrimaryKey(autoIncrement: true)
+  final int? id;
+
+  @UseConverter(codecs.NumberConverter())
+  final String number;
+
+  @UseConverter(
+    codecs.DelimitedConverter<int>.named('|', trim: true),
+  )
+  final List<String> tags;
+
+  const ConvertedItem({this.id, required this.number, required this.tags});
+}
+''',
+        },
+        outputs: {
+          'a|lib/converted_item.table.dart': decodedMatches(
+            allOf(
+              contains('"number" INTEGER NOT NULL'),
+              contains('"tags" BLOB NOT NULL'),
+              contains('const codecs.NumberConverter()'),
+              contains('const codecs.DelimitedConverter<int>.named('),
+              contains('trim: true'),
+              contains("fromSql(NativeSqliteCodec.asBlob(map['tags']))"),
+              isNot(contains('as Uint8List')),
+            ),
+          ),
+        },
+      );
+    });
+
     test('generates column constants in SCREAMING_SNAKE_CASE', () async {
       await testBuilder(
         tableBuilder(BuilderOptions({})),
         {
-          ...mockAnnotationsPackage,
+          ...realAnnotationsPackage,
           'a|lib/test_order.dart': '''
 import 'package:native_sqlite_annotations/native_sqlite_annotations.dart';
 
@@ -199,7 +300,7 @@ class TestOrder {
       await testBuilder(
         tableBuilder(BuilderOptions({})),
         {
-          ...mockAnnotationsPackage,
+          ...realAnnotationsPackage,
           'a|lib/test_tag.dart': '''
 import 'package:native_sqlite_annotations/native_sqlite_annotations.dart';
 

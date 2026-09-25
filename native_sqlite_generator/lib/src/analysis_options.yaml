@@ -1,0 +1,15 @@
+include: package:lints/recommended.yaml
+
+# Files below lib/src are implementation details and are not part of the
+# package's documented public API. They retain the same strict language and
+# async-safety checks as the package root.
+analyzer:
+  language:
+    strict-casts: true
+    strict-inference: true
+    strict-raw-types: true
+
+linter:
+  rules:
+    unawaited_futures: true
+    discarded_futures: true

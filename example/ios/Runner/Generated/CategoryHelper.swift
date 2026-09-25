@@ -27,7 +27,7 @@ public struct Category {
 /**
  * Helper class for Category CRUD operations.
  * AUTO-GENERATED from Dart - DO NOT EDIT MANUALLY
- * Thread-safe for multi-isolate access.
+ * Create an instance for each native caller/database.
  *
  * Example usage (single isolate):
  * ```
@@ -35,68 +35,10 @@ public struct Category {
  * let id = try helper.insert(Category(...))
  * let item = try helper.findById(id)
  * ```
- *
- * Example usage (multi-isolate safe):
- * ```
- * // In BGTaskScheduler or background isolate
- * let isolateId = Int64(pthread_self())
- * let helper = CategoryHelper.getInstance(databaseName: "example_app", isolateId: isolateId)
- * let users = try helper.findAll()
- * // When done, cleanup:
- * CategoryHelper.cleanupIsolate(isolateId: isolateId)
- * ```
  */
 public class CategoryHelper {
     private let databaseName: String
     private let manager = NativeSqliteManager.shared
-
-    // Track helper instances per isolate for thread safety
-    private static var isolateInstances = [Int64: CategoryHelper]()
-    private static let isolateQueue = DispatchQueue(label: "CategoryHelper.isolate")
-
-    /**
-     * Get or create helper instance for the given isolate.
-     * Safe to call from different Dart isolates or native threads.
-     *
-     * - Parameters:
-     *   - databaseName: Name of the database
-     *   - isolateId: Unique identifier for the isolate/thread
-     * - Returns: Helper instance for this isolate
-     */
-    public static func getInstance(databaseName: String, isolateId: Int64) -> CategoryHelper {
-        return isolateQueue.sync {
-            if let existing = isolateInstances[isolateId] {
-                return existing
-            }
-            let helper = CategoryHelper(databaseName: databaseName)
-            isolateInstances[isolateId] = helper
-            return helper
-        }
-    }
-
-    /**
-     * Cleanup resources for a specific isolate.
-     * Call this when an isolate is being destroyed.
-     *
-     * - Parameter isolateId: The isolate ID to cleanup
-     */
-    public static func cleanupIsolate(isolateId: Int64) {
-        isolateQueue.sync {
-            _ = isolateInstances.removeValue(forKey: isolateId)
-        }
-    }
-
-    /**
-     * Get all active isolate IDs currently using this helper.
-     * Useful for debugging.
-     *
-     * - Returns: Set of active isolate IDs
-     */
-    public static func getActiveIsolates() -> Set<Int64> {
-        return isolateQueue.sync {
-            return Set(isolateInstances.keys)
-        }
-    }
 
     public init(databaseName: String) {
         self.databaseName = databaseName
@@ -114,7 +56,7 @@ public class CategoryHelper {
     public func findById(_ id: Int64) throws -> Category? {
         let result = try manager.query(
             name: databaseName,
-            sql: "SELECT * FROM \(CategorySchema.tableName) WHERE \(CategorySchema.id) = ? LIMIT 1",
+            sql: "SELECT * FROM \(NativeSqliteManager.quoteIdentifier(CategorySchema.tableName)) WHERE \(NativeSqliteManager.quoteIdentifier(CategorySchema.id)) = ? LIMIT 1",
             arguments: [id]
         )
         guard let rows = result["rows"] as? [[Any?]], !rows.isEmpty,
@@ -129,7 +71,7 @@ public class CategoryHelper {
     }
 
     public func findAll() throws -> [Category] {
-        let result = try manager.query(name: databaseName, sql: "SELECT * FROM \(CategorySchema.tableName)")
+        let result = try manager.query(name: databaseName, sql: "SELECT * FROM \(NativeSqliteManager.quoteIdentifier(CategorySchema.tableName))")
         guard let rows = result["rows"] as? [[Any?]],
               let columns = result["columns"] as? [String] else {
             return []
@@ -197,6 +139,7 @@ public class CategoryHelper {
 
     /**
      * Delete entities matching a WHERE clause.
+     * Important: `whereClause` is trusted SQL. Never pass user input; use `whereArgs` for values.
      * - Parameters:
      *   - whereClause: SQL WHERE clause (without "WHERE" keyword)
      *   - whereArgs: Arguments for the WHERE clause
@@ -281,6 +224,7 @@ public class CategoryHelper {
 
     /**
      * Find entities matching a WHERE clause with optional ordering and limit.
+     * Important: `whereClause` and `orderBy` are trusted SQL. Never pass user input; use `whereArgs` for values.
      * - Parameters:
      *   - whereClause: SQL WHERE clause (without "WHERE" keyword)
      *   - whereArgs: Arguments for the WHERE clause
@@ -297,7 +241,7 @@ public class CategoryHelper {
         limit: Int? = nil,
         offset: Int? = nil
     ) throws -> [Category] {
-        var sql = "SELECT * FROM \(CategorySchema.tableName)"
+        var sql = "SELECT * FROM \(NativeSqliteManager.quoteIdentifier(CategorySchema.tableName))"
         if let whereClause = whereClause {
             sql += " WHERE \(whereClause)"
         }
@@ -306,6 +250,8 @@ public class CategoryHelper {
         }
         if let limit = limit {
             sql += " LIMIT \(limit)"
+        } else if offset != nil {
+            sql += " LIMIT -1"
         }
         if let offset = offset {
             sql += " OFFSET \(offset)"
@@ -324,6 +270,7 @@ public class CategoryHelper {
 
     /**
      * Count entities matching a WHERE clause.
+     * Important: `whereClause` is trusted SQL. Never pass user input; use `whereArgs` for values.
      * - Parameters:
      *   - whereClause: SQL WHERE clause (without "WHERE" keyword)
      *   - whereArgs: Arguments for the WHERE clause
@@ -333,9 +280,9 @@ public class CategoryHelper {
     public func count(whereClause: String? = nil, whereArgs: [Any?]? = nil) throws -> Int64 {
         let sql: String
         if let whereClause = whereClause {
-            sql = "SELECT COUNT(*) FROM \(CategorySchema.tableName) WHERE \(whereClause)"
+            sql = "SELECT COUNT(*) FROM \(NativeSqliteManager.quoteIdentifier(CategorySchema.tableName)) WHERE \(whereClause)"
         } else {
-            sql = "SELECT COUNT(*) FROM \(CategorySchema.tableName)"
+            sql = "SELECT COUNT(*) FROM \(NativeSqliteManager.quoteIdentifier(CategorySchema.tableName))"
         }
         let result = try manager.query(name: databaseName, sql: sql, arguments: whereArgs)
         guard let rows = result["rows"] as? [[Any?]],
@@ -347,6 +294,7 @@ public class CategoryHelper {
 
     /**
      * Get the maximum value of a column.
+     * Important: `whereClause` is trusted SQL. Never pass user input; use `whereArgs` for values.
      * - Parameters:
      *   - column: Column name to get max value from
      *   - whereClause: Optional WHERE clause
@@ -357,9 +305,9 @@ public class CategoryHelper {
     public func max(column: String, whereClause: String? = nil, whereArgs: [Any?]? = nil) throws -> Any? {
         let sql: String
         if let whereClause = whereClause {
-            sql = "SELECT MAX(\(column)) FROM \(CategorySchema.tableName) WHERE \(whereClause)"
+            sql = "SELECT MAX(\(NativeSqliteManager.quoteIdentifier(column))) FROM \(NativeSqliteManager.quoteIdentifier(CategorySchema.tableName)) WHERE \(whereClause)"
         } else {
-            sql = "SELECT MAX(\(column)) FROM \(CategorySchema.tableName)"
+            sql = "SELECT MAX(\(NativeSqliteManager.quoteIdentifier(column))) FROM \(NativeSqliteManager.quoteIdentifier(CategorySchema.tableName))"
         }
         let result = try manager.query(name: databaseName, sql: sql, arguments: whereArgs)
         guard let rows = result["rows"] as? [[Any?]] else { return nil }
@@ -368,6 +316,7 @@ public class CategoryHelper {
 
     /**
      * Get the minimum value of a column.
+     * Important: `whereClause` is trusted SQL. Never pass user input; use `whereArgs` for values.
      * - Parameters:
      *   - column: Column name to get min value from
      *   - whereClause: Optional WHERE clause
@@ -378,9 +327,9 @@ public class CategoryHelper {
     public func min(column: String, whereClause: String? = nil, whereArgs: [Any?]? = nil) throws -> Any? {
         let sql: String
         if let whereClause = whereClause {
-            sql = "SELECT MIN(\(column)) FROM \(CategorySchema.tableName) WHERE \(whereClause)"
+            sql = "SELECT MIN(\(NativeSqliteManager.quoteIdentifier(column))) FROM \(NativeSqliteManager.quoteIdentifier(CategorySchema.tableName)) WHERE \(whereClause)"
         } else {
-            sql = "SELECT MIN(\(column)) FROM \(CategorySchema.tableName)"
+            sql = "SELECT MIN(\(NativeSqliteManager.quoteIdentifier(column))) FROM \(NativeSqliteManager.quoteIdentifier(CategorySchema.tableName))"
         }
         let result = try manager.query(name: databaseName, sql: sql, arguments: whereArgs)
         guard let rows = result["rows"] as? [[Any?]] else { return nil }
@@ -389,6 +338,7 @@ public class CategoryHelper {
 
     /**
      * Get the average value of a column.
+     * Important: `whereClause` is trusted SQL. Never pass user input; use `whereArgs` for values.
      * - Parameters:
      *   - column: Column name to get average from
      *   - whereClause: Optional WHERE clause
@@ -399,9 +349,9 @@ public class CategoryHelper {
     public func avg(column: String, whereClause: String? = nil, whereArgs: [Any?]? = nil) throws -> Double? {
         let sql: String
         if let whereClause = whereClause {
-            sql = "SELECT AVG(\(column)) FROM \(CategorySchema.tableName) WHERE \(whereClause)"
+            sql = "SELECT AVG(\(NativeSqliteManager.quoteIdentifier(column))) FROM \(NativeSqliteManager.quoteIdentifier(CategorySchema.tableName)) WHERE \(whereClause)"
         } else {
-            sql = "SELECT AVG(\(column)) FROM \(CategorySchema.tableName)"
+            sql = "SELECT AVG(\(NativeSqliteManager.quoteIdentifier(column))) FROM \(NativeSqliteManager.quoteIdentifier(CategorySchema.tableName))"
         }
         let result = try manager.query(name: databaseName, sql: sql, arguments: whereArgs)
         guard let rows = result["rows"] as? [[Any?]] else { return nil }
@@ -410,6 +360,7 @@ public class CategoryHelper {
 
     /**
      * Get the sum of a column.
+     * Important: `whereClause` is trusted SQL. Never pass user input; use `whereArgs` for values.
      * - Parameters:
      *   - column: Column name to sum
      *   - whereClause: Optional WHERE clause
@@ -420,9 +371,9 @@ public class CategoryHelper {
     public func sum(column: String, whereClause: String? = nil, whereArgs: [Any?]? = nil) throws -> Double? {
         let sql: String
         if let whereClause = whereClause {
-            sql = "SELECT SUM(\(column)) FROM \(CategorySchema.tableName) WHERE \(whereClause)"
+            sql = "SELECT SUM(\(NativeSqliteManager.quoteIdentifier(column))) FROM \(NativeSqliteManager.quoteIdentifier(CategorySchema.tableName)) WHERE \(whereClause)"
         } else {
-            sql = "SELECT SUM(\(column)) FROM \(CategorySchema.tableName)"
+            sql = "SELECT SUM(\(NativeSqliteManager.quoteIdentifier(column))) FROM \(NativeSqliteManager.quoteIdentifier(CategorySchema.tableName))"
         }
         let result = try manager.query(name: databaseName, sql: sql, arguments: whereArgs)
         guard let rows = result["rows"] as? [[Any?]] else { return nil }

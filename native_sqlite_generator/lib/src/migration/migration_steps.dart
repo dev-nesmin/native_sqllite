@@ -67,7 +67,8 @@ class MigrationSteps {
   /// by generator versions whose migrations never ran).
   static List<String> ensureSchema(List<TableSchemaSnapshot> tables) {
     return [
-      for (final table in tables) SchemaSql.createTable(table, ifNotExists: true),
+      for (final table in tables)
+        SchemaSql.createTable(table, ifNotExists: true),
       for (final table in tables)
         ...SchemaSql.createIndexes(table, ifNotExists: true),
     ];

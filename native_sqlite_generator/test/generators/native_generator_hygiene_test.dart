@@ -94,4 +94,56 @@ void main() {
     expect(spec.tables.single.tableName, 'accounts');
     expect(spec.tables.single.sourcePath, 'lib/domain/account.dart');
   });
+
+  test('native create order follows Dart source order and foreign keys', () {
+    TableSchemaSnapshot table(
+      String name,
+      String sourcePath, {
+      String? foreignKey,
+    }) => TableSchemaSnapshot(
+      sourcePath: sourcePath,
+      className: name,
+      tableName: name.toLowerCase(),
+      columns: [
+        ColumnSchemaSnapshot(
+          dartName: 'id',
+          name: 'id',
+          type: 'INTEGER',
+          nullable: false,
+          primaryKey: true,
+          autoIncrement: false,
+          unique: false,
+          isJsonField: false,
+          hasConverter: false,
+          dartType: 'int',
+          foreignKey: foreignKey,
+        ),
+      ],
+      indexes: const [],
+      version: 1,
+      hash: name,
+    );
+
+    // The snapshot is sorted by SQL table name, while the Dart registry
+    // discovers files by path. Charlie depends on Alpha even though Alpha's
+    // source file sorts last.
+    final snapshots = [
+      table('Alpha', 'lib/z.dart'),
+      table('Bravo', 'lib/a.dart'),
+      table('Charlie', 'lib/m.dart', foreignKey: 'alpha.id'),
+    ];
+    final spec = NativeDatabaseSpec.fromSchemaJson(
+      jsonEncode({
+        'schemaVersion': 1,
+        'schemas': [for (final table in snapshots) table.toJson()],
+      }),
+      databaseName: 'test_db',
+    );
+
+    expect(spec.tables.map((table) => table.className), [
+      'Bravo',
+      'Alpha',
+      'Charlie',
+    ]);
+  });
 }

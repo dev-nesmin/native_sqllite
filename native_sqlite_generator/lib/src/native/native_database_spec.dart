@@ -62,7 +62,18 @@ class NativeDatabaseSpec {
       sorted.add(table);
     }
 
-    for (final table in tables) {
+    // The Dart schema registry discovers models in source-path order before
+    // sorting foreign-key dependencies. Use the same seed order here: the
+    // generated native and Dart managers must pass identical onCreate lists
+    // when they share a connection opened by either side.
+    final sourceOrderedTables = tables.toList()
+      ..sort((left, right) {
+        final byPath = (left.sourcePath ?? '').compareTo(
+          right.sourcePath ?? '',
+        );
+        return byPath != 0 ? byPath : left.className.compareTo(right.className);
+      });
+    for (final table in sourceOrderedTables) {
       visit(table);
     }
     return sorted;

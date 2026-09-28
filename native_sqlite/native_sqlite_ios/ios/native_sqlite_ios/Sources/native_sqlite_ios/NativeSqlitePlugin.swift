@@ -291,6 +291,13 @@ public class NativeSqlitePlugin: NSObject, FlutterPlugin {
                     return NSNull()
                 case let data as Data:
                     return FlutterStandardTypedData(bytes: data)
+                case let text as String where text.contains("\0"):
+                    // Flutter's Apple standard codec uses strlen for some
+                    // NSString values and truncates text at an embedded NUL.
+                    // Carry those values as UTF-8 bytes across the channel.
+                    return ["__nativeSqliteTextUtf8": FlutterStandardTypedData(
+                        bytes: Data(text.utf8)
+                    )]
                 case let value?:
                     return value
                 }

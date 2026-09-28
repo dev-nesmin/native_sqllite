@@ -52,7 +52,8 @@ class SchemaRegistryBuilder implements Builder {
 
     // Scan all Dart files for @DbTable annotations
     final dartFiles = Glob('lib/**.dart');
-    final assets = await buildStep.findAssets(dartFiles).toList();
+    final assets = await buildStep.findAssets(dartFiles).toList()
+      ..sort((left, right) => left.path.compareTo(right.path));
 
     for (final assetId in assets) {
       if (!await resolver.isLibrary(assetId)) continue;
@@ -107,6 +108,12 @@ class SchemaRegistryBuilder implements Builder {
 
     _verifySchemaMatchesTables(tables, tableElements, schemaContent);
 
+    tables.sort((left, right) {
+      final byPath = tableFiles[left.dartName]!.compareTo(
+        tableFiles[right.dartName]!,
+      );
+      return byPath != 0 ? byPath : left.dartName.compareTo(right.dartName);
+    });
     final sortedTables = _topologicalSort(tables);
     final databaseName =
         (await NativeSqliteConfig.load())?.databaseName ??

@@ -10,7 +10,10 @@ import 'package:integration_test/integration_test.dart';
 import 'package:native_sqlite/native_sqlite.dart';
 import 'package:native_sqlite_example/generated/database_manager.dart';
 import 'package:native_sqlite_example/main.dart';
+import 'package:native_sqlite_example/models/category.dart' as demo_category;
 import 'package:native_sqlite_example/models/note.dart';
+import 'package:native_sqlite_example/models/order.dart';
+import 'package:native_sqlite_example/models/product.dart';
 import 'package:native_sqlite_example/models/sync_event.dart';
 import 'package:native_sqlite_example/models/user.dart';
 import 'package:native_sqlite_example/services/database_maintenance_service.dart';
@@ -761,6 +764,10 @@ void main() {
       final result = await database.query(
         'SELECT payload, text_value FROM values_test WHERE id = 100',
       );
+      final stored = await database.query(
+        'SELECT hex(text_value) FROM values_test WHERE id = 100',
+      );
+      expect(stored.rows.single.single, '6265666F7265006166746572');
       expect(result.rows.single[0], Uint8List(0));
       expect(result.rows.single[1], 'before\u0000after');
     });
@@ -842,41 +849,145 @@ void main() {
         await tester.pumpAndSettle();
       }
       expect(target, findsOneWidget);
+      await tester.ensureVisible(target);
+      await tester.pumpAndSettle();
       await tester.tap(target);
       await tester.pumpAndSettle();
     }
 
-    testWidgets('manual API operations use the generated schema', (
+    testWidgets('raw API tour completes every operation and error check', (
       tester,
     ) async {
-      await openFeature(tester, 'Manual API Demo');
-      await tester.enterText(find.byType(TextField).at(0), 'Manual Test User');
-      await tester.enterText(
-        find.byType(TextField).at(1),
-        'manual${DateTime.now().microsecondsSinceEpoch}@test.dev',
-      );
-      await tester.tap(find.text('Insert'));
+      await openFeature(tester, 'Raw API & Errors');
+      await tester.tap(find.text('Run full API tour'));
       await tester.pumpAndSettle();
-      expect(find.textContaining('Manual Test User'), findsOneWidget);
+      expect(find.text('16/16 checks passed.'), findsOneWidget);
+    });
 
-      await tester.tap(find.text('Stats Query'));
-      await tester.pumpAndSettle();
-      final stats = await DatabaseManager.currentDatabase.query(
-        'SELECT COUNT(*) AS count, AVG(${UserSchema.AGE}) AS avg_age '
-        'FROM ${UserSchema.tableName}',
+    testWidgets('order screen creates, advances, and deletes an order', (
+      tester,
+    ) async {
+      final database = DatabaseManager.currentDatabase;
+      final suffix = DateTime.now().microsecondsSinceEpoch;
+      final userId = await UserRepository(database).insert(
+        User(name: 'UI Customer', email: 'ui-order-$suffix@example.dev'),
       );
-      expect(stats.rows.single.first, greaterThan(0));
+      final categoryId = await demo_category.CategoryRepository(
+        database,
+      ).insert(demo_category.Category(name: 'UI Category $suffix'));
+      final productId = await ProductRepository(database).insert(
+        Product(
+          name: 'UI Product',
+          price: 12.5,
+          stock: 5,
+          categoryId: categoryId!,
+        ),
+      );
+
+      await openFeature(tester, 'Order Management');
+      await tester.tap(find.text('New Order'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Create'));
+      await tester.pumpAndSettle();
+
+      final orders = await OrderRepository(database).findAll();
+      expect(orders, hasLength(1));
+      expect(orders.single.userId, userId);
+      expect(orders.single.productId, productId);
+      expect(orders.single.totalPrice, 12.5);
+      expect(
+        (await ProductRepository(database).findById(productId!))?.stock,
+        4,
+      );
+
+      await tester.tap(find.widgetWithText(TextButton, 'Processing'));
+      await tester.pumpAndSettle();
+      expect(
+        (await OrderRepository(database).findById(orders.single.id!))?.status,
+        OrderStatus.processing,
+      );
+
+      await tester.tap(find.byTooltip('Delete'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
+      await tester.pumpAndSettle();
+      expect(await OrderRepository(database).count(), 0);
+    });
+
+    testWidgets('CRUD screen creates, edits, and deletes a user', (
+      tester,
+    ) async {
+      final database = DatabaseManager.currentDatabase;
+      final suffix = DateTime.now().microsecondsSinceEpoch;
+      final email = 'ui-crud-$suffix@example.dev';
+      final name = 'AAA UI User $suffix';
+      final edited = 'AAA UI Edited $suffix';
+
+      await openFeature(tester, 'CRUD Operations');
+      await tester.tap(find.text('Add User'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextFormField).at(0), name);
+      await tester.enterText(find.byType(TextFormField).at(1), email);
+      await tester.tap(find.text('Add'));
+      await tester.pumpAndSettle();
+
+      final users = UserRepository(database);
+      final created = (await UserQueryBuilder(
+        database,
+      ).emailEqualTo(email).findFirst())!;
+      expect(created.name, name);
+
+      await tester.enterText(find.byType(TextField).first, name);
+      await tester.testTextInput.receiveAction(TextInputAction.search);
+      await tester.pumpAndSettle();
+      final createdRow = find.widgetWithText(ListTile, name);
+      expect(createdRow, findsOneWidget);
+      await tester.tap(
+        find.descendant(
+          of: createdRow,
+          matching: find.byWidgetPredicate(
+            (widget) => widget is PopupMenuButton,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Edit'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextFormField).at(0), edited);
+      await tester.tap(find.text('Update'));
+      await tester.pumpAndSettle();
+      expect((await users.findById(created.id!))?.name, edited);
+
+      await tester.enterText(find.byType(TextField).first, edited);
+      await tester.testTextInput.receiveAction(TextInputAction.search);
+      await tester.pumpAndSettle();
+      final editedRow = find.widgetWithText(ListTile, edited);
+      expect(editedRow, findsOneWidget);
+      await tester.tap(
+        find.descendant(
+          of: editedRow,
+          matching: find.byWidgetPredicate(
+            (widget) => widget is PopupMenuButton,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Delete'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
+      await tester.pumpAndSettle();
+      expect(await users.findById(created.id!), isNull);
     });
 
     testWidgets('advanced SQL demos complete successfully', (tester) async {
       await openFeature(tester, 'Advanced Features');
       final expectations = <String, String>{
-        'Transactions': 'Transaction completed successfully!',
+        'Transactions': 'Rollback verified: stock stayed',
         'Foreign Keys': 'Foreign key constraint violation caught',
         'Indexes': 'Indexes improve query performance',
         'Complex Queries': 'Order statistics by status',
         'Custom Queries': 'available products:',
-        'Batch Operations': 'Successfully inserted 50 users',
+        'Batch Operations': 'Successfully inserted 1000 users',
         'Data Types': 'All data types properly serialized',
       };
 
@@ -889,7 +1000,16 @@ void main() {
           matching: find.byType(InkWell),
         );
         tester.widget<InkWell>(inkWell).onTap!();
-        await tester.pumpAndSettle(const Duration(milliseconds: 100));
+        await tester.pump();
+        for (
+          var attempt = 0;
+          find.byType(CircularProgressIndicator).evaluate().isNotEmpty &&
+              attempt < 100;
+          attempt++
+        ) {
+          await tester.pump(const Duration(milliseconds: 100));
+        }
+        await tester.pumpAndSettle();
         expect(
           find.textContaining(entry.value, findRichText: true),
           findsOneWidget,
@@ -902,7 +1022,22 @@ void main() {
       tester,
     ) async {
       await openFeature(tester, 'Database Statistics');
-      expect(find.text(UserSchema.tableName), findsOneWidget);
+      expect(find.text('Generated database'), findsOneWidget);
+      final usersTile = find.widgetWithText(
+        ExpansionTile,
+        UserSchema.tableName,
+      );
+      final statsScroll = find
+          .descendant(
+            of: find.byType(ListView),
+            matching: find.byType(Scrollable),
+          )
+          .first;
+      await tester.scrollUntilVisible(usersTile, 300, scrollable: statsScroll);
+      await Scrollable.ensureVisible(tester.element(usersTile), alignment: 0.5);
+      await tester.pumpAndSettle();
+      await tester.tap(usersTile);
+      await tester.pumpAndSettle();
       expect(find.textContaining('CREATE TABLE "users"'), findsOneWidget);
     });
 

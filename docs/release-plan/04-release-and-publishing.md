@@ -41,14 +41,15 @@ release · **P2** before 1.0.
 
 ### REL-01 · P0 · Remove the `graphify-out/` folder from the repository
 
-- **Why:** 233 tracked files of a local analysis cache, many containing local
-  absolute paths. They were added by the unpushed commit `761f511`.
-- **Do:** `git rm -r --cached graphify-out`, add `graphify-out/` to the root
-  `.gitignore`. Ask the human whether to amend `64d1dca` (it is unpushed) or
-  add a new commit.
+- **Why:** 233 generated files of a local analysis cache, many containing local
+  absolute paths. They were originally added by unpushed commit `761f511`.
+- **Done:** the five unpushed commits were rewritten, replacing `761f511` with
+  `d5003d1` and removing `graphify-out/` from that entire range. The directory
+  remains locally available and is ignored by the root `.gitignore`. Recovery
+  is available at `refs/backup/release-plan-before-history-rewrite-20260925`.
 - **Acceptance:** `git ls-files graphify-out | wc -l` → 0; folder still
   exists locally.
-- **Needs human:** amend vs new commit (decision D-13).
+- **Decision:** D-13 resolved by the maintainer: rewrite the unpushed history.
 
 ### REL-02 · P0 · Repository hygiene
 

@@ -448,7 +448,10 @@ open class NativeSqliteManager {
         val statement = db.compileStatement(sql)
         try {
             bindArguments(statement, arguments.orEmpty())
-            return statement.executeUpdateDelete()
+            val affectedRows = statement.executeUpdateDelete()
+            // Android reports one affected row for some PRAGMA assignments,
+            // although they modify no table rows (and iOS reports zero).
+            return if (sql.trimStart().startsWith("PRAGMA", ignoreCase = true)) 0 else affectedRows
         } catch (error: SQLException) {
             // Android's SQLiteStatement rejects statements that return rows,
             // while SQLite accepts them for execute semantics. Step through
@@ -831,7 +834,16 @@ open class NativeSqliteManager {
             Cursor.FIELD_TYPE_NULL -> null
             Cursor.FIELD_TYPE_INTEGER -> getLong(index)
             Cursor.FIELD_TYPE_FLOAT -> getDouble(index)
-            Cursor.FIELD_TYPE_STRING -> getString(index)
+            // CursorWindow.getString stops at an embedded NUL on Android.
+            // getBlob retains the full UTF-8 text plus its C terminator.
+            Cursor.FIELD_TYPE_STRING -> getBlob(index).let { bytes ->
+                val length = if (bytes.isNotEmpty() && bytes.last() == 0.toByte()) {
+                    bytes.size - 1
+                } else {
+                    bytes.size
+                }
+                String(bytes, 0, length, Charsets.UTF_8)
+            }
             Cursor.FIELD_TYPE_BLOB -> getBlob(index)
             else -> null
         }

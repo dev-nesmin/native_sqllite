@@ -1,9 +1,28 @@
 /// iOS method-channel implementation of the native_sqlite platform API.
 library;
 
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:native_sqlite_platform_interface/native_sqlite_platform_interface.dart';
+
+Map<String, dynamic> _decodeQueryResult(Map<Object?, Object?> result) {
+  final decoded = result.cast<String, dynamic>();
+  return {
+    ...decoded,
+    'rows': [
+      for (final row in decoded['rows'] as List)
+        [
+          for (final value in row as List)
+            if (value is Map && value['__nativeSqliteTextUtf8'] is Uint8List)
+              utf8.decode(value['__nativeSqliteTextUtf8'] as Uint8List)
+            else
+              value,
+        ],
+    ],
+  };
+}
 
 extension on MethodChannel {
   Future<T?> _invokeNativeSqliteMethod<T>(
@@ -104,7 +123,7 @@ class NativeSqliteIOS extends NativeSqlitePlatform {
         });
 
     return QueryResult.fromMap(
-      _requireResult(result, 'query').cast<String, dynamic>(),
+      _decodeQueryResult(_requireResult(result, 'query')),
     );
   }
 
@@ -207,7 +226,7 @@ class NativeSqliteIOS extends NativeSqlitePlatform {
       transactionId,
       {'sql': sql, 'arguments': arguments},
     );
-    return QueryResult.fromMap(result.cast<String, dynamic>());
+    return QueryResult.fromMap(_decodeQueryResult(result));
   }
 
   @override
@@ -272,7 +291,13 @@ class NativeSqliteIOS extends NativeSqlitePlatform {
       'batch',
       {'name': databaseName, 'operations': operations},
     );
-    return _requireResult(result, 'batch');
+    return [
+      for (final value in _requireResult(result, 'batch'))
+        if (value is Map<Object?, Object?> && value.containsKey('rows'))
+          _decodeQueryResult(value)
+        else
+          value,
+    ];
   }
 
   @override

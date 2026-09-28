@@ -87,7 +87,7 @@ the same date.
 | D-10 | Platforms for 0.1.0? | Android, iOS, web; macOS (PLT-01) right after; Windows/Linux later | PLT-*, EX-04 | open |
 | D-11 | `.claude/settings.json` has already been removed from `origin/main` and is absent locally — add a `.claude/` ignore rule to prevent local settings returning? | Yes, ignore `.claude/` | REL-02 | open |
 | D-12 | Remove the committed Apple team id `GL866QHKF8` from the example Xcode project? | Yes | REL-07, EX-14 | open |
-| D-13 | `graphify-out/` was added by unpushed commit `761f511`: amend/rebase it out of that commit or record the prepared removal in a new commit? | Amend/rebase (keeps it out of history) | landing strategy only | open |
+| D-13 | `graphify-out/` was added by unpushed commit `761f511`: amend/rebase it out of that commit or record the prepared removal in a new commit? | Amend/rebase (keeps it out of history) | landing strategy only | ✅ **Amended/rebased out** — rewritten commit `d5003d1`; recovery ref `refs/backup/release-plan-before-history-rewrite-20260925` |
 | D-14 | Commit the workspace `pubspec.lock`? | Yes (reproducible CI and app builds; pub never publishes it) | REL-02 | open |
 | D-15 | Where does the example live? | Move to `native_sqlite/native_sqlite/example/` + `example/example.md` | REL-07 | open |
 | D-16 | Annotation API changes before publish (rename `Index`/`Ignore`/`TypeConverter` to avoid clashes; enums for FK actions/SQL types; typed defaults; one way to ignore)? | Yes, all before 0.1.0 | ANN-02, API-03 | open |

@@ -153,4 +153,51 @@ void main() {
       throwsStateError,
     );
   });
+
+  test('decodes embedded NUL text in query, transaction, and batch', () async {
+    final encoded = {
+      'columns': ['text_value'],
+      'rows': [
+        [
+          {
+            '__nativeSqliteTextUtf8': Uint8List.fromList(
+              'before\u0000after'.codeUnits,
+            ),
+          },
+        ],
+      ],
+    };
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      if (call.method == 'query') return encoded;
+      if (call.method == 'batch') return [encoded];
+      return null;
+    });
+
+    expect(
+      (await platform.query(
+        'app',
+        'SELECT text_value',
+        const [],
+      )).rows.single.single,
+      'before\u0000after',
+    );
+    expect(
+      (await platform.transactionQuery(
+        'app',
+        'tx',
+        'SELECT text_value',
+        const [],
+      )).rows.single.single,
+      'before\u0000after',
+    );
+    final batch = await platform.executeBatch('app', const [
+      {'type': 'query', 'sql': 'SELECT text_value'},
+    ]);
+    expect(
+      QueryResult.fromMap(
+        (batch.single! as Map).cast<String, dynamic>(),
+      ).rows.single.single,
+      'before\u0000after',
+    );
+  });
 }

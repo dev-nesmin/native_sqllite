@@ -33,7 +33,7 @@ dependencies:
   native_sqlite_android: any
   native_sqlite_ios: any
   native_sqlite_web: any
-  sqlite3: ^2.9.3
+  sqlite3: ^3.7.0
 
 dev_dependencies:
   flutter_test:

@@ -15,8 +15,8 @@ dependencies:
   native_sqlite: any
 
   # UI dependencies
-  cupertino_icons: ^1.0.2
-  go_router: ^13.2.5
+  cupertino_icons: ^2.0.0
+  go_router: ^18.0.2
   web: ^1.1.1
 
   # Used by lib/models (Freezed / JSON code generation)
@@ -33,11 +33,11 @@ dev_dependencies:
   plugin_platform_interface: ^2.1.8
 
   # Code generation
-  build_runner: ^2.10.1
+  build_runner: ^2.16.1
   native_sqlite_generator:
     path: ../native_sqlite_generator
   flutter_launcher_icons: ^0.14.4
-  freezed: ^3.2.3
+  freezed: ^4.0.1
   json_serializable: ^6.11.2
 
 

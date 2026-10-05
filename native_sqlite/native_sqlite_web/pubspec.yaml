@@ -22,7 +22,7 @@ dependencies:
     sdk: flutter
   flutter_web_plugins:
     sdk: flutter
-  sqlite3: ^2.9.3
+  sqlite3: ^3.7.0
   native_sqlite_platform_interface: any
 
 dev_dependencies:
